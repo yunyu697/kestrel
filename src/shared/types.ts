@@ -69,6 +69,13 @@ export interface Settings {
   runAsAdmin: boolean;
   language: string;
 
+  /** Update check frequency: "off" | "daily" | "weekly". */
+  updateCheck: string;
+  /** Also check right away on every launch. */
+  startupCheck: boolean;
+  /** Download mirror prefix; "" = GitHub direct. */
+  updateMirror: string;
+
   theme: "light" | "dark" | "system";
   accent: string;
   /** "" = theme default, a scheme id, or "custom" for the per-slot values. */

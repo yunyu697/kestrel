@@ -145,6 +145,10 @@ fn three() -> u32 {
     3
 }
 
+fn daily() -> String {
+    "daily".into()
+}
+
 /// Presets seeded into an empty custom-command list, in `lang`.
 pub fn preset_commands(lang: &str) -> Vec<CustomCommand> {
     let i = crate::i18n::index_of(lang);
@@ -206,6 +210,17 @@ pub struct Settings {
     /// Relaunch elevated (UAC) so privileged actions work without a prompt.
     pub run_as_admin: bool,
     pub language: String,
+
+    // ---- updates ----
+    /// How often to look for a new release: "off" | "daily" | "weekly".
+    #[serde(default = "daily")]
+    pub update_check: String,
+    /// Also check right away on every launch (only when update_check != off).
+    #[serde(default = "yes")]
+    pub startup_check: bool,
+    /// Download mirror prefix (e.g. "https://ghfast.top/"); empty = direct.
+    #[serde(default)]
+    pub update_mirror: String,
 
     // ---- appearance ----
     pub theme: String,
@@ -295,6 +310,10 @@ impl Default for Settings {
             single_click_open: false,
             run_as_admin: false,
             language: crate::i18n::detect_system().into(),
+
+            update_check: "daily".into(),
+            startup_check: true,
+            update_mirror: String::new(),
 
             theme: "system".into(),
             accent: "#4C7DFF".into(),

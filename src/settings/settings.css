@@ -986,3 +986,35 @@ textarea.input {
   flex: 1;
   min-width: 0;
 }
+
+/* ---- update check (About pane) ---- */
+.upd-found {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.upd-ver {
+  font-size: 13px;
+  color: var(--text);
+}
+.upd-ver b {
+  color: var(--accent);
+}
+.upd-notes {
+  margin: 8px 0;
+  padding: 0;
+  max-height: 180px;
+  overflow: auto;
+  font: 12px/1.7 var(--font-mono, ui-monospace, monospace);
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+.upd-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

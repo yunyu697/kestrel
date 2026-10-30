@@ -1170,3 +1170,49 @@
 .hash-modal .hm-body .spin-inline { font-size: 13px; opacity: 0.6; padding: 8px 0; }
 /* Footer gear fits the 34px footer bar */
 .foot .icon-btn { width: 26px; height: 26px; }
+
+/* ---- update banner ---- */
+.upd-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 8px 10px 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.upd-bar-main {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.upd-bar-main:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.upd-bar-main b {
+  color: var(--accent);
+}
+.upd-bar-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.upd-bar-x:hover {
+  color: var(--text);
+}

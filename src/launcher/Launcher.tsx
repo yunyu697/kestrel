@@ -16,6 +16,15 @@ import {
   upOne,
 } from "../shared/pathnav";
 import { applyColors } from "../shared/theme";
+import {
+  applyMirror,
+  checkForUpdate,
+  clearFoundUpdate,
+  foundUpdate,
+  mirrorPrefix,
+  shouldCheckAtStartup,
+  type FoundUpdate,
+} from "../shared/updater";
 import type { ClipboardItem, FileInfo, SearchHit, Settings, WindowInfo } from "../shared/types";
 
 type Mode = "search" | "clipboard" | "windows" | "notes";
@@ -124,16 +133,61 @@ export default function Launcher() {
   const lang = useLang();
   void lang;
 
+  // ---- update check ----
+  const [updateFound, setUpdateFound] = useState<FoundUpdate | null>(null);
+
+  /** Silent update check; the banner flips on only when something is found. */
+  const runUpdateCheck = useCallback(() => {
+    return api
+      .buildInfo()
+      .then((b) => checkForUpdate(b.version))
+      .then((r) => {
+        if (r.hasUpdate) setUpdateFound(foundUpdate());
+      })
+      .catch(() => {});
+  }, []);
+
+  const openUpdate = useCallback(() => {
+    const f = updateFound ?? foundUpdate();
+    if (!f) return;
+    // Mirrors only wrap release downloads; the release page opens directly.
+    const url = f.assetUrl
+      ? applyMirror(f.assetUrl, mirrorPrefix({ updateMirror: settings?.updateMirror ?? "" }))
+      : f.htmlUrl;
+    void api.openUrl(url);
+  }, [updateFound, settings?.updateMirror]);
+
+  const dismissUpdate = useCallback(() => {
+    clearFoundUpdate();
+    setUpdateFound(null);
+  }, []);
+
   // ---- theme + settings bootstrap ----
   useEffect(() => {
     api.getSettings().then((s) => {
       setSettings(s);
       applyTheme(s);
       setNotes(s.quickNotes || "");
+      // Update check: a previous result may still be pending, and a fresh
+      // one runs on startup when the settings ask for it. All async and
+      // silent — the banner appears only when something was actually found.
+      const fu = foundUpdate();
+      if (fu) setUpdateFound(fu);
+      if (shouldCheckAtStartup(s)) {
+        void runUpdateCheck();
+      }
     });
     api.indexStatus().then((st) => setStatus({ state: st.state, count: st.count }));
     api.clipboardList().then(setClipboard);
   }, []);
+
+  // Periodic re-check while running: daily/weekly modes catch up here even
+  // if the machine hibernates through several startup windows.
+  useEffect(() => {
+    if (!settings || settings.updateCheck === "off") return;
+    const id = window.setInterval(() => void runUpdateCheck(), 4 * 3600_000);
+    return () => window.clearInterval(id);
+  }, [settings?.updateCheck, runUpdateCheck]);
 
   function applyTheme(s: Settings) {
     // Language first: every label below is translated at render time.
@@ -682,6 +736,19 @@ export default function Launcher() {
       }
     >
       <div className="card">
+        {updateFound && (
+          <div className="upd-bar">
+            <button className="upd-bar-main" onClick={openUpdate} title={t("打开下载页")}>
+              <Icon name="refresh" size={13} />
+              <span>
+                {t("发现新版本")} <b>v{updateFound.version}</b>
+              </span>
+            </button>
+            <button className="upd-bar-x" onClick={dismissUpdate} title={t("关闭")}>
+              <Icon name="close" size={12} />
+            </button>
+          </div>
+        )}
         <header className="bar">
           <div className="bar-icon" data-active={mode === "search" && query.length > 0}>
             <Icon name="search" size={20} />

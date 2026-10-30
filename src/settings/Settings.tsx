@@ -8,6 +8,17 @@ import { resolveTheme } from "../shared/format";
 import { applyColors, COLOR_SLOTS, slotColor, THEME_SWATCHES } from "../shared/theme";
 import { SCHEMES, schemeById, schemePalette } from "../shared/palettes";
 import { pick, RELEASES, type ReleaseKind } from "../shared/releases";
+import {
+  applyMirror,
+  checkForUpdate,
+  foundUpdate,
+  lastCheckAt,
+  mirrorPrefix,
+  MIRRORS,
+  pickAsset,
+  testMirrorLatency,
+  type UpdateCheckResult,
+} from "../shared/updater";
 import type {
   AppEntry,
   BuildInfo,
@@ -229,7 +240,7 @@ export default function Settings() {
             {active === "clipboard" && <ClipboardPane s={settings} update={update} />}
             {active === "features" && <FeaturesPane s={settings} update={update} />}
             {active === "apps" && <AppsPane apps={apps} setApps={setApps} />}
-            {active === "about" && <AboutPane build={build} s={settings} />}
+            {active === "about" && <AboutPane build={build} s={settings} update={update} />}
           </div>
         </main>
       </div>
@@ -1692,10 +1703,55 @@ const RELEASE_KIND: Record<ReleaseKind, string> = {
   fix: "修复",
 };
 
-function AboutPane({ build, s }: { build: BuildInfo | null; s: Settings }) {
+function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings; update: Updater }) {
   const lang = useLang();
   // Newest release starts expanded; older ones open on demand.
   const [open, setOpen] = useState<string | null>(RELEASES[0]?.version ?? null);
+
+  // ---- update check ----
+  const [chkState, setChkState] = useState<"idle" | "checking" | "done" | "error">("idle");
+  const [chkResult, setChkResult] = useState<UpdateCheckResult | null>(null);
+  const [speeds, setSpeeds] = useState<Record<string, number | null> | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  const normPrefix = (p: string) => p.replace(/\/?$/, "/");
+  const mirrorId =
+    s.updateMirror === ""
+      ? "direct"
+      : (MIRRORS.find((m) => m.prefix && normPrefix(m.prefix) === normPrefix(s.updateMirror))?.id ??
+        "custom");
+  const [customMirror, setCustomMirror] = useState(
+    mirrorId === "custom" ? s.updateMirror : "",
+  );
+
+  const runCheck = useCallback(async () => {
+    setChkState("checking");
+    const r = await checkForUpdate(build?.version ?? "");
+    setChkResult(r);
+    setChkState(r.error ? "error" : "done");
+  }, [build?.version]);
+
+  const runSpeedTest = useCallback(async () => {
+    setTesting(true);
+    setSpeeds(null);
+    const entries = await Promise.all(
+      MIRRORS.map(async (m) => [m.id, await testMirrorLatency(m.prefix)] as const),
+    );
+    setSpeeds(Object.fromEntries(entries));
+    setTesting(false);
+  }, []);
+
+  const setMirror = (id: string) => {
+    if (id === "custom") {
+      update("updateMirror", customMirror);
+    } else {
+      update("updateMirror", MIRRORS.find((m) => m.id === id)?.prefix ?? "");
+    }
+  };
+
+  const download = (url: string) => {
+    void api.openUrl(applyMirror(url, mirrorPrefix(s)));
+  };
   return (
     <>
       <h1>{t("关于")}</h1>
@@ -1725,6 +1781,132 @@ function AboutPane({ build, s }: { build: BuildInfo | null; s: Settings }) {
         <dt>{t("索引根")}</dt>
         <dd>{(build?.indexRoots ?? s.indexedDrives).join("、") || "—"}</dd>
       </dl>
+
+      <Section title={t("更新")}>
+        <div className="card">
+          <Row
+            label={t("检查更新")}
+            desc={
+              chkState === "checking"
+                ? t("正在检查…")
+                : chkState === "error"
+                  ? t("检查失败，请稍后重试")
+                  : chkState === "done" && chkResult && !chkResult.hasUpdate
+                    ? t("已是最新版本")
+                    : lastCheckAt() > 0
+                      ? `${t("上次检查")}: ${new Date(lastCheckAt()).toLocaleString()}`
+                      : t("连接 GitHub 查询最新版本")
+            }
+          >
+            <button className="btn" data-size="sm" disabled={chkState === "checking"} onClick={() => void runCheck()}>
+              {chkState === "checking" ? t("正在检查…") : t("检查更新")}
+            </button>
+          </Row>
+          {chkState === "done" && chkResult?.hasUpdate && chkResult.info && (
+            <div className="upd-found">
+              <div className="upd-ver">
+                {t("发现新版本")} <b>v{chkResult.latest}</b>
+              </div>
+              <pre className="upd-notes">
+                {chkResult.info.notes
+                  .split("\n")
+                  .filter((l) => l.trim())
+                  .slice(0, 12)
+                  .join("\n")}
+              </pre>
+              <div className="upd-actions">
+                {(() => {
+                  const main = pickAsset(chkResult.info!.assets);
+                  const zip = chkResult.info!.assets.find((a) => a.name.endsWith(".zip"));
+                  return (
+                    <>
+                      {main && (
+                        <button className="btn" data-variant="primary" data-size="sm" onClick={() => download(main.url)}>
+                          {t("下载安装包")}
+                        </button>
+                      )}
+                      {zip && (
+                        <button className="btn" data-size="sm" onClick={() => download(zip.url)}>
+                          {t("便携版")}
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+                <button
+                  className="btn"
+                  data-size="sm"
+                  onClick={() => void api.openUrl(applyMirror(chkResult.info!.htmlUrl, mirrorPrefix(s)))}
+                >
+                  {t("前往发布页")}
+                </button>
+              </div>
+            </div>
+          )}
+          <Row label={t("检查频率")} desc={t("启动时与运行期间按此周期自动检查")}>
+            <Seg
+              value={(s.updateCheck === "weekly" ? "weekly" : s.updateCheck === "off" ? "off" : "daily") as "daily" | "weekly" | "off"}
+              options={[
+                { v: "daily", label: t("每天") },
+                { v: "weekly", label: t("每周") },
+                { v: "off", label: t("从不") },
+              ]}
+              onChange={(v) => update("updateCheck", v)}
+            />
+          </Row>
+          <Row label={t("启动时检查")} desc={t("每次启动立即查询一次（不受频率限制）")}>
+            <Toggle
+              on={s.startupCheck}
+              onChange={(v) => update("startupCheck", v)}
+            />
+          </Row>
+          <Row label={t("下载镜像")} desc={t("GitHub 直连缓慢时，用镜像加速安装包下载")}>
+            <Seg
+              value={mirrorId}
+              options={[
+                ...MIRRORS.map((m) => {
+                  const sp = speeds?.[m.id];
+                  const tag =
+                    sp === undefined ? "" : sp === null ? " ×" : ` ${sp}ms`;
+                  // Proper-noun mirror names stay untranslated on purpose.
+                  return { v: m.id, label: (m.id === "direct" ? t(m.name) : m.name) + tag };
+                }),
+                { v: "custom", label: t("自定义") },
+              ]}
+              onChange={setMirror}
+            />
+          </Row>
+          <Row
+            label={t("镜像测速")}
+            desc={
+              testing
+                ? t("正在测速…")
+                : speeds
+                  ? t("标 × 表示该镜像当前不可达")
+                  : t("测试各镜像的连通速度，帮助选择")
+            }
+          >
+            <button className="btn" data-size="sm" disabled={testing} onClick={() => void runSpeedTest()}>
+              {testing ? t("正在测速…") : t("测速")}
+            </button>
+          </Row>
+          {mirrorId === "custom" && (
+            <Row label={t("自定义镜像前缀")} desc={t("形如 https://ghfast.top/ ，会拼在下载地址前面")}>
+              <input
+                className="input"
+                style={{ width: 240 }}
+                value={customMirror}
+                placeholder="https://ghfast.top/"
+                spellCheck={false}
+                onChange={(e) => {
+                  setCustomMirror(e.target.value);
+                  update("updateMirror", e.target.value);
+                }}
+              />
+            </Row>
+          )}
+        </div>
+      </Section>
 
       <Section title={t("发布日志")}>
         <div className="releases">
