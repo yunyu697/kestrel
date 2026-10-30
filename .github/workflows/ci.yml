@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    # The app targets Windows (win32 APIs throughout), so check on Windows.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workdirs: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Frontend type check
+        run: npx tsc --noEmit
+
+      - name: i18n completeness
+        run: node scripts/check-i18n.mjs
+
+      - name: Rust check
+        working-directory: src-tauri
+        run: cargo check --all-targets
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test

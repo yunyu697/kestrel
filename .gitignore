@@ -1,0 +1,22 @@
+# Node
+node_modules/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# build outputs
+release/
+build-info.json
+*.exe
+*.msi
+
+# local scratch (probes, logs, test fixtures output)
+.tmp/
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

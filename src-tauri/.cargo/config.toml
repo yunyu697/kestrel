@@ -1,0 +1,11 @@
+# Use a domestic crates.io mirror for fast, reliable dependency fetching.
+# Remove this file if you prefer the default registry.
+[source.crates-io]
+replace-with = "rsproxy-sparse"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[net]
+retry = 5
+git-fetch-with-cli = false
