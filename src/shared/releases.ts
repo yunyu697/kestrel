@@ -27,6 +27,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.0",
+    date: "2026-10-31",
+    title: {
+      zh: "检查更新：自动发现新版本，镜像加速下载",
+      en: "Update check: find new releases automatically, mirror-accelerated downloads",
+      ja: "更新チェック：新バージョンの自動検出とミラーダウンロード",
+      es: "Comprobación de actualizaciones con descarga por espejos",
+    },
+    items: [
+      {
+        kind: "new",
+        text: {
+          zh: "自动检查更新：可设每天/每周/从不，支持启动时立即检查；发现新版本时启动器顶部出现提示条，点击直达下载",
+          en: "Automatic update checks: daily, weekly or never, with an optional check on every launch; a banner appears in the launcher when a new version is found",
+          ja: "自動更新チェック：毎日／毎週／しないから選べ、起動時の確認にも対応。新バージョン検出時はランチャー上部にバナーを表示",
+          es: "Comprobaciones automáticas: cada día, cada semana o nunca, con opción al iniciar; un aviso aparece en el lanzador al hallar una versión nueva",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "下载镜像与测速：内置多个 GitHub 加速镜像，一键测连通速度，也可填自定义镜像前缀",
+          en: "Download mirrors with a live speed test: several GitHub accelerators built in, plus a custom prefix field",
+          ja: "ダウンロードミラーと速度テスト：GitHub 加速ミラーを内蔵し、独自の接頭辞も設定できます",
+          es: "Espejos de descarga con prueba de velocidad: varios aceleradores de GitHub integrados y prefijo personalizado",
+        },
+      },
+    ],
+  },
+  {
     version: "1.1.0",
     date: "2026-10-31",
     title: {
