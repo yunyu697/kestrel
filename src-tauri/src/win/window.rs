@@ -227,18 +227,80 @@ fn child_count(parent: HWND) -> usize {
     n
 }
 
+/// Structural fingerprint of a `#32770` dialog.
+///
+/// The class alone tells us nothing: message boxes, IDM's main window and
+/// real Open/Save dialogs all share it. The class names of the children are
+/// what separates them.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct DialogShape {
+    /// The combo that holds the file name: `ComboBoxEx32` on the common
+    /// dialog, a plain `ComboBox` in the Save dialog's variant.
+    pub has_name_combo: bool,
+    /// The shell view that lists the files: `SHELLDLL_DefView` (classic) or
+    /// `DUIViewWndClassName` (DirectUI hosted).
+    pub has_shell_view: bool,
+    /// Any plain text edit — a search box, a message box input, ...
+    pub has_edit: bool,
+    /// A classic list view. IDM's download list is one of these.
+    pub has_list_view: bool,
+    /// A tree view. The navigation pane of a file dialog, IDM's category
+    /// tree, ...
+    pub has_tree_view: bool,
+    /// The legacy list box of the old-style file dialog.
+    pub has_list_box: bool,
+    pub children: usize,
+}
+
+impl DialogShape {
+    /// Fold one child class name into the fingerprint.
+    fn add_class(&mut self, class: &str) {
+        if class.eq_ignore_ascii_case("ComboBoxEx32") || class.eq_ignore_ascii_case("ComboBox") {
+            self.has_name_combo = true;
+        } else if class.eq_ignore_ascii_case("SHELLDLL_DefView")
+            || class.eq_ignore_ascii_case("DUIViewWndClassName")
+        {
+            self.has_shell_view = true;
+        } else if class.eq_ignore_ascii_case("Edit") {
+            self.has_edit = true;
+        } else if class.eq_ignore_ascii_case("SysListView32") {
+            self.has_list_view = true;
+        } else if class.eq_ignore_ascii_case("SysTreeView32")
+            || class.eq_ignore_ascii_case("NamespaceTreeControl")
+        {
+            self.has_tree_view = true;
+        } else if class.eq_ignore_ascii_case("ListBox") {
+            self.has_list_box = true;
+        }
+    }
+
+    /// Is this an Open/Save file dialog?
+    ///
+    /// Two independent markers have to be present:
+    ///
+    /// * the **shell view** (`SHELLDLL_DefView` / `DUIViewWndClassName`) —
+    ///   only the shell's own item view creates it, and
+    /// * the **file name combo** (`ComboBoxEx32` / `ComboBox`).
+    ///
+    /// The old rule ("has an Edit and something list-shaped") matched far too
+    /// much: IDM's main window is a `#32770` holding a `SysListView32` (the
+    /// download list) and an `Edit` (the search box), so the Quick Switch
+    /// popped up under IDM's download notification. Requiring the shell view
+    /// rejects it — and with it every other app that draws its own list in a
+    /// dialog.
+    pub fn is_file_dialog(&self) -> bool {
+        self.has_name_combo && self.has_shell_view
+    }
+}
+
 /// One single pass over the child tree of a dialog.
 ///
 /// The old implementation called `find_child_deep` up to seven times, and
 /// each call walked the whole tree (a modern file dialog has hundreds of
 /// child windows). One walk with the class names compared on the way is
 /// dramatically cheaper and the result is identical.
-///
-/// Returns `(has_edit, has_list, child_count)`.
-fn scan_dialog_children(parent: HWND) -> (bool, bool, usize) {
-    let mut has_edit = false;
-    let mut has_list = false;
-    let mut count = 0usize;
+fn scan_dialog_children(parent: HWND) -> DialogShape {
+    let mut shape = DialogShape::default();
     let mut stack: Vec<HWND> = Vec::new();
 
     unsafe {
@@ -250,21 +312,11 @@ fn scan_dialog_children(parent: HWND) -> (bool, bool, usize) {
     }
 
     while let Some(h) = stack.pop() {
-        count += 1;
+        shape.children += 1;
         let mut buf = [0u16; 256];
         let len = unsafe { GetClassNameW(h, buf.as_mut_ptr(), buf.len() as i32) };
         if len > 0 {
-            let name = from_wide(&buf[..len as usize]);
-            if name.eq_ignore_ascii_case("Edit") || name.eq_ignore_ascii_case("ComboBoxEx32") {
-                has_edit = true;
-            } else if name.eq_ignore_ascii_case("DirectUIHWND")
-                || name.eq_ignore_ascii_case("DUIViewWndClassName")
-                || name.eq_ignore_ascii_case("SHELLDLL_DefView")
-                || name.eq_ignore_ascii_case("SysListView32")
-                || name.eq_ignore_ascii_case("NamespaceTreeControl")
-            {
-                has_list = true;
-            }
+            shape.add_class(&from_wide(&buf[..len as usize]));
         }
         unsafe {
             let mut c = GetWindow(h, GW_CHILD);
@@ -274,19 +326,27 @@ fn scan_dialog_children(parent: HWND) -> (bool, bool, usize) {
             }
         }
     }
-    (has_edit, has_list, count)
+    shape
 }
 
-/// A file dialog is a #32770 window with an edit box and a list view / shell view.
+/// A file dialog is a `#32770` window with the shell's item view and a file
+/// name combo. See [`DialogShape::is_file_dialog`] for why the weaker
+/// "edit + list" heuristic was not enough.
 pub fn is_file_dialog(hwnd: HWND) -> bool {
     if class_name(hwnd) != "#32770" {
         return false;
     }
-    let (has_edit, has_list, n) = scan_dialog_children(hwnd);
+    let shape = scan_dialog_children(hwnd);
     crate::debug_log::qs_log_verbose(&format!(
-        "is_file_dialog {hwnd:#x}: edit={has_edit} list={has_list} children={n}"
+        "is_file_dialog {hwnd:#x}: combo={} shell={} edit={} list={} tree={} children={}",
+        shape.has_name_combo,
+        shape.has_shell_view,
+        shape.has_edit,
+        shape.has_list_view,
+        shape.has_tree_view,
+        shape.children
     ));
-    has_edit && has_list && n > 3
+    shape.is_file_dialog()
 }
 
 /// The "File name" edit of a dialog, if any.
@@ -528,5 +588,376 @@ pub fn set_dark_titlebar(hwnd: HWND, dark: bool) {
     unsafe {
         DwmSetWindowAttribute(hwnd, 20, &value as *const i32 as *const c_void, 4);
         DwmSetWindowAttribute(hwnd, 19, &value as *const i32 as *const c_void, 4);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{EnumWindows, GetWindowTextW, IsWindowVisible, PostMessageW, BOOL, LPARAM};
+    use super::DialogShape;
+    use super::{class_name, is_file_dialog};
+
+    #[link(name = "comdlg32")]
+    extern "system" {
+        fn GetOpenFileNameW(ofn: *mut OPENFILENAMEW) -> i32;
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn MessageBoxA(hwnd: isize, text: *const u8, caption: *const u8, flags: u32) -> i32;
+    }
+
+    #[repr(C)]
+    struct OPENFILENAMEW {
+        lStructSize: u32,
+        hwnd_owner: isize,
+        hinstance: isize,
+        lpstr_filter: *const u16,
+        lpstr_custom_filter: *mut u16,
+        n_max_cust_filter: u32,
+        n_filter_index: u32,
+        lpstr_file: *mut u16,
+        n_max_file: u32,
+        lpstr_file_title: *mut u16,
+        n_max_file_title: u32,
+        lpstr_initial_dir: *const u16,
+        lpstr_title: *const u16,
+        flags: u32,
+        n_file_offset: u16,
+        n_file_extension: u16,
+        lpstr_def_ext: *const u16,
+        l_cust_data: isize,
+        lpfn_hook: isize,
+        lp_template_name: *const u16,
+        pv_reserved: *mut isize,
+        dw_reserved: u32,
+        flags_ex: u32,
+    }
+
+    /// The title the probe looks for. A `fn` callback cannot capture, so the
+    /// wanted title lives in a static.
+    static mut WANTED_TITLE: &str = "";
+
+    /// Poll the top-level windows until a visible `#32770` with the wanted
+    /// title shows up.
+    fn find_visible_dialog(wanted: &'static str, timeout_ms: u64) -> Option<isize> {
+        extern "system" fn cb(hwnd: isize, l: LPARAM) -> BOOL {
+            let slot = l as *mut isize;
+            let want = unsafe { WANTED_TITLE };
+            unsafe {
+                if class_name(hwnd) == "#32770" && IsWindowVisible(hwnd) != 0 {
+                    let mut buf = [0u16; 256];
+                    let n = GetWindowTextW(hwnd, buf.as_mut_ptr(), 256);
+                    let t = String::from_utf16_lossy(&buf[..n as usize]);
+                    if t.contains(want) {
+                        *slot = hwnd;
+                        return 0;
+                    }
+                }
+            }
+            1
+        }
+        unsafe { WANTED_TITLE = wanted };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
+        while std::time::Instant::now() < deadline {
+            let mut found: isize = 0;
+            unsafe { EnumWindows(cb, &mut found as *mut isize as LPARAM) };
+            if found != 0 {
+                return Some(found);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        None
+    }
+
+    /// Close a probe dialog and wait until it is really gone.
+    fn close_dialog(hwnd: isize) {
+        unsafe { PostMessageW(hwnd, 0x0010, 0, 0) };
+        for _ in 0..50 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            if unsafe { IsWindowVisible(hwnd) } == 0 {
+                return;
+            }
+        }
+    }
+
+    /// A real common file dialog must be recognised.
+    #[test]
+    #[ignore = "opens a dialog on screen"]
+    fn detects_a_real_file_dialog() {
+        std::thread::spawn(|| {
+            let title: Vec<u16> = "KestrelOpen".encode_utf16().chain(std::iter::once(0)).collect();
+            let mut buf = [0u16; 260];
+            let mut ofn = OPENFILENAMEW {
+                lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+                hwnd_owner: 0,
+                hinstance: 0,
+                lpstr_filter: std::ptr::null(),
+                lpstr_custom_filter: std::ptr::null_mut(),
+                n_max_cust_filter: 0,
+                n_filter_index: 0,
+                lpstr_file: buf.as_mut_ptr(),
+                n_max_file: 260,
+                lpstr_file_title: std::ptr::null_mut(),
+                n_max_file_title: 0,
+                lpstr_initial_dir: std::ptr::null(),
+                lpstr_title: title.as_ptr(),
+                flags: 0x0008_0000 | 0x0000_1000 | 0x0000_0800,
+                n_file_offset: 0,
+                n_file_extension: 0,
+                lpstr_def_ext: std::ptr::null(),
+                l_cust_data: 0,
+                lpfn_hook: 0,
+                lp_template_name: std::ptr::null(),
+                pv_reserved: std::ptr::null_mut(),
+                dw_reserved: 0,
+                flags_ex: 0,
+            };
+            unsafe { GetOpenFileNameW(&mut ofn) };
+        });
+        let hwnd = find_visible_dialog("KestrelOpen", 8000).expect("no dialog appeared");
+        // The dialog shows itself before every control is in place, so give
+        // the shell a moment to finish building the view.
+        let mut detected = false;
+        let mut shape = super::DialogShape::default();
+        for _ in 0..30 {
+            shape = super::scan_dialog_children(hwnd);
+            detected = is_file_dialog(hwnd);
+            if detected {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        println!("open dialog shape: {shape:?}");
+        close_dialog(hwnd);
+        assert!(detected, "a real Open dialog was not recognised");
+    }
+
+    /// A message box must not be mistaken for a file dialog.
+    #[test]
+    #[ignore = "opens a dialog on screen"]
+    fn rejects_a_real_message_box() {
+        std::thread::spawn(|| unsafe {
+            MessageBoxA(
+                0,
+                b"hello\0".as_ptr(),
+                b"KestrelMsg\0".as_ptr(),
+                0,
+            );
+        });
+        let hwnd = find_visible_dialog("KestrelMsg", 8000).expect("no message box appeared");
+        let detected = is_file_dialog(hwnd);
+        println!("message box shape: {:?}", super::scan_dialog_children(hwnd));
+        close_dialog(hwnd);
+        assert!(!detected, "a message box was mistaken for a file dialog");
+    }
+
+    /// IDM's own windows must not be mistaken for a file dialog.
+    ///
+    /// IDM 6.43 keeps its main window in the `#32770` class and fills it with
+    /// a download list plus a search box — which is exactly what the old
+    /// "edit + list" heuristic looked for. Its download-complete popup comes
+    /// from `IDMMsgHost.exe`.
+    #[test]
+    #[ignore = "needs IDM running"]
+    fn rejects_idms_live_windows() {
+        extern "system" fn cb(hwnd: isize, l: LPARAM) -> BOOL {
+            let out = l as *mut Vec<(isize, String)>;
+            unsafe {
+                if class_name(hwnd) == "#32770" {
+                    let mut buf = [0u16; 256];
+                    let n = GetWindowTextW(hwnd, buf.as_mut_ptr(), 256);
+                    (*out).push((hwnd, String::from_utf16_lossy(&buf[..n as usize])));
+                }
+            }
+            1
+        }
+        let mut list: Vec<(isize, String)> = Vec::new();
+        unsafe { EnumWindows(cb, &mut list as *mut Vec<(isize, String)> as LPARAM) };
+        let mut checked = 0;
+        for (hwnd, title) in &list {
+            let looks_like_idm = title.contains("Internet Download Manager")
+                || title.contains("拖至窗口")
+                || title.contains("IDM");
+            if !looks_like_idm {
+                continue;
+            }
+            checked += 1;
+            println!("IDM window {hwnd:#x} title={title:?} shape={:?}", super::scan_dialog_children(*hwnd));
+            assert!(
+                !is_file_dialog(*hwnd),
+                "IDM window {hwnd:#x} ({title}) was mistaken for a file dialog"
+            );
+        }
+        println!("checked {checked} IDM windows");
+    }
+
+    /// Every live `#32770` that is *not* a file dialog must be rejected.
+    ///
+    /// Run with IDM open: its main window is a `#32770` with a download list
+    /// and a search box, and it used to be accepted.
+    #[test]
+    #[ignore = "inspects the live desktop"]
+    fn rejects_live_non_file_dialogs() {
+        extern "system" fn cb(hwnd: isize, l: LPARAM) -> BOOL {
+            let out = l as *mut Vec<isize>;
+            unsafe {
+                if class_name(hwnd) == "#32770" && IsWindowVisible(hwnd) != 0 {
+                    (*out).push(hwnd);
+                }
+            }
+            1
+        }
+        let mut dialogs: Vec<isize> = Vec::new();
+        unsafe { EnumWindows(cb, &mut dialogs as *mut Vec<isize> as LPARAM) };
+        for hwnd in dialogs {
+            let shape = super::scan_dialog_children(hwnd);
+            // A dialog that carries the shell view is a real file dialog and
+            // must be accepted; everything else must be refused.
+            assert_eq!(
+                is_file_dialog(hwnd),
+                shape.has_name_combo && shape.has_shell_view,
+                "hwnd {hwnd:#x} classified inconsistently"
+            );
+        }
+    }
+
+    /// Build a fingerprint from a real child-class listing.
+    fn shape_of(classes: &[&str]) -> DialogShape {
+        let mut s = DialogShape::default();
+        for c in classes {
+            s.add_class(c);
+            s.children += 1;
+        }
+        s
+    }
+
+    /// Child classes of the Windows 11 common "Open" dialog, captured with
+    /// scripts/probe-dialog-variants.rs.
+    const OPEN_DIALOG: &[&str] = &[
+        "Address Band Root",
+        "Breadcrumb Parent",
+        "Button",
+        "ComboBox",
+        "ComboBoxEx32",
+        "CtrlNotifySink",
+        "DUIViewWndClassName",
+        "DirectUIHWND",
+        "Edit",
+        "ListBox",
+        "NamespaceTreeControl",
+        "ReBarWindow32",
+        "SHELLDLL_DefView",
+        "ScrollBar",
+        "Search Box",
+        "SearchEditBoxWrapperClass",
+        "SeparatorBand",
+        "Shell Preview Extension Host",
+        "Static",
+        "SysTreeView32",
+        "ToolbarWindow32",
+        "TravelBand",
+        "UniversalSearchBand",
+        "UpBand",
+        "WorkerW",
+        "msctls_progress32",
+    ];
+
+    /// The Windows 11 "Save as" dialog: no ComboBoxEx32, the file name lives
+    /// in a plain ComboBox. It must still be recognised.
+    const SAVE_DIALOG: &[&str] = &[
+        "Button",
+        "ComboBox",
+        "ComboBox",
+        "CtrlNotifySink",
+        "DUIViewWndClassName",
+        "DirectUIHWND",
+        "Edit",
+        "FloatNotifySink",
+        "ListBox",
+        "NamespaceTreeControl",
+        "ReBarWindow32",
+        "SHELLDLL_DefView",
+        "ScrollBar",
+        "Search Box",
+        "Static",
+        "SysTreeView32",
+        "ToolbarWindow32",
+        "WorkerW",
+    ];
+
+    /// SHBrowseForFolder's tree picker: no shell view, no file name combo.
+    const FOLDER_PICKER: &[&str] = &["Button", "Static", "Static", "SysTreeView32"];
+
+    /// IDM 6.43's main window (a `#32770` with the download list and the
+    /// search box). This is the window the Quick Switch used to attach to.
+    const IDM_MAIN: &[&str] = &[
+        "SysListView32",
+        "SysHeader32",
+        "SysTreeView32",
+        "Button",
+        "Static",
+        "ToolbarWindow32",
+        "ReBarWindow32",
+        "#32770",
+        "Static",
+        "Edit",
+        "Edit",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+    ];
+
+    /// A plain message box: static text, an icon and two buttons.
+    const MESSAGE_BOX: &[&str] = &["Static", "Static", "Button", "Button"];
+
+    #[test]
+    fn recognises_the_open_dialog() {
+        assert!(shape_of(OPEN_DIALOG).is_file_dialog());
+    }
+
+    #[test]
+    fn recognises_the_save_dialog() {
+        assert!(shape_of(SAVE_DIALOG).is_file_dialog());
+    }
+
+    #[test]
+    fn rejects_the_folder_picker() {
+        // A folder tree has nothing to put a file name into, so the Quick
+        // Switch has no business attaching to it.
+        assert!(!shape_of(FOLDER_PICKER).is_file_dialog());
+    }
+
+    #[test]
+    fn rejects_idms_main_window() {
+        // The regression this rule was written for: an edit box plus a list
+        // view is not enough — IDM's dialog has both.
+        let s = shape_of(IDM_MAIN);
+        assert!(s.has_edit && s.has_list_view, "IDM shape changed");
+        assert!(!s.has_name_combo && !s.has_shell_view);
+        assert!(!s.is_file_dialog());
+    }
+
+    #[test]
+    fn rejects_message_boxes() {
+        assert!(!shape_of(MESSAGE_BOX).is_file_dialog());
+    }
+
+    #[test]
+    fn a_shell_view_without_a_combo_is_not_a_file_dialog() {
+        let mut s = DialogShape::default();
+        s.add_class("SHELLDLL_DefView");
+        s.add_class("DirectUIHWND");
+        assert!(!s.is_file_dialog());
+    }
+
+    #[test]
+    fn a_combo_without_a_shell_view_is_not_a_file_dialog() {
+        let mut s = DialogShape::default();
+        s.add_class("ComboBoxEx32");
+        s.add_class("Edit");
+        s.add_class("SysListView32");
+        assert!(!s.is_file_dialog());
     }
 }

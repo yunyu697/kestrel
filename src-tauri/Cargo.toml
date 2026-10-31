@@ -1,6 +1,6 @@
 [package]
 name = "kestrel"
-version = "1.2.2"
+version = "1.2.3"
 description = "Kestrel - instant file search and launcher"
 authors = ["Tyler Zhang"]
 edition = "2021"

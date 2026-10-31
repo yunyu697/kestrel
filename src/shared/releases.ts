@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.3",
+    date: "2026-10-31",
+    title: {
+      zh: "QS 栏只在真正的打开/保存对话框中弹出",
+      en: "The Quick Switch now appears only in real Open/Save dialogs",
+      ja: "QS バーは実際の保存/開くダイアログでのみ表示",
+      es: "El Quick Switch ahora aparece solo en los diálogos reales de abrir/guardar",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "修复 QS 栏在 IDM 下载完成提示等非文件对话框下方弹出：此前只凭「有输入框 + 有列表」判断，而 IDM 的主窗口恰好两者都有。现在必须同时具备外壳视图与文件名组合框，才会判定为文件对话框",
+          en: "Fixed the Quick Switch popping up under non-file dialogs such as IDM's download notification: the old check only looked for 'an edit box and a list', which IDM's main window happens to have. A dialog now has to carry both the shell view and the file name combo",
+          ja: "IDM のダウンロード完了通知など、ファイルダイアログ以外でも QS バーが出ていた問題を修正。「入力欄＋リスト」だけでは不十分で、外壳ビューとファイル名コンボの両方がある時だけファイルダイアログと判定します",
+          es: "Se corrigió que el Quick Switch apareci bajo diálogos que no son de archivo, como el aviso de descarga de IDM: la comprobación anterior solo buscaba «un campo de edición y una lista», que la ventana principal de IDM cumple. Ahora hace falta tanto la vista del shell como el combo del nombre de archivo",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "「另存为」对话框同样能被正确识别（它的文件名框不是 ComboBoxEx32，改用普通 ComboBox）",
+          en: "The Save-as dialog is recognised too — its file name box is a plain ComboBox, not a ComboBoxEx32",
+          ja: "保存ダイアログも正しく認識されます（ファイル名欄が ComboBoxEx32 ではなく通常の ComboBox のため）",
+          es: "El diálogo «Guardar como» también se reconoce: su campo de nombre es un ComboBox normal, no un ComboBoxEx32",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "新增对话框识别测试：把真实系统对话框的控件结构固化为样本，防止将来再次误判",
+          en: "Added tests that pin the real system dialogs' control layout, so the detection cannot silently regress",
+          ja: "実際のシステムダイアログの控件構造をテストとして固定し、判定の退行を防ぎます",
+          es: "Se añadieron pruebas que fijan la estructura real de los diálogos del sistema para que la detección no retroceda en silencio",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.2",
     date: "2026-10-31",
     title: {
