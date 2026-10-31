@@ -9,6 +9,7 @@ mod hotkeys;
 mod i18n;
 mod index;
 mod install;
+mod instance;
 mod model;
 mod restart;
 mod search;
@@ -53,21 +54,22 @@ pub fn run() {
         install::run(&path, parent);
         return;
     }
-    // A self-relaunch (elevation change) must not lose the single-instance
-    // race against the process it is replacing: skip the guard entirely.
-    let single_instance = !args.iter().any(|a| a == "--no-single-instance");
+    // A self-relaunch (elevation change) is the one copy that may start while
+    // its predecessor still holds the instance lock, and only when that
+    // predecessor actually announced the hand-off. Without the flag file the
+    // switch is a bare bypass that would let any process start a second
+    // instance by appending the argument.
+    let handoff = restart::pending();
+    let successor = handoff && args.iter().any(|a| a == "--no-single-instance");
+    if !instance::acquire(successor) {
+        debug_log::qs_log("instance: another copy owns the session, leaving");
+        return;
+    }
     // Remember whether we are the incoming half of a relaunch: those windows
     // need their own WebView2 profile (see `restart::profile_dir`).
-    restart::mark_relaunching(restart::pending());
+    restart::mark_relaunching(handoff);
 
-    let mut builder = tauri::Builder::default();
-    if single_instance {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(state) = app.try_state::<Arc<AppState>>() {
-                ui::show_launcher(app, &state);
-            }
-        }));
-    }
+    let builder = tauri::Builder::default();
     builder
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
@@ -94,12 +96,21 @@ pub fn run() {
                 )
                 .map(|s| s.run_as_admin)
                 .unwrap_or(false);
-                if wanted && win::shell::relaunch_self("--no-single-instance", true) {
-                    debug_log::qs_log("setup: relaunching elevated (run_as_admin)");
-                    // Deliberate exit: keep the watchdog from respawning an
-                    // unelevated copy and looping the UAC prompt.
-                    watchdog::mark_graceful_quit();
-                    std::process::exit(0);
+                if wanted {
+                    // Announce the hand-off: the elevated copy is allowed past
+                    // the instance guard only because of this flag.
+                    restart::begin();
+                    if win::shell::relaunch_self("--no-single-instance", true) {
+                        debug_log::qs_log("setup: relaunching elevated (run_as_admin)");
+                        // Deliberate exit: keep the watchdog from respawning an
+                        // unelevated copy and looping the UAC prompt.
+                        watchdog::mark_graceful_quit();
+                        std::process::exit(0);
+                    }
+                    // UAC was dismissed: withdraw the announcement, otherwise a
+                    // later normal start would mistake itself for the successor
+                    // and build its windows against the relaunch profile.
+                    restart::arrived();
                 }
             }
 
@@ -118,6 +129,9 @@ pub fn run() {
             let first_run = !data_dir.join("settings.json").exists();
             let state = AppState::new(data_dir);
             app.manage(state.clone());
+            // From here on a second launch can be answered directly; before
+            // this it was recorded as pending (see `instance`).
+            instance::mark_ready(&handle);
             debug_log::qs_log("setup: state ready");
 
             // Guard the process with a watchdog-visible alive mutex.
@@ -180,9 +194,12 @@ pub fn run() {
             clipboard::start(state.clone(), handle.clone());
             debug_log::qs_log("setup: clipboard ok");
 
-            // Show the launcher on startup unless the user opted to start minimized.
+            // Show the launcher on startup unless the user opted to start
+            // minimized — and always when a second launch asked for it while
+            // we were still starting.
+            let asked = instance::take_pending_show();
             let start_minimized = state.settings.read().start_minimized;
-            if first_run || !start_minimized {
+            if asked || first_run || !start_minimized {
                 ui::show_launcher(&handle, &state);
             }
             debug_log::qs_log("setup: done");

@@ -132,7 +132,29 @@ pub struct SHELLEXECUTEINFOW {
     pub hProcess: HANDLE,
 }
 
+#[repr(C)]
+pub struct WNDCLASSEXW {
+    pub cbSize: UINT,
+    pub style: UINT,
+    pub lpfnWndProc: Option<extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT>,
+    pub cbClsExtra: i32,
+    pub cbWndExtra: i32,
+    pub hInstance: HINSTANCE,
+    pub hIcon: HICON,
+    pub hCursor: isize,
+    pub hbrBackground: HBRUSH,
+    pub lpszMenuName: *const u16,
+    pub lpszClassName: *const u16,
+    pub hIconSm: HICON,
+}
+
 // ---------- constants ----------
+/// `GetLastError` after `CreateMutexW`/`CreateEventW` when the object already
+/// exists — the only reliable "somebody else is already running" signal.
+pub const ERROR_ALREADY_EXISTS: u32 = 183;
+/// First message id applications may use for themselves.
+pub const WM_APP: u32 = 0x8000;
+pub const WS_POPUP: isize = 0x8000_0000u32 as isize;
 pub const SW_SHOWNORMAL: i32 = 1;
 pub const SW_SHOW: i32 = 5;
 pub const SW_RESTORE: i32 = 9;
@@ -218,6 +240,24 @@ extern "system" {
         result: *mut usize,
     ) -> LRESULT;
     pub fn PostMessageW(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> BOOL;
+    pub fn FindWindowW(class: *const u16, title: *const u16) -> HWND;
+    pub fn RegisterClassExW(class: *const WNDCLASSEXW) -> ATOM;
+    pub fn CreateWindowExW(
+        exstyle: DWORD,
+        class: *const u16,
+        name: *const u16,
+        style: DWORD,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+        parent: HWND,
+        menu: isize,
+        instance: HINSTANCE,
+        param: *mut c_void,
+    ) -> HWND;
+    pub fn DestroyWindow(hwnd: HWND) -> BOOL;
+    pub fn DefWindowProcW(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
     pub fn FindWindowExW(parent: HWND, after: HWND, class: *const u16, title: *const u16) -> HWND;
     pub fn GetWindowRect(hwnd: HWND, rect: *mut RECT) -> BOOL;
     pub fn GetParent(hwnd: HWND) -> HWND;
