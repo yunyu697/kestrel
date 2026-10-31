@@ -509,7 +509,7 @@
   text-overflow: ellipsis;
 }
 /* The path is the one field that may be long: give it a full row and let it
-   wrap instead of being truncated to "C:\Users\Tyl…". */
+   wrap instead of being truncated to "C:\Users\someo…". */
 .shell[data-preview="bottom"] .preview .meta .item:last-child {
   flex: 1 1 100%;
 }

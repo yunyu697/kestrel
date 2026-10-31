@@ -153,8 +153,8 @@ mod tests {
     #[test]
     fn turns_forward_slashes_into_backslashes() {
         assert_eq!(
-            native_path("C:/Users/Tyler Zhang/app.msi"),
-            "C:\\Users\\Tyler Zhang\\app.msi"
+            native_path("C:/Users/someone/app.msi"),
+            "C:\\Users\\someone\\app.msi"
         );
         assert_eq!(
             native_path("C:\\already\\native.msi"),
