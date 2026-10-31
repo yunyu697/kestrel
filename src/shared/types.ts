@@ -209,3 +209,16 @@ export interface ColorSample {
   x: number;
   y: number;
 }
+
+/** Result of a network probe performed by the Rust side (WinHTTP). */
+export interface HttpProbeResult {
+  /** True when the server answered with a 2xx/3xx status. */
+  ok: boolean;
+  status: number;
+  body: string | null;
+  error: string | null;
+  /** Round-trip time in milliseconds. */
+  ms: number;
+  /** "direct" or "proxy" — which route worked. */
+  via: string;
+}

@@ -1,16 +1,28 @@
 // GitHub release update check.
 //
-// Runs entirely in the WebView: api.github.com answers browser fetches with
-// CORS headers, so no Rust HTTP dependency is needed. Release downloads are
-// plain github.com links; users behind slow GitHub routes can prefix them
-// with a mirror (the standard `https://mirror/https://github.com/...` form).
+// The request runs on the Rust side (WinHTTP) instead of the WebView, for
+// two reasons that both bite exactly where it matters:
+//
+//   - the WebView's content security policy can block cross-origin fetches
+//     without saying anything in the UI, and
+//   - Chromium follows the Windows proxy settings but ignores the
+//     `http_proxy` / `https_proxy` environment variables a lot of users set,
+//     so the WebView cannot reach the network while curl and git can.
+//
+// The WebView's own fetch stays as a fallback for builds that do not have
+// the Rust command yet. Release downloads are plain github.com links; users
+// behind slow GitHub routes can prefix them with a mirror (the standard
+// `https://mirror/https://github.com/...` form).
 
-import type { Settings } from "./types";
+import { api } from "./api";
+import type { HttpProbeResult, Settings } from "./types";
 
 export const UPDATE_REPO = "yunyu697/kestrel";
 
 const LS_LAST = "kestrel.update.lastCheck";
 const LS_FOUND = "kestrel.update.found";
+/** URL of the newest installer we know about — the speed test measures it. */
+const LS_LATEST_ASSET = "kestrel.update.latestAsset";
 
 export interface UpdateMirror {
   id: string;
@@ -20,11 +32,12 @@ export interface UpdateMirror {
 }
 
 /** Built-in mirrors for release downloads. Latency varies a lot by region
- *  and over time, so the settings pane can test them live. */
+ *  and over time, so the settings pane can test them live. The list only
+ *  keeps mirrors that actually answer — the ones that died are gone. */
 export const MIRRORS: UpdateMirror[] = [
   { id: "direct", name: "官方直连", prefix: "" },
-  { id: "ghfast", name: "ghfast.top", prefix: "https://ghfast.top/" },
-  { id: "ghproxy", name: "gh-proxy.com", prefix: "https://gh-proxy.com/" },
+  { id: "ghproxycom", name: "gh-proxy.com", prefix: "https://gh-proxy.com/" },
+  { id: "ghproxynet2", name: "gh-proxy.net", prefix: "https://gh-proxy.net/" },
   { id: "ghproxynet", name: "ghproxy.net", prefix: "https://ghproxy.net/" },
 ];
 
@@ -53,24 +66,83 @@ export interface ReleaseInfo {
   assets: ReleaseAsset[];
 }
 
+/** Probe a URL through the Rust side. Returns null when the command is not
+ *  there (an older build), so the caller can fall back to the WebView. */
+async function probeViaRust(
+  url: string,
+  timeoutMs: number,
+  rangeBytes?: number,
+): Promise<HttpProbeResult | null> {
+  try {
+    // Never let a stuck IPC call freeze the UI. The Rust side has a timeout
+    // of its own; this is only the safety net.
+    const guard = new Promise<null>((resolve) =>
+      window.setTimeout(() => resolve(null), timeoutMs + 3000),
+    );
+    const call = api.httpProbe(url, timeoutMs, rangeBytes).catch(() => null);
+    return await Promise.race([call, guard]);
+  } catch {
+    return null;
+  }
+}
+
+interface Fetched {
+  status: number;
+  text: string;
+  ms: number;
+}
+
+/** GET a URL: Rust first, WebView second. */
+async function fetchText(url: string, timeoutMs: number): Promise<Fetched | null> {
+  const rust = await probeViaRust(url, timeoutMs);
+  if (rust) {
+    if (rust.status > 0) {
+      return { status: rust.status, text: rust.body ?? "", ms: rust.ms };
+    }
+    // The Rust side could not reach the server either — but the WebView may
+    // still succeed, so keep going instead of giving up here.
+  }
+
+  const ctl = new AbortController();
+  const timer = window.setTimeout(() => ctl.abort(), timeoutMs);
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: ctl.signal });
+    const text = await res.text();
+    return { status: res.status, text, ms: Math.round(performance.now() - t0) };
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
-  const res = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
-    headers: { Accept: "application/vnd.github+json" },
-  });
+  const r = await fetchText(
+    `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`,
+    15_000,
+  );
+  if (!r) throw new Error("network unavailable");
   // 404 = the repo simply has no published release yet; that is "no update",
   // not a failure.
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const d = await res.json();
+  if (r.status === 404) return null;
+  if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
+  const d = JSON.parse(r.text);
+  const assets: ReleaseAsset[] = (d.assets || []).map(
+    (a: { name: string; browser_download_url: string; size: number }) => ({
+      name: a.name,
+      url: a.browser_download_url,
+      size: a.size,
+    }),
+  );
+  // Remember the newest installer: the mirror speed test measures it.
+  const asset = pickAsset(assets);
+  if (asset) localStorage.setItem(LS_LATEST_ASSET, asset.url);
   return {
     version: String(d.tag_name || "").replace(/^v/i, ""),
     notes: String(d.body || ""),
     htmlUrl: String(d.html_url || `https://github.com/${UPDATE_REPO}/releases/latest`),
-    assets: (d.assets || []).map((a: { name: string; browser_download_url: string; size: number }) => ({
-      name: a.name,
-      url: a.browser_download_url,
-      size: a.size,
-    })),
+    assets,
   };
 }
 
@@ -79,11 +151,13 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
  *  usually reachable where GitHub's API is not. It carries no assets or
  *  notes, so the caller only gets a version plus the release page link. */
 async function fetchLatestViaJsDelivr(): Promise<ReleaseInfo | null> {
-  const res = await fetch(`https://data.jsdelivr.com/v1/packages/gh/${UPDATE_REPO}`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const d = await res.json();
+  const r = await fetchText(
+    `https://data.jsdelivr.com/v1/packages/gh/${UPDATE_REPO}`,
+    15_000,
+  );
+  if (!r) throw new Error("network unavailable");
+  if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
+  const d = JSON.parse(r.text);
   const tags: string[] = (d.versions || [])
     .map((v: { version?: string }) => String(v.version || "").replace(/^v/i, ""))
     .filter((t: string) => /^\d+(\.\d+)*$/.test(t));
@@ -119,18 +193,46 @@ export function pickAsset(assets: ReleaseAsset[]): ReleaseAsset | null {
   );
 }
 
-/** A tiny fixed file used to time each mirror. */
-const SPEEDTEST_URL = "https://raw.githubusercontent.com/github/gitignore/main/README.md";
+/** The file the speed test measures: the newest installer we know about.
+ *  Mirrors only proxy release assets — asking one for a release *page* gets
+ *  a 403 — so the test has to point at a real download. */
+function speedTestTarget(currentVersion?: string): string {
+  const known = localStorage.getItem(LS_LATEST_ASSET);
+  if (known) return known;
+  const v = (currentVersion || "").trim();
+  if (v && v !== "0.0.0") {
+    return `https://github.com/${UPDATE_REPO}/releases/download/v${v}/Kestrel_${v}_x64_zh-CN.msi`;
+  }
+  return `https://github.com/${UPDATE_REPO}/releases/latest`;
+}
 
-/** Rough reachability + latency for one mirror. Uses a no-cors request, so
- *  the response is opaque — we only keep the timing. null = unreachable. */
-export async function testMirrorLatency(prefix: string, timeoutMs = 8000): Promise<number | null> {
-  const url = applyMirror(SPEEDTEST_URL, prefix);
+/** Rough reachability + latency for one mirror. A range request keeps the
+ *  transfer tiny, and any HTTP answer counts as reachable — only a transport
+ *  error means the mirror is down. null = unreachable. */
+export async function testMirrorLatency(
+  prefix: string,
+  currentVersion?: string,
+  timeoutMs = 12_000,
+): Promise<number | null> {
+  const url = applyMirror(speedTestTarget(currentVersion), prefix);
+
+  const rust = await probeViaRust(url, timeoutMs, 1024);
+  if (rust) {
+    return rust.status > 0 ? rust.ms : null;
+  }
+
+  // Fallback for builds without the Rust command: a HEAD request, so the
+  // browser asks no more than the headers and never pulls the installer.
   const t0 = performance.now();
   try {
     const ctl = new AbortController();
     const timer = window.setTimeout(() => ctl.abort(), timeoutMs);
-    await fetch(url, { mode: "no-cors", cache: "no-store", signal: ctl.signal });
+    await fetch(url, {
+      method: "HEAD",
+      mode: "no-cors",
+      cache: "no-store",
+      signal: ctl.signal,
+    });
     window.clearTimeout(timer);
     return Math.round(performance.now() - t0);
   } catch {

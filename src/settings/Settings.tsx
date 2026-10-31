@@ -1735,7 +1735,9 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
     setTesting(true);
     setSpeeds(null);
     const entries = await Promise.all(
-      MIRRORS.map(async (m) => [m.id, await testMirrorLatency(m.prefix)] as const),
+      MIRRORS.map(
+                async (m) => [m.id, await testMirrorLatency(m.prefix, build?.version)] as const,
+              ),
     );
     setSpeeds(Object.fromEntries(entries));
     setTesting(false);
@@ -1891,12 +1893,12 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
             </button>
           </Row>
           {mirrorId === "custom" && (
-            <Row label={t("自定义镜像前缀")} desc={t("形如 https://ghfast.top/ ，会拼在下载地址前面")}>
+            <Row label={t("自定义镜像前缀")} desc={t("形如 https://gh-proxy.com/ ，会拼在下载地址前面")}>
               <input
                 className="input"
                 style={{ width: 240 }}
                 value={customMirror}
-                placeholder="https://ghfast.top/"
+                placeholder="https://gh-proxy.com/"
                 spellCheck={false}
                 onChange={(e) => {
                   setCustomMirror(e.target.value);

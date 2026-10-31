@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.2",
+    date: "2026-10-31",
+    title: {
+      zh: "更新检查改由系统网络栈发起，镜像测速对准真实下载",
+      en: "Update checks now go through the system network stack; mirror tests hit the real download",
+      ja: "更新チェックをシステムのネットワーク層経由に変更、ミラー速度テストを実際のダウンロードに",
+      es: "Las comprobaciones usan ahora la pila de red del sistema y las pruebas de espejos miden la descarga real",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "彻底修复检查更新与镜像测速失败：请求改由系统网络组件（WinHTTP）直接发出，不再受页面安全策略限制，也不受浏览器忽略代理设置的影响",
+          en: "Update checks and mirror tests now run through the system network stack (WinHTTP): they are no longer held back by the page's security policy or by browsers ignoring the proxy settings",
+          ja: "更新チェックとミラー速度テストをシステムネットワーク（WinHTTP）経由に変更。ページセキュリティポリシーやブラウザのプロキシ無視の影響を受けません",
+          es: "Las comprobaciones y pruebas de espejos pasan por la pila de red del sistema (WinHTTP): ya no dependen de la política de la página ni de que el navegador ignore el proxy",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复页面自带的安全策略未放行外部请求的问题（这是此前更新功能始终不可用的真正原因）",
+          en: "Fixed the page's own security policy blocking outbound requests — the real reason the update feature never worked",
+          ja: "ページ自带のセキュリティポリシーが外部リクエストを遮断していた問題を修正（更新機能が使えなかった真因）",
+          es: "Corregida la política de seguridad de la página que bloqueaba las peticiones salientes: la causa real del fallo",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "镜像测速改为探测真实安装包地址（只取 1KB），并移除已下线的镜像；可用的镜像会显示真实延迟",
+          en: "The mirror test now probes the real installer URL (1 KB only) and the dead mirrors are gone; working ones show their true latency",
+          ja: "ミラー速度テストを実際のインストーラー URL の一部（1KB）に変更し、終了したミラーを削除。動作するミラーは実際の遅延を表示",
+          es: "La prueba de espejos usa ahora la URL real del instalador (1 KB) y se retiraron los espejos caídos; los que funcionan muestran su latencia real",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.1",
     date: "2026-10-31",
     title: {

@@ -223,6 +223,8 @@ pub fn run() {
             commands::files::file_hashes,
             commands::files::run_shell_command,
             commands::files::spawn_program,
+            // network
+            commands::net::http_probe,
             // settings & apps
             commands::settings::get_settings,
             commands::settings::save_settings,

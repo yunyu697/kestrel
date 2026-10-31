@@ -5,6 +5,7 @@ import type {
   ClipboardItem,
   ColorSample,
   FileInfo,
+  HttpProbeResult,
   IndexStatus,
   SearchResponse,
   Settings,
@@ -56,6 +57,9 @@ export const api = {
   resetSettings: () => call<Settings>("reset_settings"),
   applyHotkey: (accelerator: string) => call<boolean>("apply_hotkey", { accelerator }),
   buildInfo: () => call<BuildInfo>("build_info"),
+  /** Network probe on the Rust side; `rangeBytes` asks for a partial body. */
+  httpProbe: (url: string, timeoutMs?: number, rangeBytes?: number) =>
+    call<HttpProbeResult>("http_probe", { url, timeoutMs, rangeBytes }),
   listApps: () => call<AppEntry[]>("list_apps"),
   refreshApps: () => call<AppEntry[]>("refresh_apps"),
 
