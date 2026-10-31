@@ -8,6 +8,7 @@ src-tauri/gen/schemas/
 
 # build outputs
 release/
+dist-release/
 build-info.json
 *.exe
 *.msi

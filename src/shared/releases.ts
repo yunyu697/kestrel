@@ -27,6 +27,108 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.5",
+    date: "2026-11-01",
+    title: {
+      zh: "QS 栏进入应用自己的选文件夹对话框，并在文件夹树里直接跳转",
+      en: "The Quick Switch now works in an app's own folder dialog, jumping inside its folder tree",
+      ja: "QS バーがアプリ独自のフォルダー選択ダイアログでも使え、フォルダーツリー内を直接移動します",
+      es: "El Quick Switch ya funciona en el diálogo de carpetas de otras apps y salta dentro de su árbol de carpetas",
+    },
+    items: [
+      {
+        kind: "new",
+        text: {
+          zh: "WinRAR「解压路径和选项」这类对话框现在也会弹出 QS 栏。选中文件夹后是**在树里选中那个节点**，路径框由对话框自己同步，不再往输入框里填字符串",
+          en: "Dialogs like WinRAR's «extract path and options» get the Quick Switch too. Picking a folder now selects that node in the tree and the dialog syncs its own path field, instead of a string being pasted into an input box",
+          ja: "WinRAR の「解凍先とオプション」のようなダイアログでも QS バーが表示されます。フォルダーを選ぶとツリー内のそのノードが選択され、パス欄はダイアログ自身が同期します。入力欄に文字列を流し込むことはもうありません",
+          es: "Diálogos como «ruta y opciones de extracción» de WinRAR ya muestran el Quick Switch. Al elegir una carpeta se selecciona ese nodo en el árbol y el diálogo sincroniza su propio campo de ruta, en lugar de pegar una cadena en una caja de texto",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "树里显示的是系统本地化名称（`Documents` 显示为「文档」、`D:\\` 显示为「Data (D:)」），跳转会先向系统查询该文件夹的显示名再匹配，因此中文系统下也能正确定位",
+          en: "Trees show the shell's localised names (Documents appears as 「文档」, D:\\ as 「Data (D:)」), so the jump asks the shell for the folder's display name before matching — it lands correctly on a Chinese system too",
+          ja: "ツリーには OS のローカライズ名が表示される（Documents は「文档」、D:\\ は「Data (D:)」）ため、移動時にまずシステムへ表示名を問い合わせてから照合します。中国語環境でも正しく到達します",
+          es: "Los árboles muestran los nombres localizados del shell (Documents aparece como 「文档」, D:\\ como 「Data (D:)」), así que el salto pregunta primero al sistema por el nombre visible de la carpeta; también acierta en un sistema en chino",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "打开/保存对话框的跳转更快：不再需要按 Ctrl+L，地址栏不会闪现，也不抢焦点，实测耗时从约 520 ms 降到约 270 ms",
+          en: "Jumps in Open/Save dialogs are faster: no Ctrl+L, no address bar flashing, no focus stealing — measured at roughly 520 ms down to 270 ms",
+          ja: "開く／保存ダイアログへの移動が速くなりました。Ctrl+L 不要、アドレスバーも表示されず、フォーカスも奪いません。実測で約 520 ms から約 270 ms に短縮",
+          es: "Los saltos en los diálogos de abrir/guardar son más rápidos: sin Ctrl+L, sin que parpadee la barra de direcciones y sin robar el foco; medido, de unos 520 ms a unos 270 ms",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复在自动跳转途中关闭对话框时，Ctrl+L 被发送到应用自己的主窗口（例如 Notepad3 的编辑区）的问题",
+          en: "Fixed Ctrl+L being sent into the application's own main window (Notepad3's editor, for instance) when the dialog was closed mid-jump",
+          ja: "自動移動の途中でダイアログを閉じると、Ctrl+L がアプリ自身のメインウィンドウ（Notepad3 の編集領域など）へ送られてしまう問題を修正",
+          es: "Se corrigió que Ctrl+L se enviara a la ventana principal de la propia aplicación (el editor de Notepad3, por ejemplo) al cerrar el diálogo en mitad del salto",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复「当前目录」读取总是失败的问题：此前取到的是导航按钮所在的工具栏，导致「已经在该目录」的判断失效、每次都会重复跳转",
+          en: "Fixed reading the current folder always failing: it picked up the navigation-buttons toolbar, so «already in that folder» never triggered and every jump ran again",
+          ja: "「現在のフォルダー」の取得が常に失敗していた問題を修正。ナビゲーションボタンのツールバーを読んでいたため「すでにそのフォルダーにいる」判定が効かず、毎回移動し直していました",
+          es: "Se corrigió que la lectura de la carpeta actual fallara siempre: tomaba la barra de botones de navegación, así que «ya estás en esa carpeta» nunca se detectaba y el salto se repetía cada vez",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "对话框识别更精确：路径框必须是一个**可编辑**的组合框（内部含 Edit 子窗口），因此 IDM 主窗口这类只有输入框加列表的窗口仍不会被误判",
+          en: "Dialog detection is tighter: the path field has to be an **editable** combo (one with an Edit child window), so windows like IDM's main one — an edit box plus a list — stay rejected",
+          ja: "ダイアログ判定をより厳密にしました。パス欄は **編集可能** なコンボ（内部に Edit 子ウィンドウを持つ）である必要があるため、IDM のメインウィンドウのような「入力欄＋リスト」だけの画面は引き続き除外されます",
+          es: "La detección de diálogos es más estricta: el campo de ruta tiene que ser un combo **editable** (con una ventana Edit hija), así que ventanas como la principal de IDM —una caja de texto y una lista— siguen descartándose",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复 QS 栏被对话框盖住：此前搜索栏在置顶层、对话框在普通层，对话框会挡住搜索栏。现在两者同层，搜索栏紧贴在对话框上方一格",
+          en: "Fixed the Quick Switch being covered by the dialog: the box sat in the topmost band while the dialog did not, so the dialog could hide it. Both are in the normal band now, with the box one slot above the dialog",
+          ja: "QS バーがダイアログに隠れる問題を修正。検索バーは最前面、ダイアログは通常層にいたため隠れていました。現在は同じ層で、検索バーがダイアログのすぐ上に位置します",
+          es: "Se corrigió que el diálogo tapara el Quick Switch: la caja estaba en la banda superior y el diálogo no, así que podía ocultarla. Ahora ambos están en la banda normal y la caja queda justo encima del diálogo",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复首次建立索引时进度一直显示 0、百分比恒为 100%、取消重建会把旧索引换成残缺索引、启动后底部显示「0 个文件」这几个问题",
+          en: "Fixed the index showing 0 while the first scan ran, the percentage stuck at 100%, cancelling a rebuild replacing the old index with a partial one, and the footer reading «0 files» after startup",
+          ja: "初回インデックス作成中に 0 のまま、進捗率が常に 100%、再構築のキャンセルで不完全なインデックスに置き換わる、起動後に「0 個のファイル」と表示される問題を修正",
+          es: "Se corrigió que el índice mostrara 0 durante el primer escaneo, que el porcentaje se quedara en 100 %, que cancelar una reconstrucción sustituyera el índice anterior por uno parcial y que el pie mostrara «0 archivos» al arrancar",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "重建索引前会先确认；安装系统服务需要管理员权限，未提权时会明确提示，而不是静默失败",
+          en: "Rebuilding the index now asks for confirmation first, and installing the background service says plainly that administrator rights are required instead of failing silently",
+          ja: "インデックス再構築の前に確認を表示します。バックグラウンドサービスは管理者権限が必要で、権限がない場合は黙って失敗せず明示します",
+          es: "Reconstruir el índice pide confirmación primero, y la instalación del servicio en segundo plano avisa de que hacen falta permisos de administrador en lugar de fallar en silencio",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复应用内安装时路径含正斜杠导致 Windows Installer 报 1619 的问题",
+          en: "Fixed the in-app installer failing with Windows Installer error 1619 when the path contained forward slashes",
+          ja: "アプリ内インストールでパスにスラッシュが含まれると Windows Installer が 1619 で失敗する問題を修正",
+          es: "Se corrigió que el instalador interno fallara con el error 1619 de Windows Installer cuando la ruta contenía barras inclinadas",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.4",
     date: "2026-10-31",
     title: {
