@@ -74,6 +74,29 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
   };
 }
 
+/** Fallback when api.github.com is unreachable (common on some networks):
+ *  jsDelivr's data API lists the repo's git tags, answers CORS, and is
+ *  usually reachable where GitHub's API is not. It carries no assets or
+ *  notes, so the caller only gets a version plus the release page link. */
+async function fetchLatestViaJsDelivr(): Promise<ReleaseInfo | null> {
+  const res = await fetch(`https://data.jsdelivr.com/v1/packages/gh/${UPDATE_REPO}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const d = await res.json();
+  const tags: string[] = (d.versions || [])
+    .map((v: { version?: string }) => String(v.version || "").replace(/^v/i, ""))
+    .filter((t: string) => /^\d+(\.\d+)*$/.test(t));
+  if (!tags.length) return null;
+  const latest = tags.sort(compareVersions).pop() as string;
+  return {
+    version: latest,
+    notes: "",
+    htmlUrl: `https://github.com/${UPDATE_REPO}/releases/tag/v${latest}`,
+    assets: [],
+  };
+}
+
 /** 1 when a is newer than b, -1 when older, 0 when equal. */
 export function compareVersions(a: string, b: string): number {
   const pa = String(a).split(".").map((n) => parseInt(n, 10) || 0);
@@ -126,7 +149,14 @@ export interface UpdateCheckResult {
 
 export async function checkForUpdate(current: string): Promise<UpdateCheckResult> {
   try {
-    const info = await fetchLatestRelease();
+    // Primary source first; when GitHub's API is unreachable, jsDelivr can
+    // still tell us the newest tag. If that throws too, we report an error.
+    let info: ReleaseInfo | null;
+    try {
+      info = await fetchLatestRelease();
+    } catch {
+      info = await fetchLatestViaJsDelivr();
+    }
     if (!info) {
       const r: UpdateCheckResult = {
         checkedAt: Date.now(),

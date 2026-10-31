@@ -27,6 +27,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.1",
+    date: "2026-10-31",
+    title: {
+      zh: "修复检查更新与镜像测速必失败的问题",
+      en: "Fixed update checks and mirror speed tests always failing",
+      ja: "更新チェックとミラー速度テストが必ず失敗する問題を修正",
+      es: "Corregido: la comprobación de actualizaciones y la prueba de espejos siempre fallaban",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "修复 1.2.0 的检查更新与镜像测速在任何网络下都必然失败：安全策略未放行外部网络请求，WebView 把所有 fetch 直接拦截了",
+          en: "Fixed update checks and mirror speed tests in 1.2.0 failing on every network: the content security policy blocked all outbound requests from the WebView",
+          ja: "1.2.0 で更新チェックとミラー速度テストがどのネットワークでも必ず失敗する問題を修正（CSP が WebView の外部リクエストをすべてブロックしていた）",
+          es: "Corregido: en la 1.2.0 las comprobaciones y pruebas de espejos fallaban en cualquier red: la política de seguridad bloqueaba todas las peticiones del WebView",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "检查更新增加备用源：GitHub API 不可达时自动改用 jsDelivr 查询最新版本号",
+          en: "Update checks gained a fallback source: when GitHub's API is unreachable, the newest version is looked up via jsDelivr instead",
+          ja: "更新チェックに予備ソースを追加：GitHub API に届かない場合は jsDelivr で最新バージョンを確認",
+          es: "La comprobación de actualizaciones ahora tiene una fuente alternativa: si la API de GitHub no responde, se consulta la versión más reciente vía jsDelivr",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.0",
     date: "2026-10-31",
     title: {
