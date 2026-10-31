@@ -9,7 +9,10 @@
 //!   it when the dialog loses focus or closes.
 
 use crate::state::AppState;
-use crate::win::{class_name, EnumWindows, GetForegroundWindow, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, GetWindowRect, BOOL, HWND, LPARAM, MSG, RECT};
+use crate::win::{
+    class_name, EnumWindows, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId,
+    IsIconic, IsWindow, IsWindowVisible, BOOL, HWND, LPARAM, MSG, RECT,
+};
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -26,8 +29,7 @@ static CTX: Mutex<Option<(AppHandle, Arc<AppState>)>> = Mutex::new(None);
 /// folder had not been recorded yet and the jump was silently dropped — the
 /// user saw "the first switch does nothing, do it again". Serialising makes
 /// the ordering the same as the event ordering.
-static QUEUE: std::sync::OnceLock<std::sync::mpsc::Sender<HWND>> =
-    std::sync::OnceLock::new();
+static QUEUE: std::sync::OnceLock<std::sync::mpsc::Sender<HWND>> = std::sync::OnceLock::new();
 
 /// Last Explorer window we resolved a folder for. Used as a fallback when the
 /// pending record is missing (event coalesced / hook respawned mid-switch).
@@ -50,8 +52,15 @@ const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
 
 type HWINEVENTHOOK = isize;
 
-pub type Wineventproc =
-    extern "system" fn(hook: HWINEVENTHOOK, event: u32, hwnd: HWND, idobject: i32, idchild: i32, idthread: u32, dwmseventtime: u32);
+pub type Wineventproc = extern "system" fn(
+    hook: HWINEVENTHOOK,
+    event: u32,
+    hwnd: HWND,
+    idobject: i32,
+    idchild: i32,
+    idthread: u32,
+    dwmseventtime: u32,
+);
 
 #[link(name = "user32")]
 extern "system" {
@@ -87,7 +96,9 @@ pub fn start(app: AppHandle, state: Arc<AppState>) {
     let _ = QUEUE.set(tx);
     std::thread::spawn(move || {
         while let Ok(hwnd) = rx.recv() {
-            let Some((app, state)) = CTX.lock().clone() else { continue };
+            let Some((app, state)) = CTX.lock().clone() else {
+                continue;
+            };
             // A panic in one classification must not take the whole pipeline
             // down: every later foreground event would be lost.
             let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -218,7 +229,7 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
 
     // File dialog: attach the Quick Switch box below it.
     if class == "#32770" {
-        let mut ready = window::is_file_dialog(hwnd);
+        let mut ready = window::is_quick_switch_target(hwnd);
         if !ready {
             // Dialogs are often still building their child controls when the
             // foreground event fires, and on a loaded machine they can take
@@ -236,7 +247,7 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
                         return;
                     }
                 }
-                ready = window::is_file_dialog(hwnd);
+                ready = window::is_quick_switch_target(hwnd);
                 if ready {
                     break;
                 }
@@ -295,7 +306,9 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
         let already = *state.dialog.lock() == Some(hwnd);
         let visible = crate::ui::launcher_visible(state);
         *state.dialog.lock() = Some(hwnd);
-        crate::debug_log::qs_log(&format!("dialog captured hwnd={hwnd:#x} already={already} visible={visible}"));
+        crate::debug_log::qs_log(&format!(
+            "dialog captured hwnd={hwnd:#x} already={already} visible={visible}"
+        ));
         if let Some(dir) = window::dialog_current_folder(hwnd) {
             state.push_qs_dir(dir);
         }
@@ -387,7 +400,7 @@ fn spawn_late_attach(hwnd: HWND, gen: u64) {
                     continue;
                 }
             }
-            if !window::is_file_dialog(hwnd) {
+            if !window::is_quick_switch_target(hwnd) {
                 continue;
             }
             // Only attach while the dialog still owns the foreground: the user
@@ -573,10 +586,11 @@ fn maybe_auto_jump(app: &AppHandle, state: &Arc<AppState>, dialog: HWND, allow_f
 fn explorer_location(target: HWND) -> Option<(isize, String)> {
     use windows::core::Interface;
     use windows::Win32::System::Com::{
-        CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_LOCAL_SERVER, COINIT_APARTMENTTHREADED,
+        CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_LOCAL_SERVER,
+        COINIT_APARTMENTTHREADED,
     };
     use windows::Win32::System::Variant::{VARIANT, VARIANT_0, VARIANT_0_0, VARIANT_0_0_0, VT_I4};
-    use windows::Win32::UI::Shell::{IWebBrowser2, IShellWindows, ShellWindows};
+    use windows::Win32::UI::Shell::{IShellWindows, IWebBrowser2, ShellWindows};
 
     unsafe {
         let hr = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
@@ -586,7 +600,8 @@ fn explorer_location(target: HWND) -> Option<(isize, String)> {
             return None;
         }
         let result = (|| {
-            let sw: IShellWindows = CoCreateInstance(&ShellWindows, None, CLSCTX_LOCAL_SERVER).ok()?;
+            let sw: IShellWindows =
+                CoCreateInstance(&ShellWindows, None, CLSCTX_LOCAL_SERVER).ok()?;
             let n = sw.Count().unwrap_or(0);
             for i in 0..n.min(64) {
                 let var = VARIANT {
@@ -601,7 +616,9 @@ fn explorer_location(target: HWND) -> Option<(isize, String)> {
                     },
                 };
                 let Ok(disp) = sw.Item(&var) else { continue };
-                let Ok(wb) = disp.cast::<IWebBrowser2>() else { continue };
+                let Ok(wb) = disp.cast::<IWebBrowser2>() else {
+                    continue;
+                };
                 let Ok(h) = wb.HWND() else { continue };
                 let hwnd = h.0 as isize;
                 if hwnd != target {
@@ -662,11 +679,20 @@ fn file_url_to_path(url: &str) -> String {
 /// `scale` is the cached device pixel ratio: reading it from the window would
 /// be a round trip to the UI thread, and this runs on every follower tick.
 pub fn compute_qs_geometry(hwnd: HWND, rows: u32, scale: f64) -> Option<(i32, i32, u32, u32)> {
-    let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let mut rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
     if unsafe { GetWindowRect(hwnd, &mut rect) } == 0 {
         return None;
     }
-    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
     let wa = window::monitor_work_area(hwnd);
     let wa_w = (wa.2 - wa.0).max(320);
     let dlg_w = rect.right - rect.left;
@@ -774,7 +800,12 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
         // nothing to follow: recomputing the geometry every tick used to ask
         // the UI thread for the scale factor 60 times a second, which starved
         // the WebView and showed up as stutter.
-        let mut last_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut last_rect = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
         let mut last_rows = u32::MAX;
         // Z-order watchdog throttle (see the loop body).
         let mut last_z = Instant::now() - Duration::from_secs(1);
@@ -788,133 +819,158 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
         // minimised, so it can be restored together with the dialog.
         let mut hidden_for_iconic = false;
         loop {
-                std::thread::sleep(Duration::from_millis(16));
-                let Some(win) = crate::ui::launcher(&app) else { continue };
-                let Some(h) = *state.dialog.lock() else {
-                    hidden_since = None;
-                    hidden_for_iconic = false;
-                    last = (0, 0, 0, 0);
-                    last_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-                    last_rows = u32::MAX;
-                    continue;
+            std::thread::sleep(Duration::from_millis(16));
+            let Some(win) = crate::ui::launcher(&app) else {
+                continue;
+            };
+            let Some(h) = *state.dialog.lock() else {
+                hidden_since = None;
+                hidden_for_iconic = false;
+                last = (0, 0, 0, 0);
+                last_rect = RECT {
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
                 };
+                last_rows = u32::MAX;
+                continue;
+            };
 
-                let exists = unsafe { IsWindow(h) != 0 };
-                let on_screen = exists && unsafe { IsWindowVisible(h) != 0 };
-                let iconic = exists && unsafe { IsIconic(h) != 0 };
+            let exists = unsafe { IsWindow(h) != 0 };
+            let on_screen = exists && unsafe { IsWindowVisible(h) != 0 };
+            let iconic = exists && unsafe { IsIconic(h) != 0 };
 
-                // Really destroyed: the dialog is gone, so is the box.
-                if !exists {
-                    crate::debug_log::qs_log(&format!("follower: dialog {h:#x} destroyed -> hide"));
+            // Really destroyed: the dialog is gone, so is the box.
+            if !exists {
+                crate::debug_log::qs_log(&format!("follower: dialog {h:#x} destroyed -> hide"));
+                end_session(&app, &state);
+                hidden_since = None;
+                hidden_for_iconic = false;
+                last = (0, 0, 0, 0);
+                last_rect = RECT {
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                };
+                last_rows = u32::MAX;
+                continue;
+            }
+
+            // Minimised: get out of the way, but keep the binding so the
+            // box returns when the dialog is restored.
+            if iconic {
+                hidden_since = None;
+                if crate::ui::launcher_visible(&state) {
+                    hidden_for_iconic = true;
+                    crate::ui::hide_launcher(&app);
+                }
+                continue;
+            }
+
+            // Exists but not on screen yet (or already fading out).
+            if !on_screen {
+                let since = *hidden_since.get_or_insert_with(Instant::now);
+                if since.elapsed() > Duration::from_millis(1500) {
+                    crate::debug_log::qs_log(&format!(
+                        "follower: dialog {h:#x} hidden for {}ms -> hide",
+                        since.elapsed().as_millis()
+                    ));
                     end_session(&app, &state);
                     hidden_since = None;
                     hidden_for_iconic = false;
                     last = (0, 0, 0, 0);
-                    last_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                    last_rect = RECT {
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                    };
                     last_rows = u32::MAX;
-                    continue;
                 }
-
-                // Minimised: get out of the way, but keep the binding so the
-                // box returns when the dialog is restored.
-                if iconic {
-                    hidden_since = None;
-                    if crate::ui::launcher_visible(&state) {
-                        hidden_for_iconic = true;
-                        crate::ui::hide_launcher(&app);
-                    }
-                    continue;
-                }
-
-                // Exists but not on screen yet (or already fading out).
-                if !on_screen {
-                    let since = *hidden_since.get_or_insert_with(Instant::now);
-                    if since.elapsed() > Duration::from_millis(1500) {
-                        crate::debug_log::qs_log(&format!(
-                            "follower: dialog {h:#x} hidden for {}ms -> hide",
-                            since.elapsed().as_millis()
-                        ));
-                        end_session(&app, &state);
-                        hidden_since = None;
-                        hidden_for_iconic = false;
-                        last = (0, 0, 0, 0);
-                        last_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-                        last_rows = u32::MAX;
-                    }
-                    continue;
-                }
-                hidden_since = None;
-
-                // Restored from the taskbar: bring the box back.
-                if hidden_for_iconic {
-                    hidden_for_iconic = false;
-                    last = (0, 0, 0, 0);
-                    last_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-                    last_rows = u32::MAX;
-                    crate::ui::show_quick_switch(&app, &state, h);
-                    continue;
-                }
-
-                if !crate::ui::launcher_visible(&state) {
-                    continue;
-                }
-
-                // Z-order watchdog.
-                //
-                // Every activation of the dialog (clicking its file list is
-                // enough) raises it to the top of the normal band, which
-                // silently pushes the box behind it — the box and the dialog
-                // then look like two different layers. While the dialog is the
-                // foreground window the box belongs one slot above it; when
-                // anything else is in front, nothing has to happen: both sink
-                // together.
-                //
-                // Throttled and conditional: an unconditional SetWindowPos on
-                // every 16 ms tick made the box flicker.
-                if last_z.elapsed() > Duration::from_millis(150) {
-                    last_z = Instant::now();
-                    if let Ok(qs) = win.hwnd() {
-                        let qs = qs.0 as isize;
-                        if unsafe { GetForegroundWindow() } == h
-                            && crate::win::keep_above(qs, h)
-                        {
-                            crate::debug_log::qs_log("follower: z-order re-asserted above dialog");
-                        }
-                    }
-                }
-
-                // Follow the dialog: only touch the window when something
-                // actually changed (repeated set_size / set_position cause
-                // visible flicker).
-                let rows = state.settings.read().qs_visible_rows;
-                let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-                let got_rect = unsafe { GetWindowRect(h, &mut rect) } != 0;
-                let moved = !got_rect
-                    || rect.left != last_rect.left
-                    || rect.top != last_rect.top
-                    || rect.right != last_rect.right
-                    || rect.bottom != last_rect.bottom;
-                if !moved && rows == last_rows && last != (0, 0, 0, 0) {
-                    // The dialog did not move: nothing to recompute.
-                    continue;
-                }
-
-                let scale = crate::ui::launcher_scale(&state);
-                let Some((x, y, w, hh)) = compute_qs_geometry(h, rows, scale) else {
-                    continue;
-                };
-                if (x, y, w, hh) != last {
-                    crate::debug_log::qs_log(&format!("follower: apply geom ({x},{y},{w},{hh})"));
-                    if w != last.2 || hh != last.3 {
-                        let _ = win.set_size(tauri::PhysicalSize::new(w, hh));
-                    }
-                    if x != last.0 || y != last.1 {
-                        let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
-                    }
-                    last = (x, y, w, hh);
-                }
-                last_rect = rect;
-                last_rows = rows;
+                continue;
             }
-        });
+            hidden_since = None;
+
+            // Restored from the taskbar: bring the box back.
+            if hidden_for_iconic {
+                hidden_for_iconic = false;
+                last = (0, 0, 0, 0);
+                last_rect = RECT {
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                };
+                last_rows = u32::MAX;
+                crate::ui::show_quick_switch(&app, &state, h);
+                continue;
+            }
+
+            if !crate::ui::launcher_visible(&state) {
+                continue;
+            }
+
+            // Z-order watchdog.
+            //
+            // Every activation of the dialog (clicking its file list is
+            // enough) raises it to the top of the normal band, which
+            // silently pushes the box behind it — the box and the dialog
+            // then look like two different layers. While the dialog is the
+            // foreground window the box belongs one slot above it; when
+            // anything else is in front, nothing has to happen: both sink
+            // together.
+            //
+            // Throttled and conditional: an unconditional SetWindowPos on
+            // every 16 ms tick made the box flicker.
+            if last_z.elapsed() > Duration::from_millis(150) {
+                last_z = Instant::now();
+                if let Ok(qs) = win.hwnd() {
+                    let qs = qs.0 as isize;
+                    if unsafe { GetForegroundWindow() } == h && crate::win::keep_above(qs, h) {
+                        crate::debug_log::qs_log("follower: z-order re-asserted above dialog");
+                    }
+                }
+            }
+
+            // Follow the dialog: only touch the window when something
+            // actually changed (repeated set_size / set_position cause
+            // visible flicker).
+            let rows = state.settings.read().qs_visible_rows;
+            let mut rect = RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            };
+            let got_rect = unsafe { GetWindowRect(h, &mut rect) } != 0;
+            let moved = !got_rect
+                || rect.left != last_rect.left
+                || rect.top != last_rect.top
+                || rect.right != last_rect.right
+                || rect.bottom != last_rect.bottom;
+            if !moved && rows == last_rows && last != (0, 0, 0, 0) {
+                // The dialog did not move: nothing to recompute.
+                continue;
+            }
+
+            let scale = crate::ui::launcher_scale(&state);
+            let Some((x, y, w, hh)) = compute_qs_geometry(h, rows, scale) else {
+                continue;
+            };
+            if (x, y, w, hh) != last {
+                crate::debug_log::qs_log(&format!("follower: apply geom ({x},{y},{w},{hh})"));
+                if w != last.2 || hh != last.3 {
+                    let _ = win.set_size(tauri::PhysicalSize::new(w, hh));
+                }
+                if x != last.0 || y != last.1 {
+                    let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+                }
+                last = (x, y, w, hh);
+            }
+            last_rect = rect;
+            last_rows = rows;
+        }
+    });
 }

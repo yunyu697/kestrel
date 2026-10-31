@@ -40,7 +40,10 @@ extern "system" {
 
 /// Milliseconds since the last keyboard/mouse input anywhere on the desktop.
 fn user_idle_ms() -> u64 {
-    let mut lii = LastInputInfo { cb_size: std::mem::size_of::<LastInputInfo>() as u32, dw_time: 0 };
+    let mut lii = LastInputInfo {
+        cb_size: std::mem::size_of::<LastInputInfo>() as u32,
+        dw_time: 0,
+    };
     let ok = unsafe { GetLastInputInfo(&mut lii) };
     if ok == 0 {
         return 0; // unknown: assume active, the caller's other checks still apply
@@ -79,7 +82,12 @@ fn hook_thread_body() {
     unsafe {
         let my_gen = HOOK_GEN.load(Ordering::SeqCst);
         HOOK_THREAD_ID.store(GetCurrentThreadId(), Ordering::SeqCst);
-        let mut hook = SetWindowsHookExW(WH_KEYBOARD_LL, hook_proc, GetModuleHandleW(std::ptr::null()), 0);
+        let mut hook = SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            hook_proc,
+            GetModuleHandleW(std::ptr::null()),
+            0,
+        );
         crate::debug_log::qs_log_verbose(&format!("hook: installed={} gen={my_gen}", hook != 0));
         if hook == 0 {
             // Hook install failed (rare): park so the supervisor does not spin.
@@ -114,7 +122,12 @@ fn hook_thread_body() {
             }
             crate::debug_log::qs_log(&format!("hook: pump exited rc={rc} -> reinstall"));
             let _ = UnhookWindowsHookEx(hook);
-            hook = SetWindowsHookExW(WH_KEYBOARD_LL, hook_proc, GetModuleHandleW(std::ptr::null()), 0);
+            hook = SetWindowsHookExW(
+                WH_KEYBOARD_LL,
+                hook_proc,
+                GetModuleHandleW(std::ptr::null()),
+                0,
+            );
             crate::debug_log::qs_log(&format!("hook: reinstalled={}", hook != 0));
             if hook == 0 {
                 loop {
@@ -312,57 +325,57 @@ pub fn install_hook(app: AppHandle, state: Arc<AppState>) {
         let app = app.clone();
         let state = state.clone();
         crate::supervise_forever("kestrel-hotkey-worker", move || loop {
-                std::thread::sleep(std::time::Duration::from_millis(18));
-                WORKER_TICK.fetch_add(1, Ordering::Relaxed);
-                // Double Ctrl is polled here, not hooked: the hook can be
-                // dropped by Windows at any moment, the poll cannot.
-                poll_double_ctrl();
-                // Report hook activity from here — never from the hook itself.
-                let seen = CTRL_DOWNS.load(Ordering::Relaxed);
-                if seen != LAST_SEEN.swap(seen, Ordering::Relaxed) {
-                    let diag = HOOK_DIAG.load(Ordering::Relaxed);
-                    crate::debug_log::qs_log_verbose(&format!(
-                        "hook: ctrl downs={} dirty={} enabled={}",
-                        seen,
-                        diag & 1,
-                        (diag >> 1) & 1,
-                    ));
+            std::thread::sleep(std::time::Duration::from_millis(18));
+            WORKER_TICK.fetch_add(1, Ordering::Relaxed);
+            // Double Ctrl is polled here, not hooked: the hook can be
+            // dropped by Windows at any moment, the poll cannot.
+            poll_double_ctrl();
+            // Report hook activity from here — never from the hook itself.
+            let seen = CTRL_DOWNS.load(Ordering::Relaxed);
+            if seen != LAST_SEEN.swap(seen, Ordering::Relaxed) {
+                let diag = HOOK_DIAG.load(Ordering::Relaxed);
+                crate::debug_log::qs_log_verbose(&format!(
+                    "hook: ctrl downs={} dirty={} enabled={}",
+                    seen,
+                    diag & 1,
+                    (diag >> 1) & 1,
+                ));
+            }
+            match TRIGGER.swap(0, Ordering::Relaxed) {
+                0 => {}
+                1 => {
+                    crate::debug_log::qs_log_verbose("hook: double ctrl -> toggle");
+                    crate::ui::toggle_launcher(&app, &state);
                 }
-                match TRIGGER.swap(0, Ordering::Relaxed) {
-                    0 => {}
-                    1 => {
-                        crate::debug_log::qs_log_verbose("hook: double ctrl -> toggle");
-                        crate::ui::toggle_launcher(&app, &state);
-                    }
-                    3 => crate::ui::show_launcher(&app, &state),
-                    2 => {
-                        // Ctrl+G inside a file dialog: show the attached box,
-                        // or if it is already attached, jump to the record the
-                        // user selected (frontend knows the selection).
-                        // When the box is on screen *it* owns the focus, so the
-                        // foreground check below would never match — handle the
-                        // attached case first.
-                        let attached = state.dialog.lock().is_some();
-                        let visible = state.qs_active.load(Ordering::Relaxed)
-                            && crate::ui::launcher(&app)
-                                .map(|w| w.is_visible().unwrap_or(false))
-                                .unwrap_or(false);
-                        if attached && visible {
-                            let _ = app.emit("quickswitch://jump", ());
-                        } else {
-                            let fg = window::foreground();
-                            if window::is_file_dialog(fg) {
-                                *state.dialog.lock() = Some(fg);
-                                if let Some(dir) = window::dialog_current_folder(fg) {
-                                    state.push_qs_dir(dir);
-                                }
-                                crate::ui::show_quick_switch(&app, &state, fg);
+                3 => crate::ui::show_launcher(&app, &state),
+                2 => {
+                    // Ctrl+G inside a file dialog: show the attached box,
+                    // or if it is already attached, jump to the record the
+                    // user selected (frontend knows the selection).
+                    // When the box is on screen *it* owns the focus, so the
+                    // foreground check below would never match — handle the
+                    // attached case first.
+                    let attached = state.dialog.lock().is_some();
+                    let visible = state.qs_active.load(Ordering::Relaxed)
+                        && crate::ui::launcher(&app)
+                            .map(|w| w.is_visible().unwrap_or(false))
+                            .unwrap_or(false);
+                    if attached && visible {
+                        let _ = app.emit("quickswitch://jump", ());
+                    } else {
+                        let fg = window::foreground();
+                        if window::is_quick_switch_target(fg) {
+                            *state.dialog.lock() = Some(fg);
+                            if let Some(dir) = window::dialog_current_folder(fg) {
+                                state.push_qs_dir(dir);
                             }
+                            crate::ui::show_quick_switch(&app, &state, fg);
                         }
                     }
-                    _ => {}
                 }
-            })
+                _ => {}
+            }
+        })
     }
 
     // Independent watchdog: reports hook/worker liveness without going
@@ -411,7 +424,9 @@ pub fn install_hook(app: AppHandle, state: Arc<AppState>) {
                 continue;
             }
             if app_alive && frozen > stall_secs * 1000 {
-                crate::debug_log::qs_log(&format!("hookwatch: hook stalled {stall_secs}s -> respawning"));
+                crate::debug_log::qs_log(&format!(
+                    "hookwatch: hook stalled {stall_secs}s -> respawning"
+                ));
                 WATCH_LAST_CHANGE.store(now_ms(), Ordering::Relaxed); // don't respawn in a loop
                 let old_id = HOOK_THREAD_ID.load(Ordering::SeqCst);
                 HOOK_GEN.fetch_add(1, Ordering::SeqCst);

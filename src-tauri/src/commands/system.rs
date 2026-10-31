@@ -1,8 +1,8 @@
 //! Window management, system actions, colour picking and Quick Switch.
 
 use crate::state::AppState;
-use crate::win::window::{self, WindowInfo};
 use crate::win::shell;
+use crate::win::window::{self, WindowInfo};
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
@@ -78,7 +78,11 @@ fn run(id: &str) -> bool {
         "cmd.recycle" => shell::open_url("shell:RecycleBinFolder"),
         "cmd.emptyrecycle" => unsafe { SHEmptyRecycleBinW(0, std::ptr::null(), 1 | 2 | 4) == 0 },
         "cmd.lock" => shell::spawn("rundll32.exe", Some("user32.dll,LockWorkStation"), None),
-        "cmd.sleep" => shell::spawn("rundll32.exe", Some("powrprof.dll,SetSuspendState 0,1,0"), None),
+        "cmd.sleep" => shell::spawn(
+            "rundll32.exe",
+            Some("powrprof.dll,SetSuspendState 0,1,0"),
+            None,
+        ),
         "cmd.shutdown" => shell::spawn("shutdown.exe", Some("/s /t 0"), None),
         "cmd.restart" => shell::spawn("shutdown.exe", Some("/r /t 0"), None),
         "cmd.logout" => shell::spawn("shutdown.exe", Some("/l"), None),
@@ -91,7 +95,11 @@ fn run(id: &str) -> bool {
         "cmd.bluetooth" => shell::open_url("ms-settings:bluetooth"),
         "cmd.apps" => shell::open_url("ms-settings:appsfeatures"),
         "cmd.datetime" => shell::open_url("ms-settings:dateandtime"),
-        "cmd.env" => shell::spawn("rundll32.exe", Some("sysdm.cpl,EditEnvironmentVariables"), None),
+        "cmd.env" => shell::spawn(
+            "rundll32.exe",
+            Some("sysdm.cpl,EditEnvironmentVariables"),
+            None,
+        ),
         "cmd.device" => shell::spawn("mmc.exe", Some("devmgmt.msc"), None),
         "cmd.disk" => shell::spawn("mmc.exe", Some("diskmgmt.msc"), None),
         "cmd.services" => shell::spawn("mmc.exe", Some("services.msc"), None),
@@ -130,7 +138,11 @@ pub fn run_builtin(app: AppHandle, state: State<'_, Arc<AppState>>, id: String) 
                     "shell" => shell::run_shell(&c.target, None),
                     "program" => shell::spawn(
                         &c.target,
-                        if c.args.is_empty() { None } else { Some(c.args.as_str()) },
+                        if c.args.is_empty() {
+                            None
+                        } else {
+                            Some(c.args.as_str())
+                        },
                         None,
                     ),
                     _ => false,
@@ -151,7 +163,7 @@ pub fn run_builtin(app: AppHandle, state: State<'_, Arc<AppState>>, id: String) 
 /// NOTE: keeps the Quick Switch session alive — the box stays attached until
 /// the dialog itself is closed (the follower thread handles that).
 pub fn apply_path_to_dialog(_state: &Arc<AppState>, dialog: isize, path: &str) -> bool {
-    window::navigate_to_folder(dialog, path)
+    window::apply_folder(dialog, path)
 }
 
 /// Apply the Quick Switch: move the focused file dialog to the chosen folder,
@@ -183,7 +195,7 @@ pub fn has_dialog_target(state: State<'_, Arc<AppState>>) -> bool {
     state
         .dialog
         .lock()
-        .map(|h| window::is_file_dialog(h))
+        .map(|h| window::is_quick_switch_target(h))
         .unwrap_or(false)
 }
 
@@ -247,7 +259,11 @@ pub fn qs_context(state: State<'_, Arc<AppState>>) -> QsContext {
         .lock()
         .and_then(|h| window::dialog_current_folder(h));
     let children = folder.as_deref().map(child_dirs).unwrap_or_default();
-    QsContext { folder, home, children }
+    QsContext {
+        folder,
+        home,
+        children,
+    }
 }
 
 // ---------------- Watchdog service (安装为服务) ----------------
@@ -282,10 +298,21 @@ pub fn service_install() -> String {
     if !crate::win::is_elevated() {
         return "needsAdmin".into();
     }
-    let Ok(exe) = std::env::current_exe() else { return "failed".into() };
+    let Ok(exe) = std::env::current_exe() else {
+        return "failed".into();
+    };
     let tr = format!("\"{}\" --watchdog", exe.display());
     if !schtasks(&[
-        "/Create", "/F", "/SC", "ONLOGON", "/RL", "LIMITED", "/TN", WATCHDOG_TASK, "/TR", &tr,
+        "/Create",
+        "/F",
+        "/SC",
+        "ONLOGON",
+        "/RL",
+        "LIMITED",
+        "/TN",
+        WATCHDOG_TASK,
+        "/TR",
+        &tr,
     ]) {
         crate::debug_log::qs_log("service: schtasks /Create failed while elevated");
         return "failed".into();

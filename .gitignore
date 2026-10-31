@@ -11,6 +11,7 @@ release/
 build-info.json
 *.exe
 *.msi
+*.pdb
 
 # local scratch (probes, logs, test fixtures output)
 .tmp/

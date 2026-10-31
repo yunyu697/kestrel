@@ -6,7 +6,11 @@ use std::ffi::c_void;
 
 #[link(name = "user32")]
 extern "system" {
-    fn EnumChildWindows(hwnd: HWND, cb: extern "system" fn(HWND, LPARAM) -> BOOL, lparam: LPARAM) -> BOOL;
+    fn EnumChildWindows(
+        hwnd: HWND,
+        cb: extern "system" fn(HWND, LPARAM) -> BOOL,
+        lparam: LPARAM,
+    ) -> BOOL;
     fn MonitorFromWindow(hwnd: HWND, flags: u32) -> isize;
     fn GetMonitorInfoW(monitor: isize, info: *mut MONITORINFO) -> BOOL;
     fn GetWindowLongPtrW(hwnd: HWND, index: i32) -> isize;
@@ -166,7 +170,12 @@ fn work_area(hwnd: HWND) -> RECT {
         if GetMonitorInfoW(mon, &mut info) != 0 {
             info.rc_work
         } else {
-            RECT { left: 0, top: 0, right: 1920, bottom: 1080 }
+            RECT {
+                left: 0,
+                top: 0,
+                right: 1920,
+                bottom: 1080,
+            }
         }
     }
 }
@@ -242,6 +251,11 @@ pub struct DialogShape {
     pub has_shell_view: bool,
     /// Any plain text edit — a search box, a message box input, ...
     pub has_edit: bool,
+    /// An **editable** combo box, i.e. one whose text field is a real `Edit`
+    /// child. That is the "you can type a path in here" marker: a plain
+    /// drop-down list (`CBS_DROPDOWNLIST`) has no `Edit` inside it, so a
+    /// settings dialog with a picker and a search box does not qualify.
+    pub has_path_edit: bool,
     /// A classic list view. IDM's download list is one of these.
     pub has_list_view: bool,
     /// A tree view. The navigation pane of a file dialog, IDM's category
@@ -291,6 +305,29 @@ impl DialogShape {
     pub fn is_file_dialog(&self) -> bool {
         self.has_name_combo && self.has_shell_view
     }
+
+    /// A dialog that chooses a **folder** without hosting the shell's item
+    /// view: an editable path field plus a folder tree.
+    ///
+    /// WinRAR's "extract path and options" dialog is the model case — the user
+    /// picks a destination folder there, which is exactly what the Quick
+    /// Switch is for, yet it is an ordinary app dialog (`#32770`, a
+    /// `ComboBox` with an `Edit` inside, and a `SysTreeView32`), not a shell
+    /// dialog, so the file-dialog rule never matched it.
+    ///
+    /// The editable combo is what keeps this narrow. IDM's main window (the
+    /// regression the file-dialog rule was written for) has an `Edit` and a
+    /// `SysTreeView32` as well, but no combo, so it stays rejected.
+    ///
+    /// The test is deliberately structural — no cross-process text reads in
+    /// the attach loop, which runs up to eight times per dialog. A settings
+    /// dialog that happens to put an editable combo next to a category tree
+    /// can therefore still match. The cost is a stray box: attaching changes
+    /// nothing, and the only way to alter the dialog is for the user to pick
+    /// a folder in it.
+    pub fn is_folder_dialog(&self) -> bool {
+        self.has_path_edit && self.has_tree_view
+    }
 }
 
 /// One single pass over the child tree of a dialog.
@@ -316,7 +353,22 @@ fn scan_dialog_children(parent: HWND) -> DialogShape {
         let mut buf = [0u16; 256];
         let len = unsafe { GetClassNameW(h, buf.as_mut_ptr(), buf.len() as i32) };
         if len > 0 {
-            shape.add_class(&from_wide(&buf[..len as usize]));
+            let class = from_wide(&buf[..len as usize]);
+            shape.add_class(&class);
+            // An `Edit` whose parent is a combo means the combo is editable:
+            // a drop-down *list* keeps its text inside the control and has no
+            // child window, so this is exactly the "type a path here" signal.
+            if class.eq_ignore_ascii_case("Edit") {
+                let parent = unsafe { GetParent(h) };
+                if parent != 0 {
+                    let pc = class_name(parent);
+                    if pc.eq_ignore_ascii_case("ComboBox")
+                        || pc.eq_ignore_ascii_case("ComboBoxEx32")
+                    {
+                        shape.has_path_edit = true;
+                    }
+                }
+            }
         }
         unsafe {
             let mut c = GetWindow(h, GW_CHILD);
@@ -333,25 +385,48 @@ fn scan_dialog_children(parent: HWND) -> DialogShape {
 /// name combo. See [`DialogShape::is_file_dialog`] for why the weaker
 /// "edit + list" heuristic was not enough.
 pub fn is_file_dialog(hwnd: HWND) -> bool {
+    dialog_shape(hwnd)
+        .map(|s| s.is_file_dialog())
+        .unwrap_or(false)
+}
+
+/// Can the Quick Switch attach here?
+///
+/// Broader than [`is_file_dialog`] on purpose: an app that asks "which folder?"
+/// with its own dialog (WinRAR's extract-to dialog) is just as good a place to
+/// pick a folder as the shell's picker. What differs is only *how* the choice
+/// is applied — see [`apply_folder`].
+pub fn is_quick_switch_target(hwnd: HWND) -> bool {
+    dialog_shape(hwnd)
+        .map(|s| s.is_file_dialog() || s.is_folder_dialog())
+        .unwrap_or(false)
+}
+
+fn dialog_shape(hwnd: HWND) -> Option<DialogShape> {
     if class_name(hwnd) != "#32770" {
-        return false;
+        return None;
     }
     let shape = scan_dialog_children(hwnd);
     crate::debug_log::qs_log_verbose(&format!(
-        "is_file_dialog {hwnd:#x}: combo={} shell={} edit={} list={} tree={} children={}",
+        "dialog shape {hwnd:#x}: combo={} path_edit={} shell={} edit={} list={} tree={} children={}",
         shape.has_name_combo,
+        shape.has_path_edit,
         shape.has_shell_view,
         shape.has_edit,
         shape.has_list_view,
         shape.has_tree_view,
         shape.children
     ));
-    shape.is_file_dialog()
+    Some(shape)
 }
 
-/// The "File name" edit of a dialog, if any.
+/// The text field that holds a path, if any.
+///
+/// On a shell dialog that is the "File name" box; on an app's own folder
+/// dialog (WinRAR's destination path) it is the editable combo's field. Both
+/// are the place a chosen path belongs.
 pub fn dialog_edit(hwnd: HWND) -> Option<HWND> {
-    if !is_file_dialog(hwnd) {
+    if !is_quick_switch_target(hwnd) {
         return None;
     }
     // Prefer an Edit nested in a ComboBox (that is the filename field).
@@ -361,6 +436,11 @@ pub fn dialog_edit(hwnd: HWND) -> Option<HWND> {
         }
     }
     find_child_deep(hwnd, "Edit")
+}
+
+/// The folder tree of an app's own folder dialog, if it has one.
+pub fn dialog_tree(hwnd: HWND) -> Option<HWND> {
+    find_child_deep(hwnd, "SysTreeView32")
 }
 
 pub fn get_text(hwnd: HWND) -> String {
@@ -383,24 +463,52 @@ pub fn set_text(hwnd: HWND, text: &str) {
 }
 
 /// Best-effort guess of the folder currently shown in a file dialog.
-pub fn dialog_current_folder(hwnd: HWND) -> Option<String> {    // The address bar of the modern dialog exposes the path through a toolbar's text.
-    if let Some(toolbar) = find_child_deep(hwnd, "ToolbarWindow32") {
-        let t = get_text(toolbar);
-        if t.contains(":\\") {
-            if let Some(idx) = t.find(":\\") {
-                let start = t[..idx].rfind(|c| c == ' ').map(|i| i + 1).unwrap_or(0);
-                let candidate = &t[start..];
-                if std::path::Path::new(candidate).is_dir() {
-                    return Some(candidate.to_string());
-                }
-            }
+extern "system" fn scan_address_text(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let out = unsafe { &mut *(lparam as *mut Option<String>) };
+    if class_name(hwnd) != "ToolbarWindow32" {
+        return 1;
+    }
+    let t = get_text(hwnd);
+    // The band's text is "地址: C:\Windows" — the path starts after the last
+    // space that precedes the drive colon.
+    if let Some(idx) = t.find(":\\") {
+        let start = t[..idx].rfind(|c| c == ' ').map(|i| i + 1).unwrap_or(0);
+        let candidate = &t[start..];
+        if std::path::Path::new(candidate).is_dir() {
+            *out = Some(candidate.to_string());
+            return 0; // stop enumerating
         }
     }
-    // Fallback: if the filename box already holds a full path.
+    1
+}
+
+pub fn dialog_current_folder(hwnd: HWND) -> Option<String> {
+    // The address band exposes the path through a toolbar's text. There are
+    // several toolbars (navigation buttons, up band, address band, address
+    // segments) and only one of them holds a path, so every one has to be
+    // checked — taking the first ToolbarWindow32 found "导航按钮" and made this
+    // function answer None for every real file dialog.
+    let mut found: Option<String> = None;
+    unsafe {
+        EnumChildWindows(
+            hwnd,
+            scan_address_text,
+            &mut found as *mut Option<String> as LPARAM,
+        );
+    }
+    if found.is_some() {
+        return found;
+    }
+    // Fallback: the path field may already hold a full path. A file dialog's
+    // name box holds a *file*, so its folder is the parent; an app's folder
+    // dialog holds the folder itself (WinRAR's destination path).
     if let Some(edit) = dialog_edit(hwnd) {
         let t = get_text(edit);
         if t.contains(":\\") {
             let p = std::path::PathBuf::from(&t);
+            if p.is_dir() {
+                return Some(t);
+            }
             if let Some(parent) = p.parent() {
                 return Some(parent.to_string_lossy().to_string());
             }
@@ -453,7 +561,12 @@ fn pick_edit(dialog: HWND, want_top: bool) -> Option<HWND> {
     if unsafe { GetWindowRect(dialog, &mut r) } == 0 {
         return None;
     }
-    let mut ctx = EditBand { dlg_top: r.top, want_top, hit: None, hit_pos: 0 };
+    let mut ctx = EditBand {
+        dlg_top: r.top,
+        want_top,
+        hit: None,
+        hit_pos: 0,
+    };
     unsafe { EnumChildWindows(dialog, scan_edit_band, &mut ctx as *mut EditBand as LPARAM) };
     ctx.hit
 }
@@ -470,6 +583,93 @@ const VK_CONTROL: u8 = 0x11;
 const VK_RETURN: u8 = 0x0D;
 const KEYEVENTF_KEYUP: u32 = 0x0002;
 const GA_ROOT: u32 = 2;
+const WM_KEYDOWN: u32 = 0x0100;
+const WM_KEYUP: u32 = 0x0101;
+
+/// Two paths are the same folder?
+fn same_folder(a: &str, b: &str) -> bool {
+    fn norm(s: &str) -> String {
+        s.trim_end_matches(['\\', '/'])
+            .replace('/', "\\")
+            .to_lowercase()
+    }
+    !a.is_empty() && norm(a) == norm(b)
+}
+
+/// The address band's text field.
+///
+/// It exists **before** Ctrl+L — the shell creates it up front and merely keeps
+/// it hidden until the band enters edit mode — and its ancestor chain always
+/// contains `Address Band Root`. The file name box is a direct child of the
+/// dialog, so it can never be mistaken for this one. That matters: Enter in the
+/// *name* box confirms the dialog instead of navigating.
+fn address_band_edit(dialog: HWND) -> Option<HWND> {
+    struct Ctx {
+        dialog: HWND,
+        hit: Option<HWND>,
+    }
+    extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let ctx = unsafe { &mut *(lparam as *mut Ctx) };
+        if class_name(hwnd) != "Edit" {
+            return 1;
+        }
+        let mut cur = hwnd;
+        for _ in 0..8 {
+            cur = unsafe { GetParent(cur) };
+            if cur == 0 || cur == ctx.dialog {
+                break;
+            }
+            if class_name(cur) == "Address Band Root" {
+                ctx.hit = Some(hwnd);
+                return 0; // found it: stop enumerating
+            }
+        }
+        1
+    }
+    let mut ctx = Ctx { dialog, hit: None };
+    unsafe {
+        EnumChildWindows(dialog, cb, &mut ctx as *mut Ctx as LPARAM);
+    }
+    ctx.hit
+}
+
+/// Navigate by writing into the address band and posting Enter **to that
+/// edit**, without entering edit mode.
+///
+/// This is what makes a jump invisible: no address bar appears, the breadcrumb
+/// stays a breadcrumb, and the dialog never has to take the foreground — so
+/// there is no focus fight with the Quick Switch box either. Measured on both
+/// the classic comdlg32 dialog and the DirectUI `IFileDialog`: the shell
+/// accepts the path and switches folders.
+///
+/// The shell loads the folder asynchronously, so the result is confirmed
+/// against the dialog's own address band. Without that check a failed jump
+/// would report success and the caller would never retry.
+fn jump_via_address_band(dialog: HWND, path: &str) -> bool {
+    let Some(edit) = address_band_edit(dialog) else {
+        return false;
+    };
+    set_text(edit, &path.replace('/', "\\"));
+    unsafe {
+        SendMessageW(edit, WM_KEYDOWN, VK_RETURN as WPARAM, 0);
+        SendMessageW(edit, WM_KEYUP, VK_RETURN as WPARAM, 0);
+    }
+    // The band updates when the shell has actually switched, which takes a few
+    // hundred milliseconds on a cold folder; poll rather than guess a delay.
+    for _ in 0..25 {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        if dialog_closing(dialog) {
+            return false;
+        }
+        if let Some(cur) = dialog_current_folder(dialog) {
+            if same_folder(&cur, path) {
+                crate::debug_log::qs_log(&format!("navigate: {path} (address band, no Ctrl+L)"));
+                return true;
+            }
+        }
+    }
+    false
+}
 
 /// True when the dialog is on its way out.
 ///
@@ -513,6 +713,19 @@ pub fn navigate_to_folder(dialog: HWND, path: &str) -> bool {
     if !is_file_dialog(dialog) {
         return false;
     }
+    // Fast, invisible path: the address band's edit is already there, so the
+    // folder can be typed into it without ever showing the address bar.
+    if jump_via_address_band(dialog, path) {
+        return true;
+    }
+    if dialog_closing(dialog) {
+        crate::debug_log::qs_log("navigate: dialog closed before the jump");
+        return false;
+    }
+    // Slow path, kept for dialogs whose address band does not exist (older
+    // shells, custom templates): Ctrl+L turns the breadcrumb into an editable
+    // address bar and hands it the caret.
+    //
     // The box itself has the focus when the user clicks a folder in it, so the
     // dialog has to be activated first — and we must *verify* that happened
     // before sending keys. Alt+D fired at the wrong window would open a menu
@@ -596,6 +809,44 @@ pub fn navigate_to_folder(dialog: HWND, path: &str) -> bool {
     true
 }
 
+/// Apply a chosen folder to whatever kind of dialog is in front.
+///
+/// The two kinds need different mechanics. A shell dialog has an address bar,
+/// and typing a folder there only navigates. An app's own folder dialog has a
+/// folder tree instead, and the tree is what the user is looking at — so the
+/// selection is moved there and the dialog works out the path itself. Only
+/// when the tree cannot express the path (a hidden or system folder has no
+/// node at all) does the path get written into the field, and even then
+/// nothing is pressed: Enter in WinRAR's extract dialog starts extracting.
+pub fn apply_folder(dialog: HWND, path: &str) -> bool {
+    match dialog_shape(dialog) {
+        Some(s) if s.is_file_dialog() => navigate_to_folder(dialog, path),
+        Some(s) if s.is_folder_dialog() => {
+            if super::tree::select_folder(dialog, path) {
+                activate(dialog);
+                return true;
+            }
+            fill_path_field(dialog, path)
+        }
+        _ => false,
+    }
+}
+
+/// Write `path` into an app dialog's path field, without pressing anything.
+fn fill_path_field(dialog: HWND, path: &str) -> bool {
+    let Some(edit) = dialog_edit(dialog) else {
+        return false;
+    };
+    set_text(edit, path);
+    // Select it so the user can simply overwrite, or accept it as it is.
+    unsafe {
+        SendMessageW(edit, 0x00B1 /* EM_SETSEL */, 0, -1);
+    }
+    activate(dialog);
+    crate::debug_log::qs_log(&format!("fill path: dialog {dialog:#x} -> {path}"));
+    true
+}
+
 /// Put `path` in the filename box so the user can accept it themselves.
 /// Deliberately does **not** press OK: choosing what to do with the path is
 /// the user's call.
@@ -625,7 +876,11 @@ pub fn pixel_color(x: i32, y: i32) -> (u8, u8, u8) {
         if c == u32::MAX {
             return (0, 0, 0);
         }
-        ((c & 0xFF) as u8, ((c >> 8) & 0xFF) as u8, ((c >> 16) & 0xFF) as u8)
+        (
+            (c & 0xFF) as u8,
+            ((c >> 8) & 0xFF) as u8,
+            ((c >> 16) & 0xFF) as u8,
+        )
     }
 }
 
@@ -654,7 +909,19 @@ pub fn set_dark_titlebar(hwnd: HWND, dark: bool) {
 mod tests {
     use super::super::{EnumWindows, GetWindowTextW, IsWindowVisible, PostMessageW, BOOL, LPARAM};
     use super::DialogShape;
-    use super::{class_name, is_file_dialog};
+    use super::{class_name, is_file_dialog, same_folder};
+
+    #[test]
+    fn compares_folder_paths_the_way_the_shell_does() {
+        // The address band answers with backslashes and no trailing separator;
+        // the caller may pass either. Case never matters on Windows.
+        assert!(same_folder("C:\\Windows", "c:\\windows"));
+        assert!(same_folder("C:\\Windows\\", "C:/Windows"));
+        assert!(same_folder("C:/Users/x/", "C:\\Users\\x"));
+        assert!(!same_folder("C:\\Windows", "C:\\Windows\\System32"));
+        // An empty answer must never count as "already there".
+        assert!(!same_folder("", ""));
+    }
 
     #[link(name = "comdlg32")]
     extern "system" {
@@ -745,7 +1012,10 @@ mod tests {
     #[ignore = "opens a dialog on screen"]
     fn detects_a_real_file_dialog() {
         std::thread::spawn(|| {
-            let title: Vec<u16> = "KestrelOpen".encode_utf16().chain(std::iter::once(0)).collect();
+            let title: Vec<u16> = "KestrelOpen"
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
             let mut buf = [0u16; 260];
             let mut ofn = OPENFILENAMEW {
                 lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
@@ -797,12 +1067,7 @@ mod tests {
     #[ignore = "opens a dialog on screen"]
     fn rejects_a_real_message_box() {
         std::thread::spawn(|| unsafe {
-            MessageBoxA(
-                0,
-                b"hello\0".as_ptr(),
-                b"KestrelMsg\0".as_ptr(),
-                0,
-            );
+            MessageBoxA(0, b"hello\0".as_ptr(), b"KestrelMsg\0".as_ptr(), 0);
         });
         let hwnd = find_visible_dialog("KestrelMsg", 8000).expect("no message box appeared");
         let detected = is_file_dialog(hwnd);
@@ -843,7 +1108,10 @@ mod tests {
                 continue;
             }
             checked += 1;
-            println!("IDM window {hwnd:#x} title={title:?} shape={:?}", super::scan_dialog_children(*hwnd));
+            println!(
+                "IDM window {hwnd:#x} title={title:?} shape={:?}",
+                super::scan_dialog_children(*hwnd)
+            );
             assert!(
                 !is_file_dialog(*hwnd),
                 "IDM window {hwnd:#x} ({title}) was mistaken for a file dialog"
@@ -883,10 +1151,21 @@ mod tests {
     }
 
     /// Build a fingerprint from a real child-class listing.
+    ///
+    /// `"ComboBox>Edit"` spells out a parent/child pair a flat class list
+    /// cannot express: an **editable** combo, whose text field is a real `Edit`
+    /// child window. That relation is the "you can type a path here" marker.
     fn shape_of(classes: &[&str]) -> DialogShape {
         let mut s = DialogShape::default();
         for c in classes {
-            s.add_class(c);
+            match c.strip_suffix(">Edit") {
+                Some(parent) => {
+                    s.add_class(parent);
+                    s.add_class("Edit");
+                    s.has_path_edit = true;
+                }
+                None => s.add_class(c),
+            }
             s.children += 1;
         }
         s
@@ -899,7 +1178,7 @@ mod tests {
         "Breadcrumb Parent",
         "Button",
         "ComboBox",
-        "ComboBoxEx32",
+        "ComboBoxEx32>Edit",
         "CtrlNotifySink",
         "DUIViewWndClassName",
         "DirectUIHWND",
@@ -949,6 +1228,58 @@ mod tests {
     /// SHBrowseForFolder's tree picker: no shell view, no file name combo.
     const FOLDER_PICKER: &[&str] = &["Button", "Static", "Static", "SysTreeView32"];
 
+    /// `IFileOpenDialog` with `FOS_PICKFOLDERS` (the "choose a folder" dialog
+    /// Windows shows today). Captured with tools/probe-dialogs.rs — it is a
+    /// full shell dialog, so the file-dialog rule already covered it.
+    const MODERN_FOLDER_PICKER: &[&str] = &[
+        "DUIViewWndClassName",
+        "DirectUIHWND",
+        "CtrlNotifySink",
+        "NamespaceTreeControl",
+        "SysTreeView32",
+        "SHELLDLL_DefView",
+        "ScrollBar",
+        "Static",
+        "ComboBoxEx32>Edit",
+        "ComboBox",
+        "Button",
+        "Button",
+        "ListBox",
+        "WorkerW",
+        "ReBarWindow32",
+        "TravelBand",
+        "ToolbarWindow32",
+        "Address Band Root",
+        "Breadcrumb Parent",
+        "msctls_progress32",
+    ];
+
+    /// WinRAR 7.23's "extract path and options" dialog. An ordinary app dialog:
+    /// a destination path in an editable combo and a folder tree, but no shell
+    /// view and no address bar. This is what the Quick Switch used to skip.
+    const WINRAR_EXTRACT: &[&str] = &[
+        "#32770",
+        "Static",
+        "ComboBox>Edit",
+        "SysTreeView32",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "SysTabControl32",
+    ];
+
     /// IDM 6.43's main window (a `#32770` with the download list and the
     /// search box). This is the window the Quick Switch used to attach to.
     const IDM_MAIN: &[&str] = &[
@@ -984,9 +1315,42 @@ mod tests {
 
     #[test]
     fn rejects_the_folder_picker() {
-        // A folder tree has nothing to put a file name into, so the Quick
-        // Switch has no business attaching to it.
-        assert!(!shape_of(FOLDER_PICKER).is_file_dialog());
+        // The legacy SHBrowseForFolder tree has nothing to put a path into:
+        // no combo, no address bar, and its selection is not readable. The
+        // Quick Switch has no business attaching to it.
+        let s = shape_of(FOLDER_PICKER);
+        assert!(!s.is_file_dialog());
+        assert!(!s.is_folder_dialog());
+    }
+
+    #[test]
+    fn recognises_the_modern_folder_picker() {
+        // IFileOpenDialog + FOS_PICKFOLDERS is a shell dialog: shell view and
+        // a "Folder:" combo, so the file-dialog rule already covers it.
+        let s = shape_of(MODERN_FOLDER_PICKER);
+        assert!(s.has_shell_view && s.has_name_combo);
+        assert!(s.is_file_dialog());
+    }
+
+    #[test]
+    fn recognises_an_apps_folder_dialog() {
+        // WinRAR's extract-to dialog: an editable path field and a folder
+        // tree, no shell view. It picks a folder, so the Quick Switch belongs
+        // there even though it is not a shell dialog.
+        let s = shape_of(WINRAR_EXTRACT);
+        assert!(s.has_path_edit && s.has_tree_view);
+        assert!(!s.is_file_dialog(), "no address bar to navigate");
+        assert!(s.is_folder_dialog());
+    }
+
+    #[test]
+    fn a_drop_down_list_is_not_a_path_field() {
+        // The editable-combo marker is what separates WinRAR's dialog from any
+        // dialog that merely has a picker and a tree: a CBS_DROPDOWNLIST keeps
+        // its text inside the control and has no Edit child.
+        let mut s = shape_of(WINRAR_EXTRACT);
+        s.has_path_edit = false;
+        assert!(!s.is_folder_dialog());
     }
 
     #[test]
@@ -997,6 +1361,10 @@ mod tests {
         assert!(s.has_edit && s.has_list_view, "IDM shape changed");
         assert!(!s.has_name_combo && !s.has_shell_view);
         assert!(!s.is_file_dialog());
+        // And it must stay out under the folder-dialog rule too: no editable
+        // combo, even though it does have a tree view.
+        assert!(s.has_tree_view && !s.has_path_edit);
+        assert!(!s.is_folder_dialog());
     }
 
     #[test]

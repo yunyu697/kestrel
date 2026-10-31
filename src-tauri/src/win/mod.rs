@@ -64,6 +64,25 @@ pub struct SHFILEINFOW {
     pub szTypeName: [u16; 80],
 }
 
+/// `TVITEMW` from commctrl.h — the payload of `TVM_GETITEMW`.
+///
+/// A tree view keeps its item text in its own process, so reading it means
+/// handing the control a struct that lives in *its* address space; the field
+/// offsets here have to match the C layout exactly.
+#[repr(C)]
+pub struct TVITEMW {
+    pub mask: u32,
+    pub h_item: isize,
+    pub state: u32,
+    pub state_mask: u32,
+    pub psz_text: *mut u16,
+    pub cch_text_max: i32,
+    pub i_image: i32,
+    pub i_selected_image: i32,
+    pub c_children: i32,
+    pub l_param: isize,
+}
+
 #[repr(C)]
 pub struct BITMAPINFOHEADER {
     pub biSize: u32,
@@ -154,6 +173,17 @@ pub const VK_SHIFT: u32 = 0x10;
 pub const VK_MENU: u32 = 0x12;
 
 pub const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+pub const PROCESS_VM_OPERATION: u32 = 0x0008;
+pub const PROCESS_VM_READ: u32 = 0x0010;
+pub const PROCESS_VM_WRITE: u32 = 0x0020;
+
+pub const MEM_COMMIT: u32 = 0x1000;
+pub const MEM_RESERVE: u32 = 0x2000;
+pub const MEM_RELEASE: u32 = 0x8000;
+pub const PAGE_READWRITE: u32 = 0x04;
+
+pub const SMTO_BLOCK: u32 = 0x0001;
+pub const SMTO_ABORTIFHUNG: u32 = 0x0002;
 
 pub const SEE_MASK_INVOKEIDLIST: u32 = 0x0000_000C;
 pub const SEE_MASK_NOCLOSEPROCESS: u32 = 0x0000_0040;
@@ -178,6 +208,15 @@ extern "system" {
     pub fn AttachThreadInput(id_attach: u32, id_attach_to: u32, attach: BOOL) -> BOOL;
     pub fn GetCurrentThreadId() -> u32;
     pub fn SendMessageW(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
+    pub fn SendMessageTimeoutW(
+        hwnd: HWND,
+        msg: u32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+        flags: u32,
+        timeout: u32,
+        result: *mut usize,
+    ) -> LRESULT;
     pub fn PostMessageW(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> BOOL;
     pub fn FindWindowExW(parent: HWND, after: HWND, class: *const u16, title: *const u16) -> HWND;
     pub fn GetWindowRect(hwnd: HWND, rect: *mut RECT) -> BOOL;
@@ -278,6 +317,28 @@ extern "system" {
     pub fn GlobalLock(mem: *mut c_void) -> *mut c_void;
     pub fn GlobalUnlock(mem: *mut c_void) -> BOOL;
     pub fn GlobalFree(mem: *mut c_void) -> *mut c_void;
+    pub fn VirtualAllocEx(
+        process: HANDLE,
+        addr: *mut c_void,
+        size: usize,
+        kind: u32,
+        protect: u32,
+    ) -> *mut c_void;
+    pub fn VirtualFreeEx(process: HANDLE, addr: *mut c_void, size: usize, kind: u32) -> BOOL;
+    pub fn ReadProcessMemory(
+        process: HANDLE,
+        addr: *const c_void,
+        buf: *mut c_void,
+        size: usize,
+        read: *mut usize,
+    ) -> BOOL;
+    pub fn WriteProcessMemory(
+        process: HANDLE,
+        addr: *mut c_void,
+        buf: *const c_void,
+        size: usize,
+        written: *mut usize,
+    ) -> BOOL;
 }
 
 #[link(name = "dwmapi")]
@@ -288,6 +349,7 @@ extern "system" {
 pub mod icon;
 pub mod monitor;
 pub mod shell;
+pub mod tree;
 pub mod window;
 
 pub fn wide(s: &str) -> Vec<u16> {
