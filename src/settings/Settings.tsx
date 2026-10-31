@@ -9,16 +9,16 @@ import { applyColors, COLOR_SLOTS, slotColor, THEME_SWATCHES } from "../shared/t
 import { SCHEMES, schemeById, schemePalette } from "../shared/palettes";
 import { pick, RELEASES, type ReleaseKind } from "../shared/releases";
 import {
-  applyMirror,
   checkForUpdate,
   foundUpdate,
   lastCheckAt,
   mirrorPrefix,
   MIRRORS,
-  pickAsset,
+  pickInstallAsset,
   testMirrorLatency,
   type UpdateCheckResult,
 } from "../shared/updater";
+import UpdateActions from "../shared/UpdateActions";
 import type {
   AppEntry,
   BuildInfo,
@@ -1713,6 +1713,16 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
   const [chkResult, setChkResult] = useState<UpdateCheckResult | null>(null);
   const [speeds, setSpeeds] = useState<Record<string, number | null> | null>(null);
   const [testing, setTesting] = useState(false);
+  // How this copy was installed: the update has to use the matching
+  // installer, or it would install a second Kestrel next to this one.
+  const [installMode, setInstallMode] = useState("perMachine");
+
+  useEffect(() => {
+    void api
+      .installMode()
+      .then(setInstallMode)
+      .catch(() => setInstallMode("perMachine"));
+  }, []);
 
   const normPrefix = (p: string) => p.replace(/\/?$/, "/");
   const mirrorId =
@@ -1751,9 +1761,6 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
     }
   };
 
-  const download = (url: string) => {
-    void api.openUrl(applyMirror(url, mirrorPrefix(s)));
-  };
   return (
     <>
       <h1>{t("关于")}</h1>
@@ -1816,33 +1823,11 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
                   .slice(0, 12)
                   .join("\n")}
               </pre>
-              <div className="upd-actions">
-                {(() => {
-                  const main = pickAsset(chkResult.info!.assets);
-                  const zip = chkResult.info!.assets.find((a) => a.name.endsWith(".zip"));
-                  return (
-                    <>
-                      {main && (
-                        <button className="btn" data-variant="primary" data-size="sm" onClick={() => download(main.url)}>
-                          {t("下载安装包")}
-                        </button>
-                      )}
-                      {zip && (
-                        <button className="btn" data-size="sm" onClick={() => download(zip.url)}>
-                          {t("便携版")}
-                        </button>
-                      )}
-                    </>
-                  );
-                })()}
-                <button
-                  className="btn"
-                  data-size="sm"
-                  onClick={() => void api.openUrl(applyMirror(chkResult.info!.htmlUrl, mirrorPrefix(s)))}
-                >
-                  {t("前往发布页")}
-                </button>
-              </div>
+              <UpdateActions
+                assetUrl={pickInstallAsset(chkResult.info.assets, installMode)?.url ?? ""}
+                htmlUrl={chkResult.info.htmlUrl}
+                mirror={mirrorPrefix(s)}
+              />
             </div>
           )}
           <Row label={t("检查频率")} desc={t("启动时与运行期间按此周期自动检查")}>

@@ -193,6 +193,37 @@ export function pickAsset(assets: ReleaseAsset[]): ReleaseAsset | null {
   );
 }
 
+/** The installer that replaces *this* installation.
+ *
+ *  A per-machine copy (MSI → Program Files) has to be upgraded with the MSI,
+ *  a current-user copy (NSIS → AppData) with the NSIS setup — running the
+ *  other one would install a second copy next to the running one instead of
+ *  replacing it. */
+export function pickInstallAsset(
+  assets: ReleaseAsset[],
+  mode: string,
+): ReleaseAsset | null {
+  if (mode === "currentUser") {
+    return (
+      assets.find((a) => a.name.includes("setup") && a.name.endsWith(".exe")) ??
+      assets.find((a) => a.name.endsWith(".zip")) ??
+      null
+    );
+  }
+  return pickAsset(assets);
+}
+
+/** The file name of a download URL — what the installer is saved as. */
+export function assetFileName(url: string, fallback: string): string {
+  try {
+    const clean = url.split("?")[0].split("#")[0];
+    const name = decodeURIComponent(clean.slice(clean.lastIndexOf("/") + 1));
+    return name || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /** The file the speed test measures: the newest installer we know about.
  *  Mirrors only proxy release assets — asking one for a release *page* gets
  *  a 403 — so the test has to point at a real download. */
@@ -282,7 +313,10 @@ export async function checkForUpdate(current: string): Promise<UpdateCheckResult
     };
     localStorage.setItem(LS_LAST, String(r.checkedAt));
     if (r.hasUpdate && r.info) {
-      const asset = pickAsset(r.info.assets);
+      // The installer has to match how this copy was installed, otherwise
+      // the update installs a second Kestrel next to the running one.
+      const mode = await api.installMode().catch(() => "perMachine");
+      const asset = pickInstallAsset(r.info.assets, mode);
       localStorage.setItem(
         LS_FOUND,
         JSON.stringify({

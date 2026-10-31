@@ -8,6 +8,7 @@ mod debug_log;
 mod hotkeys;
 mod i18n;
 mod index;
+mod install;
 mod model;
 mod restart;
 mod search;
@@ -36,6 +37,20 @@ pub fn run() {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--watchdog") {
         watchdog::run();
+        return;
+    }
+    // Installer helper mode: wait for the app to exit, then run the installer
+    // that replaces it. It has to be handled before the single-instance
+    // plugin, which would otherwise turn this copy into a second launcher.
+    if let Some(i) = args.iter().position(|a| a == "--install") {
+        let path = args.get(i + 1).cloned().unwrap_or_default();
+        let parent = args
+            .iter()
+            .position(|a| a == "--parent")
+            .and_then(|i| args.get(i + 1))
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0);
+        install::run(&path, parent);
         return;
     }
     // A self-relaunch (elevation change) must not lose the single-instance
@@ -225,6 +240,12 @@ pub fn run() {
             commands::files::spawn_program,
             // network
             commands::net::http_probe,
+            // update
+            commands::update::update_download,
+            commands::update::update_cancel,
+            commands::update::update_install,
+            commands::update::update_reveal,
+            commands::update::install_mode,
             // settings & apps
             commands::settings::get_settings,
             commands::settings::save_settings,

@@ -27,6 +27,63 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.4",
+    date: "2026-10-31",
+    title: {
+      zh: "应用内更新：更新 / 仅下载 / 打开下载页面",
+      en: "In-app updates: install, download only, or open the release page",
+      ja: "アプリ内更新：更新 / ダウンロードのみ / リリースページを開く",
+      es: "Actualizaciones dentro de la app: instalar, solo descargar o abrir la página de la versión",
+    },
+    items: [
+      {
+        kind: "new",
+        text: {
+          zh: "发现新版本后提供三个操作：「更新」直接下载并在完成后自动完成安装；「仅下载」只下载安装包，下载完提示是否安装；「打开下载页面」打开该版本的 release 页面",
+          en: "Three actions once a new version is found: «Update» downloads and installs automatically, «Download only» fetches the installer and then asks whether to install, and «Open release page» opens that release on GitHub",
+          ja: "新バージョンを検出すると 3 つの操作：「更新」はダウンロード後に自動でインストール、「仅下载（ダウンロードのみ）」はインストーラーを保存するだけで完了後にインストールするか確認、「打开下载页面（リリースページを開く）」はその版の release ページを開きます",
+          es: "Tres acciones al detectar una versión nueva: «Actualizar» descarga e instala automáticamente, «Solo descargar» guarda el instalador y luego pregunta si instalarlo, y «Abrir la página de la versión» abre esa versión en GitHub",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "下载在应用内完成，走系统网络组件（WinHTTP），带进度条、已下载大小与实时速度；可随时取消",
+          en: "The download runs inside the app through the system network stack (WinHTTP) with a progress bar, byte counter and live speed; it can be cancelled at any time",
+          ja: "ダウンロードはアプリ内でシステムのネットワーク層（WinHTTP）経由で行い、進捗バー・取得済みサイズ・実測速度を表示。いつでも中断できます",
+          es: "La descarga se hace dentro de la app usando la pila de red del sistema (WinHTTP), con barra de progreso, tamaño descargado y velocidad en vivo; se puede cancelar en cualquier momento",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复「检查更新」找到新版本后按钮点了没反应：此前只是把下载链接丢给浏览器，现在改为应用内直接下载并安装",
+          en: "Fixed the update button doing nothing after a new version was found: it used to hand the download link to the browser, now the app downloads and installs it itself",
+          ja: "新バージョン検出後に更新ボタンが反応しなかった問題を修正。従来はダウンロードリンクをブラウザーに渡すだけでしたが、アプリ内で直接ダウンロード・インストールします",
+          es: "Se corrigió que el botón de actualización no hiciera nada tras detectar una versión nueva: antes solo se pasaba el enlace al navegador; ahora la app descarga e instala por su cuenta",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "安装器会等应用完全退出后再执行，避免「文件被占用」导致安装失败；装完自动启动新版本",
+          en: "The installer now waits until the app has fully exited before it runs, so it cannot fail with «file in use»; the new version starts itself afterwards",
+          ja: "インストーラーはアプリが完全に終了してから実行されるため「ファイルが使用中」で失敗しません。完了後に新バージョンを自動で起動します",
+          es: "El instalador espera a que la app se cierre por completo antes de ejecutarse, así no falla con «el archivo está en uso»; al terminar se inicia la versión nueva",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "更新时自动选择与当前安装方式匹配的安装包（MSI / NSIS），不会再装出第二份 Kestrel",
+          en: "The update now picks the installer that matches how this copy was installed (MSI / NSIS), so it never installs a second Kestrel next to the running one",
+          ja: "現在のインストール形態に合ったインストーラー（MSI / NSIS）を選ぶようになり、Kestrel が二重に導入されなくなりました",
+          es: "La actualización elige ahora el instalador que corresponde al tipo de instalación actual (MSI / NSIS), de modo que nunca instala un segundo Kestrel junto al que está en marcha",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.3",
     date: "2026-10-31",
     title: {

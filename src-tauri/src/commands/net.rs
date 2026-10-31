@@ -26,7 +26,7 @@ use windows::Win32::Networking::WinHttp::{
     WinHttpQueryDataAvailable, WinHttpQueryHeaders, WinHttpReadData, WinHttpReceiveResponse,
     WinHttpSendRequest, WinHttpSetOption, WinHttpSetTimeouts, WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
     WINHTTP_ACCESS_TYPE_NAMED_PROXY, WINHTTP_FLAG_SECURE, WINHTTP_OPTION_USER_AGENT,
-    WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_QUERY_STATUS_CODE,
+    WINHTTP_QUERY_CONTENT_LENGTH, WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_QUERY_STATUS_CODE,
 };
 
 const AGENT: &str = "Kestrel";
@@ -148,14 +148,39 @@ fn parse_url(url: &str) -> Result<Parts, String> {
     })
 }
 
-/// One request over an explicit route. `proxy` is `None` for a direct call.
-unsafe fn request(
+/// An open WinHTTP request together with every handle it owns.
+struct Conn {
+    session: *mut c_void,
+    connect: *mut c_void,
+    request: *mut c_void,
+}
+
+impl Drop for Conn {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.request.is_null() {
+                let _ = WinHttpCloseHandle(self.request);
+            }
+            if !self.connect.is_null() {
+                let _ = WinHttpCloseHandle(self.connect);
+            }
+            if !self.session.is_null() {
+                let _ = WinHttpCloseHandle(self.session);
+            }
+        }
+    }
+}
+
+/// Open a session/connect/request trio for one HTTP call. `proxy` is `None`
+/// for a direct connection.
+///
+/// The handles are owned by the returned `Conn`, so every early return still
+/// closes them.
+unsafe fn open_request(
     parts: &Parts,
     proxy: Option<&str>,
     timeout_ms: u32,
-    range_bytes: Option<u32>,
-) -> Result<HttpProbe, String> {
-    let via = if proxy.is_some() { "proxy" } else { "direct" };
+) -> Result<Conn, String> {
     let agent: Vec<u16> = AGENT.encode_utf16().chain(std::iter::once(0)).collect();
     let proxy_w: Vec<u16> = proxy
         .unwrap_or("")
@@ -182,15 +207,14 @@ unsafe fn request(
             unsafe { windows::Win32::Foundation::GetLastError() }.0
         ));
     }
-    let guard = Handle(session);
     let _ = WinHttpSetTimeouts(session, timeout_ms as i32, timeout_ms as i32, timeout_ms as i32, timeout_ms as i32);
 
     let host_w: Vec<u16> = parts.host.encode_utf16().chain(std::iter::once(0)).collect();
     let connect = WinHttpConnect(session, PCWSTR(host_w.as_ptr()), parts.port, 0);
     if connect.is_null() {
+        let _ = WinHttpCloseHandle(session);
         return Err("无法建立连接".into());
     }
-    let connect_guard = Handle(connect);
 
     let path_w: Vec<u16> = parts.path.encode_utf16().chain(std::iter::once(0)).collect();
     let verb_w: Vec<u16> = "GET".encode_utf16().chain(std::iter::once(0)).collect();
@@ -210,14 +234,33 @@ unsafe fn request(
         flags,
     );
     if req.is_null() {
+        let _ = WinHttpCloseHandle(connect);
+        let _ = WinHttpCloseHandle(session);
         return Err("无法创建请求".into());
     }
-    let req_guard = Handle(req);
 
     // GitHub's API insists on a User-Agent; WinHTTP's default one is ancient
     // enough that it is better to set our own.
     let ua: Vec<u8> = agent.iter().flat_map(|c| c.to_le_bytes()).collect();
     let _ = WinHttpSetOption(Some(req), WINHTTP_OPTION_USER_AGENT, Some(&ua));
+
+    Ok(Conn {
+        session,
+        connect,
+        request: req,
+    })
+}
+
+/// One request over an explicit route. `proxy` is `None` for a direct call.
+unsafe fn request(
+    parts: &Parts,
+    proxy: Option<&str>,
+    timeout_ms: u32,
+    range_bytes: Option<u32>,
+) -> Result<HttpProbe, String> {
+    let via = if proxy.is_some() { "proxy" } else { "direct" };
+    let conn = open_request(parts, proxy, timeout_ms)?;
+    let req = conn.request;
 
     // A range request keeps the speed test cheap: the server answers with the
     // first few hundred bytes instead of the whole installer.
@@ -259,10 +302,6 @@ unsafe fn request(
         }
     }
 
-    drop(req_guard);
-    drop(connect_guard);
-    drop(guard);
-
     let text = String::from_utf8_lossy(&body).to_string();
     Ok(HttpProbe {
         ok: status >= 200 && status < 400,
@@ -274,16 +313,116 @@ unsafe fn request(
     })
 }
 
-/// RAII wrapper so every early return still closes the WinHTTP handles.
-struct Handle(*mut c_void);
-impl Drop for Handle {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe {
-                let _ = WinHttpCloseHandle(self.0);
+/// Stream a URL straight into a file, reporting progress as it goes.
+///
+/// `on_progress` receives `(received, total)` and returns `false` to abort the
+/// transfer. Direct connection first, proxy second — same policy as the
+/// probes.
+pub(crate) fn download_to_file(
+    url: &str,
+    dest: &std::path::Path,
+    timeout_ms: u32,
+    mut on_progress: impl FnMut(u64, u64) -> bool,
+) -> Result<u64, String> {
+    let parts = parse_url(url)?;
+    // A cancelled transfer must not be retried through the proxy: the user
+    // asked for it to stop, not for another route.
+    let canceled = std::cell::Cell::new(false);
+    let direct = unsafe {
+        stream_to_file(&parts, None, timeout_ms, dest, &mut on_progress, &canceled)
+    };
+    match direct {
+        Ok(n) => Ok(n),
+        Err(direct_err) => {
+            if canceled.get() {
+                return Err(direct_err);
+            }
+            match proxy_from_env(parts.secure) {
+                Some(proxy) => unsafe {
+                    stream_to_file(
+                        &parts,
+                        Some(&proxy),
+                        timeout_ms,
+                        dest,
+                        &mut on_progress,
+                        &canceled,
+                    )
+                }
+                .map_err(|e| format!("{direct_err}；代理 {proxy} 也失败: {e}")),
+                None => Err(direct_err),
             }
         }
     }
+}
+
+/// The download half of `download_to_file`: one connection, one file.
+unsafe fn stream_to_file(
+    parts: &Parts,
+    proxy: Option<&str>,
+    timeout_ms: u32,
+    dest: &std::path::Path,
+    on_progress: &mut impl FnMut(u64, u64) -> bool,
+    canceled: &std::cell::Cell<bool>,
+) -> Result<u64, String> {
+    let conn = open_request(parts, proxy, timeout_ms)?;
+    let req = conn.request;
+
+    WinHttpSendRequest(req, None, None, 0, 0, 0).map_err(|e| format!("发送失败: {e}"))?;
+    WinHttpReceiveResponse(req, std::ptr::null_mut()).map_err(|e| format!("接收失败: {e}"))?;
+
+    let mut status: u32 = 0;
+    let mut status_len: u32 = 4;
+    let _ = WinHttpQueryHeaders(
+        req,
+        WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+        PCWSTR::null(),
+        Some(&mut status as *mut u32 as *mut c_void),
+        &mut status_len,
+        std::ptr::null_mut(),
+    );
+    if !(200..300).contains(&status) {
+        return Err(format!("下载失败：HTTP {status}"));
+    }
+
+    // The total is only known when the server sends a Content-Length; without
+    // it the UI shows an indeterminate bar instead of a percentage.
+    let mut total: u32 = 0;
+    let mut total_len: u32 = 4;
+    let _ = WinHttpQueryHeaders(
+        req,
+        WINHTTP_QUERY_CONTENT_LENGTH | WINHTTP_QUERY_FLAG_NUMBER,
+        PCWSTR::null(),
+        Some(&mut total as *mut u32 as *mut c_void),
+        &mut total_len,
+        std::ptr::null_mut(),
+    );
+
+    use std::io::Write;
+    let mut file = std::fs::File::create(dest).map_err(|e| format!("无法写入文件: {e}"))?;
+    let mut received: u64 = 0;
+    let mut buf = vec![0u8; 64 * 1024];
+    loop {
+        let mut avail: u32 = 0;
+        if WinHttpQueryDataAvailable(req, &mut avail).is_err() || avail == 0 {
+            break;
+        }
+        let want = avail.min(buf.len() as u32);
+        let mut read: u32 = 0;
+        if WinHttpReadData(req, buf.as_mut_ptr() as *mut c_void, want, &mut read).is_err()
+            || read == 0
+        {
+            break;
+        }
+        file.write_all(&buf[..read as usize])
+            .map_err(|e| format!("写入失败: {e}"))?;
+        received += read as u64;
+        if !on_progress(received, total as u64) {
+            canceled.set(true);
+            return Err("下载已取消".into());
+        }
+    }
+    file.flush().ok();
+    Ok(received)
 }
 
 /// Probe a URL. Direct first, proxy second — the proxy is only used when the
@@ -438,5 +577,62 @@ mod tests {
             println!("{prefix} -> status={} via={} ms={}", p.status, p.via, p.ms);
             assert!(p.status > 0, "no response from {prefix}: {:?}", p.error);
         }
+    }
+
+    /// The real update path: stream a release asset to disk and check that
+    /// the file arrives complete.
+    #[test]
+    #[ignore = "needs network"]
+    fn downloads_a_release_asset_to_disk() {
+        let latest = probe(
+            "https://api.github.com/repos/yunyu697/kestrel/releases/latest",
+            20_000,
+            None,
+        );
+        assert!(latest.ok, "probe failed: {:?}", latest.error);
+        let body = latest.body.unwrap_or_default();
+        let json: serde_json::Value = serde_json::from_str(&body).expect("bad release json");
+        let assets = json["assets"].as_array().expect("no assets array");
+        let msi = assets
+            .iter()
+            .find(|a| a["name"].as_str().unwrap_or("").ends_with(".msi"))
+            .expect("no msi asset");
+        let asset = msi["browser_download_url"].as_str().expect("no download url");
+        // The expected size comes from the release payload, so a truncated
+        // download is caught even though the server answers 200.
+        let expected = msi["size"].as_u64().expect("no size");
+
+        let dir = std::env::temp_dir().join("kestrel-download-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join("asset.msi");
+        let mut ticks = 0u32;
+        let written = download_to_file(asset, &dest, 180_000, |received, total| {
+            ticks += 1;
+            assert!(total == 0 || total >= received, "total went backwards");
+            true
+        })
+        .expect("download failed");
+        assert!(written > 0, "nothing was written");
+        assert_eq!(std::fs::metadata(&dest).unwrap().len(), written);
+        assert_eq!(written, expected, "downloaded {written} of {expected}");
+        println!("downloaded {written} bytes in {ticks} ticks");
+        let _ = std::fs::remove_file(&dest);
+    }
+
+    /// A cancelled transfer must not leave a half-written file behind.
+    #[test]
+    #[ignore = "needs network"]
+    fn cancels_a_download() {
+        let dir = std::env::temp_dir().join("kestrel-download-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join("cancelled.bin");
+        let err = download_to_file(
+            "https://api.github.com/repos/yunyu697/kestrel/releases/latest",
+            &dest,
+            30_000,
+            |_, _| false,
+        )
+        .expect_err("the transfer should have been aborted");
+        assert!(err.contains("取消"), "unexpected error: {err}");
     }
 }

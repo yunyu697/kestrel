@@ -4,6 +4,7 @@ pub mod net;
 pub mod search;
 pub mod settings;
 pub mod system;
+pub mod update;
 
 pub fn now_ms() -> u128 {
     std::time::SystemTime::now()

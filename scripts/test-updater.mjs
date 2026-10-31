@@ -26,9 +26,15 @@ globalThis.localStorage = {
   removeItem: (k) => store.delete(k),
 };
 
-const { fetchLatestRelease, testMirrorLatency, MIRRORS, applyMirror } = await import(
-  "../src/shared/updater.ts"
-);
+const {
+  fetchLatestRelease,
+  testMirrorLatency,
+  MIRRORS,
+  applyMirror,
+  pickInstallAsset,
+  assetFileName,
+  compareVersions,
+} = await import("../src/shared/updater.ts");
 
 let failures = 0;
 function check(name, cond, detail = "") {
@@ -62,6 +68,39 @@ check("gh-proxy.com 测速返回延迟", typeof ghproxy === "number" && ghproxy 
 check("镜像前缀拼接正确", applyMirror("https://x/y", "https://m/") === "https://m/https://x/y");
 check("无前缀时原样返回", applyMirror("https://x/y", "") === "https://x/y");
 check("镜像列表非空", MIRRORS.length >= 2, `${MIRRORS.length} 个`);
+
+// 4) The installer must match how this copy was installed, otherwise the
+//    update installs a second Kestrel instead of replacing this one.
+const perMachine = pickInstallAsset(info?.assets ?? [], "perMachine");
+const currentUser = pickInstallAsset(info?.assets ?? [], "currentUser");
+check(
+  "机器级安装选用 MSI",
+  !!perMachine && perMachine.name.endsWith(".msi"),
+  perMachine?.name,
+);
+check(
+  "当前用户安装选用 NSIS",
+  !!currentUser && currentUser.name.includes("setup"),
+  currentUser?.name,
+);
+check(
+  "两种安装方式选出的文件不同",
+  !!perMachine && !!currentUser && perMachine.url !== currentUser.url,
+);
+
+// 5) The download file name comes from the URL.
+check(
+  "从下载地址解析文件名",
+  assetFileName("https://github.com/o/r/releases/download/v1.2.4/Kestrel_1.2.4_x64_zh-CN.msi", "x") ===
+    "Kestrel_1.2.4_x64_zh-CN.msi",
+);
+check("空地址回退到默认名", assetFileName("", "kestrel-update.bin") === "kestrel-update.bin");
+
+// 6) Version comparison drives the "有更新" decision.
+check("版本比较：新的更大", compareVersions("1.2.4", "1.2.3") === 1);
+check("版本比较：相同为 0", compareVersions("1.2.3", "1.2.3") === 0);
+check("版本比较：旧的更小", compareVersions("1.2.2", "1.2.3") === -1);
+check("版本比较：位数不同", compareVersions("1.10.0", "1.2.3") === 1);
 
 console.log(failures === 0 ? "\n全部通过" : `\n${failures} 项失败`);
 process.exit(failures === 0 ? 0 : 1);

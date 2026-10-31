@@ -222,3 +222,21 @@ export interface HttpProbeResult {
   /** "direct" or "proxy" — which route worked. */
   via: string;
 }
+
+/** Progress of an in-app installer download, pushed from the Rust side. */
+export interface UpdateProgress {
+  /** Job id of the download. */
+  id: string;
+  /** Bytes received so far. */
+  received: number;
+  /** Total size in bytes; 0 when the server did not say. */
+  total: number;
+  /** "downloading" | "done" | "error" | "canceled" */
+  status: "downloading" | "done" | "error" | "canceled";
+  /** Path of the finished file — only set when the status is "done". */
+  path: string;
+  /** Why the download failed. */
+  error: string;
+  /** Milliseconds since the download started. */
+  ms: number;
+}

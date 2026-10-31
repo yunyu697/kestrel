@@ -17,7 +17,6 @@ import {
 } from "../shared/pathnav";
 import { applyColors } from "../shared/theme";
 import {
-  applyMirror,
   checkForUpdate,
   clearFoundUpdate,
   foundUpdate,
@@ -25,6 +24,7 @@ import {
   shouldCheckAtStartup,
   type FoundUpdate,
 } from "../shared/updater";
+import UpdateActions from "../shared/UpdateActions";
 import type { ClipboardItem, FileInfo, SearchHit, Settings, WindowInfo } from "../shared/types";
 
 type Mode = "search" | "clipboard" | "windows" | "notes";
@@ -135,6 +135,8 @@ export default function Launcher() {
 
   // ---- update check ----
   const [updateFound, setUpdateFound] = useState<FoundUpdate | null>(null);
+  // The banner stays a one-line strip until the user asks for the actions.
+  const [updOpen, setUpdOpen] = useState(false);
 
   /** Silent update check; the banner flips on only when something is found. */
   const runUpdateCheck = useCallback(() => {
@@ -147,19 +149,10 @@ export default function Launcher() {
       .catch(() => {});
   }, []);
 
-  const openUpdate = useCallback(() => {
-    const f = updateFound ?? foundUpdate();
-    if (!f) return;
-    // Mirrors only wrap release downloads; the release page opens directly.
-    const url = f.assetUrl
-      ? applyMirror(f.assetUrl, mirrorPrefix({ updateMirror: settings?.updateMirror ?? "" }))
-      : f.htmlUrl;
-    void api.openUrl(url);
-  }, [updateFound, settings?.updateMirror]);
-
   const dismissUpdate = useCallback(() => {
     clearFoundUpdate();
     setUpdateFound(null);
+    setUpdOpen(false);
   }, []);
 
   // ---- theme + settings bootstrap ----
@@ -737,16 +730,32 @@ export default function Launcher() {
     >
       <div className="card">
         {updateFound && (
-          <div className="upd-bar">
-            <button className="upd-bar-main" onClick={openUpdate} title={t("打开下载页")}>
-              <Icon name="refresh" size={13} />
-              <span>
-                {t("发现新版本")} <b>v{updateFound.version}</b>
-              </span>
-            </button>
-            <button className="upd-bar-x" onClick={dismissUpdate} title={t("关闭")}>
-              <Icon name="close" size={12} />
-            </button>
+          <div className="upd-panel">
+            <div className="upd-bar">
+              <button
+                className="upd-bar-main"
+                onClick={() => setUpdOpen((v) => !v)}
+                title={t("更新")}
+              >
+                <Icon name="refresh" size={13} />
+                <span>
+                  {t("发现新版本")} <b>v{updateFound.version}</b>
+                </span>
+              </button>
+              <button className="upd-bar-x" onClick={dismissUpdate} title={t("关闭")}>
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+            {updOpen && (
+              <div className="upd-panel-body">
+                <UpdateActions
+                  assetUrl={updateFound.assetUrl}
+                  htmlUrl={updateFound.htmlUrl}
+                  mirror={mirrorPrefix({ updateMirror: settings?.updateMirror ?? "" })}
+                  compact
+                />
+              </div>
+            )}
           </div>
         )}
         <header className="bar">
