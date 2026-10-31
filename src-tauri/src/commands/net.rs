@@ -407,12 +407,31 @@ mod tests {
         println!("github api via={} ms={}", p.via, p.ms);
     }
 
-    /// The mirror path used by the speed test: a range request against the
-    /// release page through a mirror prefix.
+    /// The mirror path used by the speed test: a range request against a real
+    /// release asset through a mirror prefix. The asset URL is resolved from
+    /// the live GitHub API so the test never rots when the version bumps.
     #[test]
     #[ignore = "needs network"]
     fn reaches_mirror() {
-        let asset = "https://github.com/yunyu697/kestrel/releases/download/v1.2.1/Kestrel_1.2.1_x64_zh-CN.msi";
+        let latest = probe(
+            "https://api.github.com/repos/yunyu697/kestrel/releases/latest",
+            20_000,
+            None,
+        );
+        assert!(latest.ok, "probe failed: {:?}", latest.error);
+        let body = latest.body.unwrap_or_default();
+        let urls: Vec<&str> = body
+            .split("\"browser_download_url\":")
+            .skip(1)
+            .filter_map(|rest| rest.split('"').nth(1))
+            .collect();
+        assert!(!urls.is_empty(), "no asset url in release payload");
+        let asset = urls
+            .iter()
+            .find(|u| u.ends_with(".msi"))
+            .copied()
+            .unwrap_or(urls[0]);
+        println!("asset = {asset}");
         for prefix in ["https://gh-proxy.com/", "https://ghproxy.net/", "https://gh-proxy.net/"] {
             let url = format!("{prefix}{asset}");
             let p = probe(&url, 20_000, Some(1024));
