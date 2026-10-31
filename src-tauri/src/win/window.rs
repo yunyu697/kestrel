@@ -778,7 +778,8 @@ mod tests {
         for (hwnd, title) in &list {
             let looks_like_idm = title.contains("Internet Download Manager")
                 || title.contains("拖至窗口")
-                || title.contains("IDM");
+                || title.contains("IDM")
+                || title.contains("下载文件信息");
             if !looks_like_idm {
                 continue;
             }
