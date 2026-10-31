@@ -28,15 +28,22 @@ pub fn spawn_helper(installer: &str) -> bool {
     shell::spawn(&exe.to_string_lossy(), Some(&args), None)
 }
 
+/// Windows Installer only understands backslashes: a path with forward
+/// slashes makes msiexec fail with 1619 ("package could not be opened").
+fn native_path(path: &str) -> String {
+    path.replace('/', "\\")
+}
+
 /// Entry point of the helper mode.
 pub fn run(installer: &str, parent_pid: u32) {
+    let installer = native_path(installer);
     // Hold the watchdog's alive mutex while the installer runs. Otherwise the
     // watchdog sees "no Kestrel running" in the gap between our exit and the
     // installer's start and respawns the old binary — which is exactly the
     // "file in use" failure the helper exists to avoid.
     crate::watchdog::hold_alive_mutex();
     wait_for_parent(parent_pid);
-    let ok = launch(installer);
+    let ok = launch(&installer);
     crate::debug_log::qs_log(&format!(
         "install helper: installer={installer} launched={ok}"
     ));
@@ -142,6 +149,18 @@ fn relaunch() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn turns_forward_slashes_into_backslashes() {
+        assert_eq!(
+            native_path("C:/Users/Tyler Zhang/app.msi"),
+            "C:\\Users\\Tyler Zhang\\app.msi"
+        );
+        assert_eq!(
+            native_path("C:\\already\\native.msi"),
+            "C:\\already\\native.msi"
+        );
+    }
 
     #[test]
     fn returns_at_once_without_a_parent() {

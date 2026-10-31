@@ -9,7 +9,7 @@
 //!   it when the dialog loses focus or closes.
 
 use crate::state::AppState;
-use crate::win::{class_name, EnumWindows, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, GetWindowRect, BOOL, HWND, LPARAM, MSG, RECT};
+use crate::win::{class_name, EnumWindows, GetForegroundWindow, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, GetWindowRect, BOOL, HWND, LPARAM, MSG, RECT};
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -312,20 +312,18 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
         if already && visible {
             // Same dialog already served: refresh position but NEVER steal
             // focus back — otherwise the dialog could never be closed.
-            // Coming back to the dialog: put the box back above it. Topmost is
-            // re-asserted here because it was dropped when the user switched
-            // away (see the "other windows" branch below).
-            crate::ui::set_topmost(app, true);
+            // Coming back to the dialog means Windows just raised it to the
+            // top of the normal band, which pushes the box behind it: put the
+            // box back one slot above, still in the same band.
+            crate::ui::set_topmost(app, false);
             if let Some(win) = crate::ui::launcher(app) {
                 let rows = state.settings.read().qs_visible_rows;
                 let scale = crate::ui::launcher_scale(state);
-                // Re-raise above the dialog without focus. The box is no
-                // longer topmost (it shares the dialog's z-level), so after a
-                // jump the dialog can end up in front of it where the two
-                // overlap. Raising here restores "right above the dialog"
-                // without taking focus from the dialog.
+                // Re-raise above the dialog without focus. Both windows are
+                // plain normal-band windows, so this lands the box directly
+                // above the dialog instead of in a separate topmost layer.
                 if let Ok(h) = win.hwnd() {
-                    crate::win::raise_no_activate(h.0 as isize);
+                    crate::win::keep_above(h.0 as isize, hwnd);
                 }
                 position_for_dialog(win, hwnd, rows, scale);
             }
@@ -346,11 +344,11 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
     // Other windows: leave the box alone. Its lifetime is bound to the
     // dialog's lifetime (managed by the follower thread), not to focus.
     //
-    // Z-order is a different matter: while the dialog is not in front, the box
-    // must not float over whatever the user switched to. Dropping topmost puts
-    // it back under the newly activated (foreground) window, which is exactly
-    // "part of the dialog" behaviour. It is re-asserted the moment the dialog
-    // comes forward again.
+    // Z-order needs no work here: the box is *not* topmost any more, so the
+    // window the user just activated is raised above both it and the dialog —
+    // they sink together, which is exactly "part of the dialog" behaviour.
+    // (`set_topmost(false)` is kept as a cheap safety net for sessions that
+    // started before this rule existed.)
     if state.qs_active.load(Ordering::Relaxed) {
         crate::ui::set_topmost(app, false);
     }
@@ -555,6 +553,12 @@ fn maybe_auto_jump(app: &AppHandle, state: &Arc<AppState>, dialog: HWND, allow_f
         // The dialog moved by itself. Without this the box keeps resolving
         // `..` and half-typed names against the folder it has already left.
         let _ = app.emit("quickswitch://moved", ());
+    } else if window::dialog_closing(dialog) {
+        // The dialog the jump was meant for is going away — the user accepted
+        // or cancelled it in the very instant the jump ran. Retrying a closed
+        // dialog is pointless, and keeping the record would spend it on the
+        // next dialog that gets focus, which is a completely unrelated one.
+        crate::debug_log::qs_log("auto-jump: dialog closed, record dropped");
     } else {
         // Put it back so the next focus change retries instead of the user
         // having to redo the whole Explorer round trip.
@@ -772,6 +776,8 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
         // the WebView and showed up as stutter.
         let mut last_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
         let mut last_rows = u32::MAX;
+        // Z-order watchdog throttle (see the loop body).
+        let mut last_z = Instant::now() - Duration::from_secs(1);
         // A dialog that exists but is not on screen is usually a freshly
         // created one (shown a few hundred ms later) or one that is closing
         // (hidden just before it is destroyed). Both look identical, so wait a
@@ -851,6 +857,30 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
 
                 if !crate::ui::launcher_visible(&state) {
                     continue;
+                }
+
+                // Z-order watchdog.
+                //
+                // Every activation of the dialog (clicking its file list is
+                // enough) raises it to the top of the normal band, which
+                // silently pushes the box behind it — the box and the dialog
+                // then look like two different layers. While the dialog is the
+                // foreground window the box belongs one slot above it; when
+                // anything else is in front, nothing has to happen: both sink
+                // together.
+                //
+                // Throttled and conditional: an unconditional SetWindowPos on
+                // every 16 ms tick made the box flicker.
+                if last_z.elapsed() > Duration::from_millis(150) {
+                    last_z = Instant::now();
+                    if let Ok(qs) = win.hwnd() {
+                        let qs = qs.0 as isize;
+                        if unsafe { GetForegroundWindow() } == h
+                            && crate::win::keep_above(qs, h)
+                        {
+                            crate::debug_log::qs_log("follower: z-order re-asserted above dialog");
+                        }
+                    }
                 }
 
                 // Follow the dialog: only touch the window when something

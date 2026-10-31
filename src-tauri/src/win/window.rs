@@ -469,6 +469,37 @@ pub fn filename_edit(dialog: HWND) -> Option<HWND> {
 const VK_CONTROL: u8 = 0x11;
 const VK_RETURN: u8 = 0x0D;
 const KEYEVENTF_KEYUP: u32 = 0x0002;
+const GA_ROOT: u32 = 2;
+
+/// True when the dialog is on its way out.
+///
+/// `IsWindow` alone answers "yes" for another few hundred milliseconds after
+/// the user has cancelled: measured on a common dialog, `IsWindowVisible` drops
+/// 100 ms after clicking Cancel and 290 ms after Esc, while `IsWindow` keeps
+/// returning true until 600 / 980 ms. That gap is exactly the window in which a
+/// jump used to fire keystrokes at a dialog that no longer existed.
+pub fn dialog_closing(hwnd: HWND) -> bool {
+    unsafe { IsWindow(hwnd) == 0 || IsWindowVisible(hwnd) == 0 }
+}
+
+/// True when `fg` is the dialog itself or one of its own child windows.
+///
+/// Accepting *any* window of the dialog's process was too loose: when the user
+/// closes the dialog, the foreground falls back to the application's main
+/// window, which shares that process. Measured on Notepad3 — the jump then sent
+/// Ctrl+L into the editor and looked for an address bar on a destroyed window.
+/// `GetAncestor(GA_ROOT)` walks a child up to its top-level window, so the
+/// legitimate "foreground is a child of the dialog" case still passes while a
+/// sibling window of the same process no longer does.
+fn is_dialog_or_child(fg: HWND, dialog: HWND) -> bool {
+    if fg == dialog {
+        return true;
+    }
+    if unsafe { IsWindow(fg) } == 0 {
+        return false;
+    }
+    unsafe { GetAncestor(fg, GA_ROOT) == dialog }
+}
 
 /// Navigate an open file dialog to `path` **without confirming it**.
 ///
@@ -488,42 +519,70 @@ pub fn navigate_to_folder(dialog: HWND, path: &str) -> bool {
     // somewhere else entirely.
     let mut focused = false;
     for _ in 0..6 {
+        if dialog_closing(dialog) {
+            crate::debug_log::qs_log("navigate: dialog closed before the jump");
+            return false;
+        }
         activate(dialog);
-        let fg = foreground();
-        if fg == dialog {
-            focused = true;
-            break;
-        }
-        let mut fg_pid = 0u32;
-        let mut dlg_pid = 0u32;
-        unsafe {
-            GetWindowThreadProcessId(fg, &mut fg_pid);
-            GetWindowThreadProcessId(dialog, &mut dlg_pid);
-        }
-        // While the dialog is coming up, the foreground is often one of its own
-        // child windows — same process is good enough.
-        if fg_pid == dlg_pid && fg_pid != 0 {
+        // Same dialog or one of its own children — nothing else will do.
+        if is_dialog_or_child(foreground(), dialog) {
             focused = true;
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(30));
     }
     if !focused {
-        crate::debug_log::qs_log("navigate: dialog did not take focus, keys not sent");
+        // A closing dialog cannot take focus, so report the real reason
+        // instead of blaming the focus transfer.
+        if dialog_closing(dialog) {
+            crate::debug_log::qs_log("navigate: dialog closed before the jump");
+        } else {
+            crate::debug_log::qs_log("navigate: dialog did not take focus, keys not sent");
+        }
         return false;
     }
     std::thread::sleep(std::time::Duration::from_millis(40));
+    // Focus can still move during that pause (the user clicking away, the
+    // dialog closing). Sending Ctrl+L blind would drive whatever app is in
+    // front now, so verify once more right before the keystroke.
+    if !is_dialog_or_child(foreground(), dialog) {
+        crate::debug_log::qs_log("navigate: lost focus before Ctrl+L");
+        return false;
+    }
     // Ctrl+L: turn the breadcrumb into an editable address bar AND give it the
     // caret. Plain Alt+D only made the edit visible while the filename box kept
     // the focus, so typing landed in the wrong field.
-    unsafe {
-        keybd_event(VK_CONTROL, 0, 0, 0);
-        keybd_event(b'L', 0, 0, 0);
-        keybd_event(b'L', 0, KEYEVENTF_KEYUP, 0);
-        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+    let mut edit = None;
+    for attempt in 0..2 {
+        unsafe {
+            keybd_event(VK_CONTROL, 0, 0, 0);
+            keybd_event(b'L', 0, 0, 0);
+            keybd_event(b'L', 0, KEYEVENTF_KEYUP, 0);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(130));
+        // A closed dialog and a swallowed keystroke look identical from the
+        // caller's side, so tell them apart here.
+        if dialog_closing(dialog) {
+            crate::debug_log::qs_log("navigate: dialog closed while jumping");
+            return false;
+        }
+        edit = pick_edit(dialog, true);
+        if edit.is_some() || attempt > 0 {
+            break;
+        }
+        // The keystroke can be swallowed while the dialog is still settling
+        // after activation. Retry once — Ctrl+L on an already open address bar
+        // is a no-op, so the retry costs nothing when it was not needed.
+        crate::debug_log::qs_log("navigate: address bar did not open, retrying");
+        if !is_dialog_or_child(foreground(), dialog) {
+            crate::debug_log::qs_log("navigate: lost focus before retry");
+            return false;
+        }
+        activate(dialog);
+        std::thread::sleep(std::time::Duration::from_millis(60));
     }
-    std::thread::sleep(std::time::Duration::from_millis(130));
-    let Some(edit) = pick_edit(dialog, true) else {
+    let Some(edit) = edit else {
         crate::debug_log::qs_log("navigate: address bar did not open");
         return false;
     };

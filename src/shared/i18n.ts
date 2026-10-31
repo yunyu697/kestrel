@@ -317,6 +317,18 @@ const en: Dict = {
     "Scanned {n} files. Apps and commands work already; file results appear as the index fills in.",
   "正在索引：{name}": "Indexing: {name}",
   "已收录 {n} 项": "{n} entries indexed",
+  "已扫描 {n} 项": "{n} entries scanned",
+  "重建索引会重新扫描所有索引磁盘，期间文件搜索结果可能不完整。确定继续？":
+    "Rebuilding re-scans every indexed drive; file results may be incomplete while it runs. Continue?",
+  "在任务计划程序中注册登录任务，Kestrel 被意外关闭时自动重启（需要管理员权限）":
+    "Registers a logon task in Task Scheduler that restarts Kestrel if it is closed unexpectedly (requires administrator rights)",
+  "需要管理员权限": "Administrator rights required",
+  "「安装为服务」会在任务计划程序中注册登录任务，需要管理员权限。请先在「常规 › 以管理员身份运行」中提权重启 Kestrel，再开启此开关。":
+    "“Install as a service” registers a logon task in Task Scheduler, which requires administrator rights. Restart Kestrel elevated via General › Run as administrator first, then turn this on.",
+  "无法注册守护进程，请检查系统权限":
+    "Could not register the watchdog — check system permissions",
+  "无法卸载守护进程，请检查系统权限":
+    "Could not remove the watchdog — check system permissions",
   "{v} 条": "{v}",
   "· 已固定": " · Pinned",
   "图片": "Image",
@@ -324,8 +336,6 @@ const en: Dict = {
   "读取守护状态中…": "Reading watchdog status…",
   "已启用：Kestrel 被意外关闭时会自动重启；关闭开关即卸载":
     "Enabled: Kestrel restarts automatically if it is closed unexpectedly; turn off to uninstall",
-  "注册守护任务，防止程序被意外关闭（在任务计划中注册，无需管理员）":
-    "Register a watchdog task so the app survives being closed (Task Scheduler, no admin needed)",
   "快捷键已更新": "Shortcut updated",
   "未设置": "Not set",
   "索引就绪": "Index ready",
@@ -745,6 +755,18 @@ const ja: Dict = {
     "{n} ファイルをスキャンしました。アプリとコマンドはすぐ使えます。ファイル結果はインデックスの進行に伴って表示されます。",
   "正在索引：{name}": "インデックス中：{name}",
   "已收录 {n} 项": "{n} 件を収録",
+  "已扫描 {n} 项": "{n} 件をスキャン済み",
+  "重建索引会重新扫描所有索引磁盘，期间文件搜索结果可能不完整。确定继续？":
+    "インデックスを再構築すると、対象のすべてのドライブを再スキャンします。実行中はファイル検索結果が不完全になる場合があります。続行しますか？",
+  "在任务计划程序中注册登录任务，Kestrel 被意外关闭时自动重启（需要管理员权限）":
+    "タスク スケジューラにサインイン時のタスクを登録し、Kestrel が予期せず終了したときに自動で再起動します（管理者権限が必要）",
+  "需要管理员权限": "管理者権限が必要です",
+  "「安装为服务」会在任务计划程序中注册登录任务，需要管理员权限。请先在「常规 › 以管理员身份运行」中提权重启 Kestrel，再开启此开关。":
+    "「サービスとしてインストール」はタスク スケジューラにサインイン時のタスクを登録するため、管理者権限が必要です。先に「一般 › 管理者として実行」で Kestrel を管理者として再起動してから、このスイッチをオンにしてください。",
+  "无法注册守护进程，请检查系统权限":
+    "監視プロセスを登録できませんでした。システム権限を確認してください",
+  "无法卸载守护进程，请检查系统权限":
+    "監視プロセスを削除できませんでした。システム権限を確認してください",
   "{v} 条": "{v}",
   "· 已固定": " · 固定済み",
   "图片": "画像",
@@ -752,8 +774,6 @@ const ja: Dict = {
   "读取守护状态中…": "監視状態を読み込み中…",
   "已启用：Kestrel 被意外关闭时会自动重启；关闭开关即卸载":
     "有効：Kestrel が予期せず終了した場合に自動で再起動します。オフにするとアンインストールされます",
-  "注册守护任务，防止程序被意外关闭（在任务计划中注册，无需管理员）":
-    "監視タスクを登録し、予期しない終了から保護します（タスクスケジューラに登録、管理者不要）",
   "快捷键已更新": "ショートカットを更新しました",
   "未设置": "未設定",
   "索引就绪": "インデックス準備完了",
@@ -1191,6 +1211,18 @@ const es: Dict = {
     "{n} archivos escaneados. Las aplicaciones y comandos ya funcionan; los archivos aparecen a medida que avanza el índice.",
   "正在索引：{name}": "Indexando: {name}",
   "已收录 {n} 项": "{n} entradas indexadas",
+  "已扫描 {n} 项": "{n} entradas escaneadas",
+  "重建索引会重新扫描所有索引磁盘，期间文件搜索结果可能不完整。确定继续？":
+    "Reconstruir el índice vuelve a analizar todas las unidades indexadas; mientras tanto los resultados de archivos pueden estar incompletos. ¿Continuar?",
+  "在任务计划程序中注册登录任务，Kestrel 被意外关闭时自动重启（需要管理员权限）":
+    "Registra una tarea de inicio de sesión en el Programador de tareas que reinicia Kestrel si se cierra inesperadamente (requiere permisos de administrador)",
+  "需要管理员权限": "Se requieren permisos de administrador",
+  "「安装为服务」会在任务计划程序中注册登录任务，需要管理员权限。请先在「常规 › 以管理员身份运行」中提权重启 Kestrel，再开启此开关。":
+    "«Instalar como servicio» registra una tarea de inicio de sesión en el Programador de tareas, lo que requiere permisos de administrador. Reinicia Kestrel con permisos elevados desde General › Ejecutar como administrador y luego activa este interruptor.",
+  "无法注册守护进程，请检查系统权限":
+    "No se pudo registrar el vigilante; comprueba los permisos del sistema",
+  "无法卸载守护进程，请检查系统权限":
+    "No se pudo quitar el vigilante; comprueba los permisos del sistema",
   "{v} 条": "{v}",
   "· 已固定": " · Fijado",
   "图片": "Imagen",
@@ -1198,8 +1230,6 @@ const es: Dict = {
   "读取守护状态中…": "Leyendo el estado del vigilante…",
   "已启用：Kestrel 被意外关闭时会自动重启；关闭开关即卸载":
     "Activado: Kestrel se reinicia si se cierra inesperadamente; desactívalo para desinstalarlo",
-  "注册守护任务，防止程序被意外关闭（在任务计划中注册，无需管理员）":
-    "Registra una tarea de vigilancia para que la app no se cierre (Programador de tareas, sin permisos de administrador)",
   "快捷键已更新": "Atajo actualizado",
   "未设置": "Sin definir",
   "索引就绪": "Índice listo",
@@ -1614,6 +1644,16 @@ const zhTW: Dict = {
     "已掃描 {n} 個檔案。你可以先搜尋應用程式與命令，檔案結果會隨索引完善逐步出現。",
   "正在索引：{name}": "正在索引：{name}",
   "已收录 {n} 项": "已收錄 {n} 項",
+  "已扫描 {n} 项": "已掃描 {n} 項",
+  "重建索引会重新扫描所有索引磁盘，期间文件搜索结果可能不完整。确定继续？":
+    "重建索引會重新掃描所有索引磁碟，期間檔案搜尋結果可能不完整。確定繼續？",
+  "在任务计划程序中注册登录任务，Kestrel 被意外关闭时自动重启（需要管理员权限）":
+    "在工作排程器中註冊登入工作，Kestrel 被意外關閉時自動重新啟動（需要系統管理員權限）",
+  "需要管理员权限": "需要系統管理員權限",
+  "「安装为服务」会在任务计划程序中注册登录任务，需要管理员权限。请先在「常规 › 以管理员身份运行」中提权重启 Kestrel，再开启此开关。":
+    "「安裝為服務」會在工作排程器中註冊登入工作，需要系統管理員權限。請先在「一般 › 以系統管理員身分執行」中提權重新啟動 Kestrel，再開啟此開關。",
+  "无法注册守护进程，请检查系统权限": "無法註冊守護程序，請檢查系統權限",
+  "无法卸载守护进程，请检查系统权限": "無法卸載守護程序，請檢查系統權限",
   "{v} 条": "{v} 條",
   "· 已固定": " · 已固定",
   "图片": "圖片",
@@ -1621,8 +1661,6 @@ const zhTW: Dict = {
   "读取守护状态中…": "讀取守護狀態中…",
   "已启用：Kestrel 被意外关闭时会自动重启；关闭开关即卸载":
     "已啟用：Kestrel 被意外關閉時會自動重新啟動；關閉開關即解除安裝",
-  "注册守护任务，防止程序被意外关闭（在任务计划中注册，无需管理员）":
-    "註冊守護工作，防止程式被意外關閉（在工作排程器中註冊，無需系統管理員）",
   "快捷键已更新": "快速鍵已更新",
   "未设置": "未設定",
   "索引就绪": "索引就緒",

@@ -525,6 +525,20 @@ textarea.input {
   background: var(--accent);
   transition: width var(--dur) var(--ease);
 }
+/* First build: no previous index, so there is no total to divide by. Sweep a
+   short bar instead of pretending to know a percentage. */
+.progress[data-indeterminate="true"] > i {
+  width: 35%;
+  animation: progress-sweep 1.1s ease-in-out infinite;
+}
+@keyframes progress-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(330%);
+  }
+}
 
 /* apps grid */
 .apps-grid {

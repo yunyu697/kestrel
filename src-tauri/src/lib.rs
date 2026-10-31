@@ -19,7 +19,7 @@ mod win;
 
 use state::AppState;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
 
 pub fn run() {
@@ -150,6 +150,14 @@ pub fn run() {
                         commands::index::spawn_rebuild(h.clone(), st.clone());
                     } else {
                         commands::index::restart_watcher(&h, &st);
+                        // The window was created before the index finished
+                        // loading, so its first `index_status` call returned 0
+                        // and the footer kept saying "0 个文件" until something
+                        // else triggered a rebuild. Announce the loaded index.
+                        let _ = h.emit(
+                            "index://done",
+                            serde_json::json!({ "count": st.index.count(), "ms": 0 }),
+                        );
                     }
                 });
             }

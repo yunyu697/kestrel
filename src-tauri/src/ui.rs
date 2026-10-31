@@ -8,7 +8,14 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 /// Current always-on-top state of the shared launcher/QS window.
-static TOPMOST: AtomicBool = AtomicBool::new(false);
+///
+/// Starts as `true` because the window is *built* with
+/// `.always_on_top(true)` (see `lib.rs`). Starting at `false` made the first
+/// `set_topmost(app, false)` a no-op — it "changed" nothing according to the
+/// flag — so the Quick Switch box kept the topmost bit it was created with and
+/// sat in a different z-order band than its dialog. That is exactly the bug the
+/// user kept reporting.
+static TOPMOST: AtomicBool = AtomicBool::new(true);
 
 /// Set the box's always-on-top state, only touching the window when it really
 /// changes. Every call is a `SetWindowPos`, and the foreground monitor calls
@@ -137,17 +144,19 @@ pub fn show_quick_switch(app: &AppHandle, state: &Arc<AppState>, hwnd: isize) {
     // is still invisible, so the first painted frame is already the QS box.
     std::thread::sleep(std::time::Duration::from_millis(40));
     let _ = win.show();
-    // Z-order: the box must be *above* the dialog it belongs to, and nothing
-    // else. A non-topmost window can never reliably cover the foreground
-    // window — Windows keeps whatever the user just activated on top — so
-    // "raise without focus" was silently ineffective and the box ended up
-    // behind other windows while the dialog was in front.
+    // Z-order: the box must look like part of the dialog — directly above it,
+    // in the *same* band.
     //
-    // Topmost is therefore switched dynamically instead of being fixed: ON
-    // while the dialog (or the box) is in front, OFF as soon as the user
-    // activates something else (see `monitor::handle_foreground`). That gives
-    // "glued to the dialog" without ever floating over unrelated windows.
-    set_topmost(app, true);
+    // Topmost was the wrong tool. It put the box in its own band, above the
+    // taskbar and above every other application, while the dialog stayed a
+    // normal window: the two were visibly on different levels, which is what
+    // the user kept reporting. Dropping topmost and raising inside the normal
+    // band instead puts the box exactly one slot above the dialog, and it
+    // still sinks together with the dialog when another app is activated.
+    set_topmost(app, false);
+    if let Ok(h) = win.hwnd() {
+        crate::win::keep_above(h.0 as isize, hwnd);
+    }
     let _ = win.set_focus();
     state
         .launcher_visible

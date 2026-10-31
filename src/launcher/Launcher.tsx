@@ -79,7 +79,16 @@ export default function Launcher() {
   const [preview, setPreview] = useState<FileInfo | null>(null);
   const [icons, setIcons] = useState<Record<string, string>>({});
   const [hint, setHint] = useState<string | null>(null);
-  const [status, setStatus] = useState<{ state: string; count: number }>({ state: "idle", count: 0 });
+  // `count` is the committed index size; `scanned` is the live walk counter.
+  // While a rebuild runs `count` still holds the *old* index (it is swapped in
+  // only when the walk finishes), so showing it made the footer read
+  // "索引中 0" for the whole first build.
+  const [status, setStatus] = useState<{ state: string; count: number; scanned: number }>({
+    state: "idle",
+    count: 0,
+    scanned: 0,
+  });
+  const shownCount = status.state === "scanning" ? status.scanned : status.count;
   const [toast, setToast] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [quick, setQuick] = useState(false);
@@ -170,7 +179,7 @@ export default function Launcher() {
         void runUpdateCheck();
       }
     });
-    api.indexStatus().then((st) => setStatus({ state: st.state, count: st.count }));
+    api.indexStatus().then((st) => setStatus({ state: st.state, count: st.count, scanned: st.scanned }));
     api.clipboardList().then(setClipboard);
   }, []);
 
@@ -262,8 +271,12 @@ export default function Launcher() {
         setTimeout(() => inputRef.current?.focus(), 30);
       }
     });
-    const u3 = await win.listen("index://progress", () => api.indexStatus().then((s) => setStatus({ state: s.state, count: s.count })));
-    const u4 = await win.listen("index://done", () => api.indexStatus().then((s) => setStatus({ state: s.state, count: s.count })));
+    const u3 = await win.listen("index://progress", () =>
+      api.indexStatus().then((s) => setStatus({ state: s.state, count: s.count, scanned: s.scanned })),
+    );
+    const u4 = await win.listen("index://done", () =>
+      api.indexStatus().then((s) => setStatus({ state: s.state, count: s.count, scanned: s.scanned })),
+    );
     const u5 = await win.listen("clipboard://changed", () => api.clipboardList().then(setClipboard));
     const u6 = await win.listen("settings://changed", (e: any) => {
       const s: Settings = e.payload;
@@ -700,7 +713,18 @@ export default function Launcher() {
     { id: "note", label: t("快捷笔记"), icon: "note", act: () => setMode("notes") },
     { id: "color", label: t("颜色取色"), icon: "palette", act: async () => { const c = await api.pickColor(); await api.clipboardPushText(c.hex); showToast(t("已复制 {text}", { text: c.hex })); } },
     { id: "settings", label: t("设置…"), icon: "gear", key: "Ctrl ,", act: () => api.openSettingsWindow() },
-    { id: "reindex", label: t("重建索引"), icon: "refresh", act: () => { api.rebuildIndex(); showToast(t("开始重建索引")); } },
+    {
+      id: "reindex",
+      label: t("重建索引"),
+      icon: "refresh",
+      act: async () => {
+        // A rebuild walks every indexed drive: minutes of disk churn and
+        // temporarily incomplete file results. Never do that on a stray click.
+        if (!window.confirm(t("重建索引会重新扫描所有索引磁盘，期间文件搜索结果可能不完整。确定继续？"))) return;
+        await api.rebuildIndex();
+        showToast(t("开始重建索引"));
+      },
+    },
   ];
 
   // The sidebar is driven by one setting only, so it can never flicker on and
@@ -810,7 +834,7 @@ export default function Launcher() {
                     {status.state === "scanning" ? (
                       <>
                         <div className="big">{t("正在建立索引…")}</div>
-                        <div className="small">{t("已扫描 {n} 个文件。你可以先搜索应用与命令，文件结果会随索引完善逐步出现。", { n: status.count.toLocaleString() })}</div>
+                        <div className="small">{t("已扫描 {n} 个文件。你可以先搜索应用与命令，文件结果会随索引完善逐步出现。", { n: shownCount.toLocaleString() })}</div>
                       </>
                     ) : query ? (
                       <>
@@ -991,7 +1015,7 @@ export default function Launcher() {
               <span className="grow" />
               <span className="stat">
                 <span className="dot" data-state={status.state} />
-                {status.state === "scanning" ? t("索引中 {n}", { n: status.count.toLocaleString() }) : t("{n} 个文件", { n: status.count.toLocaleString() })}
+                {status.state === "scanning" ? t("索引中 {n}", { n: shownCount.toLocaleString() }) : t("{n} 个文件", { n: shownCount.toLocaleString() })}
               </span>
             </>
           ) : mode === "search" ? (
@@ -1004,7 +1028,7 @@ export default function Launcher() {
               {hint && <span className="hint optional">{hint}</span>}
               <span className="stat">
                 <span className="dot" data-state={status.state} />
-                {status.state === "scanning" ? t("索引中 {n}", { n: status.count.toLocaleString() }) : t("{n} 个文件", { n: status.count.toLocaleString() })}
+                {status.state === "scanning" ? t("索引中 {n}", { n: shownCount.toLocaleString() }) : t("{n} 个文件", { n: shownCount.toLocaleString() })}
               </span>
               <button
                 className="icon-btn"

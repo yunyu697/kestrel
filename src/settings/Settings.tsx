@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { confirm as confirmDialog, open as dialogOpen } from "@tauri-apps/plugin-dialog";
+import { confirm as confirmDialog, message, open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import { Icon } from "../shared/icons";
 import { api } from "../shared/api";
 import { LANGS, setLang, systemLang, t, useLang } from "../shared/i18n";
@@ -424,14 +424,33 @@ function GeneralPane({
                 ? t("读取守护状态中…")
                 : svc
                   ? t("已启用：Kestrel 被意外关闭时会自动重启；关闭开关即卸载")
-                  : t("注册守护任务，防止程序被意外关闭（在任务计划中注册，无需管理员）")
+                  : t("在任务计划程序中注册登录任务，Kestrel 被意外关闭时自动重启（需要管理员权限）")
             }
           >
             <Toggle
               on={svc === true}
               onChange={async (v) => {
-                const ok = v ? await api.serviceInstall() : await api.serviceUninstall();
-                if (ok) setSvc(v);
+                const res = v ? await api.serviceInstall() : await api.serviceUninstall();
+                if (res === "ok") {
+                  setSvc(v);
+                  return;
+                }
+                // The toggle snaps back either way — always say why, otherwise
+                // it just looks broken.
+                if (res === "needsAdmin") {
+                  void message(
+                    t(
+                      "「安装为服务」会在任务计划程序中注册登录任务，需要管理员权限。请先在「常规 › 以管理员身份运行」中提权重启 Kestrel，再开启此开关。",
+                    ),
+                    { title: t("需要管理员权限"), kind: "warning" },
+                  );
+                } else {
+                  flash(
+                    v
+                      ? t("无法注册守护进程，请检查系统权限")
+                      : t("无法卸载守护进程，请检查系统权限"),
+                  );
+                }
               }}
             />
           </Row>
@@ -1047,17 +1066,42 @@ function IndexPane({
   setStatus: (v: IndexStatus | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const scanning = status?.state === "scanning";
 
   const refreshStatus = useCallback(() => {
     api.indexStatus().then(setStatus).catch(() => {});
   }, [setStatus]);
 
+  // Poll while a rebuild runs — including one started from the launcher's
+  // command menu, which never sets `busy` in this window.
   useEffect(() => {
-    if (busy) {
+    if (busy || scanning) {
       const t = window.setInterval(refreshStatus, 700);
       return () => window.clearInterval(t);
     }
-  }, [busy, refreshStatus]);
+  }, [busy, scanning, refreshStatus]);
+
+  // Re-enable the button when the walk actually ends instead of guessing a
+  // fixed delay: `busy` may be set before the scan has flipped to "scanning".
+  const sawScanning = useRef(false);
+  useEffect(() => {
+    if (!busy) {
+      sawScanning.current = false;
+      return;
+    }
+    if (scanning) sawScanning.current = true;
+    else if (sawScanning.current) setBusy(false);
+  }, [busy, scanning]);
+
+  // Safety net: if the walk finished between two polls the status never showed
+  // "scanning", and the button would stay disabled forever.
+  useEffect(() => {
+    if (!busy) return;
+    const t = window.setTimeout(() => {
+      if (!sawScanning.current) setBusy(false);
+    }, 5000);
+    return () => window.clearTimeout(t);
+  }, [busy]);
 
   const toggleDrive = (d: string) => {
     const has = s.indexedDrives.includes(d);
@@ -1081,8 +1125,13 @@ function IndexPane({
       update("excludeDirs", [...s.excludeDirs, p]);
   };
 
-  const scanning = status?.state === "scanning";
-  const pct = status && status.scanned > 0 ? Math.min(100, Math.round((status.scanned / Math.max(1, status.scanned)) * 100)) : 0;
+  const scanned = status?.scanned ?? 0;
+  // A filesystem walk has no known total, so the *previous* index size is the
+  // only honest yardstick: a rebuild normally visits roughly as many entries.
+  // A first build has no yardstick at all, which is what the indeterminate bar
+  // is for. (The old formula divided scanned by itself — always 100%.)
+  const base = status?.count ?? 0;
+  const pct = scanning && base > 0 ? Math.min(99, Math.round((scanned / base) * 100)) : null;
 
   return (
     <>
@@ -1104,12 +1153,14 @@ function IndexPane({
           </span>
           <span className="spacer" />
           <span style={{ color: "var(--text-3)" }}>
-            {t("已收录 {n} 项", { n: (status?.count ?? 0).toLocaleString() })}
+            {scanning
+              ? t("已扫描 {n} 项", { n: scanned.toLocaleString() })
+              : t("已收录 {n} 项", { n: (status?.count ?? 0).toLocaleString() })}
           </span>
         </div>
         {scanning && (
-          <div className="progress">
-            <i style={{ width: `${pct}%` }} />
+          <div className="progress" data-indeterminate={pct === null}>
+            <i style={pct === null ? undefined : { width: `${pct}%` }} />
           </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -1118,10 +1169,15 @@ function IndexPane({
             data-variant="primary"
             disabled={busy}
             onClick={async () => {
+              // Rebuilding walks every indexed drive; ask first.
+              const ok = await confirmDialog(
+                t("重建索引会重新扫描所有索引磁盘，期间文件搜索结果可能不完整。确定继续？"),
+                { title: t("重建索引"), kind: "warning" },
+              ).catch(() => false);
+              if (!ok) return;
               setBusy(true);
               await api.rebuildIndex();
-              window.setTimeout(refreshStatus, 600);
-              window.setTimeout(() => setBusy(false), 4000);
+              refreshStatus();
             }}
           >
             <Icon name="refresh" size={15} className={busy ? "spin" : ""} />{t("重建索引")}</button>

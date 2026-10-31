@@ -183,6 +183,7 @@ extern "system" {
     pub fn GetWindowRect(hwnd: HWND, rect: *mut RECT) -> BOOL;
     pub fn GetParent(hwnd: HWND) -> HWND;
     pub fn GetWindow(hwnd: HWND, cmd: u32) -> HWND;
+    pub fn GetTopWindow(hwnd: HWND) -> HWND;
     pub fn GetWindowLongW(hwnd: HWND, index: i32) -> isize;
     pub fn SetWindowLongW(hwnd: HWND, index: i32, value: isize) -> isize;
     pub fn SetWindowsHookExW(id_hook: i32, proc: HOOKPROC, hmod: HMODULE, thread: u32) -> HHOOK;
@@ -445,4 +446,91 @@ pub fn raise_no_activate(hwnd: HWND) {
             SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE,
         );
     }
+}
+
+/// Drop the topmost band. `SetWindowPos(HWND_NOTOPMOST)` is used instead of
+/// Tauri's `set_always_on_top(false)` where a synchronous, no-round-trip call
+/// is needed (the follower runs at 60 Hz).
+pub fn clear_topmost(hwnd: HWND) {
+    const HWND_NOTOPMOST: HWND = -2;
+    const SWP_NOSIZE: u32 = 0x0001;
+    const SWP_NOMOVE: u32 = 0x0002;
+    const SWP_NOACTIVATE: u32 = 0x0010;
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            HWND_NOTOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE,
+        );
+    }
+}
+
+/// Whether `child` currently sits above `anchor` in the z-order.
+///
+/// Walks the top-level list from the front, so the answer reflects what the
+/// user actually sees. Used to avoid calling `SetWindowPos` on every follower
+/// tick: unconditional raises made the box flicker.
+pub fn is_above(child: HWND, anchor: HWND) -> bool {
+    const GW_HWNDNEXT: u32 = 2;
+    unsafe {
+        let mut h = GetTopWindow(0);
+        while h != 0 {
+            if h == child {
+                return true;
+            }
+            if h == anchor {
+                return false;
+            }
+            h = GetWindow(h, GW_HWNDNEXT);
+        }
+        false
+    }
+}
+
+/// Keep `child` one slot above `anchor`, in the same (normal) z-order band.
+///
+/// This is the whole "the box is part of the dialog" rule, and it is fiddly
+/// because of a Windows guarantee: the foreground window always sits at the
+/// top of its band, and `HWND_TOP` on another window of that band is silently
+/// ignored (measured on Win11: `SetWindowPos(child, HWND_TOP, ...)` returned
+/// TRUE and changed nothing). A plain raise therefore could never put the box
+/// back above the dialog it belongs to — which is why every previous attempt
+/// either did nothing or fell back to making the box topmost, and topmost put
+/// it in a *different band* than the dialog (the user's actual complaint).
+///
+/// The way around the rule is to bounce through the topmost band and come
+/// straight back out: `HWND_NOTOPMOST` inserts the window at the top of the
+/// normal band, i.e. exactly one slot above the foreground dialog. Both calls
+/// are back-to-back with no message pump in between, so the box is never
+/// painted while topmost — no flash.
+///
+/// Only does anything while `anchor` really is the foreground window; lifting
+/// the box above whatever the user switched to would be the opposite of what
+/// we want. Returns whether anything was changed.
+pub fn keep_above(child: HWND, anchor: HWND) -> bool {
+    const HWND_TOPMOST: HWND = -1;
+    const HWND_NOTOPMOST: HWND = -2;
+    const SWP_NOSIZE: u32 = 0x0001;
+    const SWP_NOMOVE: u32 = 0x0002;
+    const SWP_NOACTIVATE: u32 = 0x0010;
+    const GWL_EXSTYLE: i32 = -20;
+    const WS_EX_TOPMOST: isize = 0x8;
+    const FLAGS: u32 = SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE;
+
+    if unsafe { GetForegroundWindow() } != anchor {
+        return false;
+    }
+    let topmost = unsafe { GetWindowLongW(child, GWL_EXSTYLE) } & WS_EX_TOPMOST != 0;
+    if !topmost && is_above(child, anchor) {
+        return false;
+    }
+    unsafe {
+        SetWindowPos(child, HWND_TOPMOST, 0, 0, 0, 0, FLAGS);
+        SetWindowPos(child, HWND_NOTOPMOST, 0, 0, 0, 0, FLAGS);
+    }
+    true
 }

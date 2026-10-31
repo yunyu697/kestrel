@@ -13,6 +13,9 @@ import type {
   Favorite,
 } from "./types";
 
+/** Outcome of a watchdog (un)install attempt. */
+export type ServiceResult = "ok" | "needsAdmin" | "failed";
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   return invoke<T>(cmd, args);
 }
@@ -110,8 +113,9 @@ export const api = {
   fileHashes: (path: string) =>
     call<{ md5: string; sha1: string; sha256: string; size: number }>("file_hashes", { path }),
   serviceStatus: () => call<boolean>("service_status"),
-  serviceInstall: () => call<boolean>("service_install"),
-  serviceUninstall: () => call<boolean>("service_uninstall"),
+  // "ok" | "needsAdmin" | "failed" — registering a logon task needs elevation.
+  serviceInstall: () => call<ServiceResult>("service_install"),
+  serviceUninstall: () => call<ServiceResult>("service_uninstall"),
   clearDialogTarget: () => call<void>("clear_dialog_target"),
   hasDialogTarget: () => call<boolean>("has_dialog_target"),
 

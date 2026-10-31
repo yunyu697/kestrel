@@ -170,10 +170,11 @@ pub fn update_cancel(id: String) -> bool {
 /// this process to exit and then runs it.
 #[tauri::command]
 pub fn update_install(path: String) -> bool {
-    if path.trim().is_empty() {
+    let path = path.trim();
+    if path.is_empty() {
         return false;
     }
-    crate::install::spawn_helper(path.trim())
+    crate::install::spawn_helper(path)
 }
 
 /// Show a downloaded installer in Explorer.

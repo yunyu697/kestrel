@@ -272,24 +272,42 @@ pub fn service_status() -> bool {
 
 /// Register a logon task that keeps Kestrel alive (restarts after crashes
 /// or forced kills), and start the watchdog immediately.
+///
+/// Returns `"ok"`, `"needsAdmin"` or `"failed"`. Creating a logon task is a
+/// machine-level change, so `schtasks` answers "Access is denied" when the app
+/// runs unelevated — that case is reported separately instead of being
+/// collapsed into a bare `false`, because the UI has to *explain* it.
 #[tauri::command]
-pub fn service_install() -> bool {
-    let Ok(exe) = std::env::current_exe() else { return false };
+pub fn service_install() -> String {
+    if !crate::win::is_elevated() {
+        return "needsAdmin".into();
+    }
+    let Ok(exe) = std::env::current_exe() else { return "failed".into() };
     let tr = format!("\"{}\" --watchdog", exe.display());
     if !schtasks(&[
         "/Create", "/F", "/SC", "ONLOGON", "/RL", "LIMITED", "/TN", WATCHDOG_TASK, "/TR", &tr,
     ]) {
-        return false;
+        crate::debug_log::qs_log("service: schtasks /Create failed while elevated");
+        return "failed".into();
     }
     crate::watchdog::clear_stop_flag();
     crate::win::shell::spawn(&exe.to_string_lossy(), Some("--watchdog"), None);
-    true
+    "ok".into()
 }
 
 /// Remove the watchdog task and tell the running watchdog to stop.
 #[tauri::command]
-pub fn service_uninstall() -> bool {
-    let ok = schtasks(&["/Delete", "/F", "/TN", WATCHDOG_TASK]);
+pub fn service_uninstall() -> String {
+    if !crate::win::is_elevated() {
+        return "needsAdmin".into();
+    }
+    let deleted = schtasks(&["/Delete", "/F", "/TN", WATCHDOG_TASK]);
     crate::watchdog::mark_stop();
-    ok
+    // "Nothing was registered" also counts as success, otherwise the toggle
+    // would stick on after cleaning up a task that was already gone.
+    if deleted || !service_status() {
+        "ok".into()
+    } else {
+        "failed".into()
+    }
 }

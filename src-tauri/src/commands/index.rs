@@ -88,6 +88,29 @@ pub fn spawn_rebuild(app: AppHandle, state: Arc<AppState>) {
             });
 
             let count = entries.len();
+            // A cancelled walk only produced a *partial* entry set. Swapping it
+            // in would silently shrink the index until the next rebuild, so the
+            // previous index is kept as-is and the partial scan is dropped.
+            if state.index.cancel.swap(false, Ordering::Relaxed) {
+                crate::debug_log::qs_log(&format!(
+                    "scan cancelled after {count} entries: keeping the previous index"
+                ));
+                drop(entries);
+                state.index.scanning.store(false, Ordering::SeqCst);
+                *state.index.current.write() = String::new();
+                if let Some(w) = state.watcher.lock().as_ref() {
+                    w.paused.store(false, Ordering::Relaxed);
+                }
+                let _ = app.emit(
+                    "index://done",
+                    serde_json::json!({
+                        "count": state.index.count(),
+                        "ms": started.elapsed().as_millis() as u64,
+                        "cancelled": true,
+                    }),
+                );
+                return;
+            }
             state
                 .index
                 .replace(entries, settings.indexed_drives.clone());
