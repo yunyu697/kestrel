@@ -27,6 +27,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.7",
+    date: "2026-11-01",
+    title: {
+      zh: "修复更新下载失败：不支持的协议",
+      en: "Fixes update downloads failing with an unsupported-protocol error",
+      ja: "更新のダウンロードが「サポートされていないプロトコル」で失敗する問題を修正",
+      es: "Corrige los fallos de descarga de la actualización por protocolo no admitido",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "默认「官方直连」时下载地址被拼成 `/https://github.com/...`，导致 1.2.0 之后的版本点下载一律失败并提示「不支持的协议」。空前缀现在会被正确理解为「不加速」，而不是一个 `/`",
+          en: "With the default «direct» route the download URL was built as `/https://github.com/...`, so every download since 1.2.0 failed with an unsupported-protocol error. An empty prefix now means «no mirror» instead of turning into a slash",
+          ja: "既定の「公式直結」ではダウンロード URL が `/https://github.com/...` になってしまい、1.2.0 以降はダウンロードが必ず「サポートされていないプロトコル」で失敗していました。空のプレフィックスは `/` ではなく「ミラーなし」として扱われます",
+          es: "Con la ruta «directa» predeterminada la URL se construía como `/https://github.com/...`, así que toda descarga desde 1.2.0 fallaba con un error de protocolo no admitido. Un prefijo vacío ahora significa «sin espejo» en lugar de convertirse en una barra",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "自定义镜像如果只填了域名（缺 `https://`）或填了不合法的内容，不再拼出非法地址，而是自动补全或回退到官方直连",
+          en: "A custom mirror typed without `https://`, or with something that is not a URL at all, no longer produces an unusable address: the scheme is filled in, or the download falls back to the direct route",
+          ja: "カスタム ミラーに `https://` のないドメインや URL でない文字列を入力しても、不正なアドレスを作らず、スキームを補完するか公式直結に戻ります",
+          es: "Un espejo personalizado escrito sin `https://`, o con algo que no es una URL, ya no genera una dirección inservible: se completa el esquema o se vuelve a la ruta directa",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.6",
     date: "2026-11-01",
     title: {
