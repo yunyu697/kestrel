@@ -1,7 +1,7 @@
 {
   "name": "kestrel",
   "private": true,
-  "version": "1.2.5",
+  "version": "1.2.6",
   "type": "module",
   "description": "Kestrel - instant file search and launcher for Windows",
   "scripts": {

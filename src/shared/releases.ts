@@ -27,6 +27,54 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.6",
+    date: "2026-11-01",
+    title: {
+      zh: "同一时间只允许运行一个实例",
+      en: "Only one copy runs at a time",
+      ja: "同時に起動できるのは 1 つだけ",
+      es: "Solo se ejecuta una copia a la vez",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "同时启动多个副本时可能留下两个实例。守卫现在在任何窗口创建之前就获取，抢不到的副本直接退出——不会再有 WebView2 配置冲突导致的崩溃弹窗",
+          en: "Launching several copies at once could leave two instances running. The guard is now taken before any window exists, so the copy that loses simply exits — no more crash dialog from a WebView2 profile conflict",
+          ja: "同時に複数のコピーを起動すると 2 つのインスタンスが残ることがありました。ガードはウィンドウを作る前に取得するようになり、取れなかったコピーはそのまま終了します。WebView2 のプロファイル競合によるクラッシュ ダイアログはもう出ません",
+          es: "Lanzar varias copias a la vez podía dejar dos instancias en marcha. La guarda se toma ahora antes de crear ninguna ventana, así que la copia que pierde simplemente sale: se acabó el diálogo de error por conflicto de perfil de WebView2",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "已经开着的时候再点一次图标，会正常弹出搜索栏。以前在启动的头一两秒内点，是完全没有反应的",
+          en: "Clicking the icon again while it is already open now brings up the search box. Before, clicking during the first second or two of startup did nothing at all",
+          ja: "起動済みのときにもう一度アイコンを押すと、検索バーがちゃんと表示されます。以前は起動直後の 1〜2 秒に押しても何も起きませんでした",
+          es: "Volver a pulsar el icono con la app ya abierta ahora muestra el buscador. Antes, pulsar durante el primer segundo o dos del arranque no hacía absolutamente nada",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "`--no-single-instance` 不再是通用绕过开关，只对「以管理员身份重启」这一次交接有效",
+          en: "`--no-single-instance` is no longer a general bypass; it only applies to the hand-off when restarting as administrator",
+          ja: "`--no-single-instance` は汎用のバイパスではなくなり、「管理者として再起動」の引き継ぎ時だけ有効になります",
+          es: "`--no-single-instance` ya no es un atajo universal: solo se aplica al traspaso al reiniciar como administrador",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "单实例按登录会话隔离：同一台电脑上两个用户各自登录，可以各开一份",
+          en: "The lock is per sign-in session, so two users logged in on the same PC can each run their own copy",
+          ja: "単一インスタンスはログオン セッション単位です。同じ PC に 2 人がログオンしていれば、それぞれ 1 つずつ起動できます",
+          es: "El bloqueo es por sesión de inicio, así que dos usuarios con sesión abierta en el mismo PC pueden tener cada uno su copia",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.5",
     date: "2026-11-01",
     title: {
