@@ -106,7 +106,12 @@ fn parse_url(url: &str) -> Result<Parts, String> {
     let secure = match scheme.to_ascii_lowercase().as_str() {
         "https" => true,
         "http" => false,
-        other => return Err(format!("不支持的协议: {other}")),
+        other => {
+            // The bare scheme is useless on its own ("不支持的协议: /https"):
+            // the whole URL is what identifies a bad caller.
+            crate::debug_log::qs_log(&format!("net: refusing scheme {other:?} in {url}"));
+            return Err(format!("不支持的协议: {other}"));
+        }
     };
     let (authority, path) = match rest.find('/') {
         Some(i) => (&rest[..i], rest[i..].to_string()),
@@ -506,6 +511,20 @@ mod tests {
     fn rejects_broken_url() {
         assert!(parse_url("not a url").is_err());
         assert!(parse_url("ftp://example.com/x").is_err());
+    }
+
+    /// The scheme has to be named in the error: it is the only clue that the
+    /// caller joined a mirror prefix onto a URL wrongly. A prefix of "/" used
+    /// to produce "/https://github.com/…" and the message read
+    /// "不支持的协议: /https" — which is exactly how 1.2.0-1.2.6 shipped an
+    /// updater that could not download anything.
+    #[test]
+    fn names_the_scheme_it_cannot_speak() {
+        let err = match parse_url("/https://github.com/x/y/releases/download/v1/a.msi") {
+            Ok(_) => panic!("the leading slash should not parse as a host"),
+            Err(e) => e,
+        };
+        assert!(err.contains("/https"), "error was {err:?}");
     }
 
     #[test]

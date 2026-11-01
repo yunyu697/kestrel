@@ -41,15 +41,40 @@ export const MIRRORS: UpdateMirror[] = [
   { id: "ghproxynet", name: "ghproxy.net", prefix: "https://ghproxy.net/" },
 ];
 
+/**
+ * The prefix to put in front of a release URL, with exactly one trailing
+ * slash — or `""` for the official direct route.
+ *
+ * The empty string is a *meaning*, not an empty prefix. Appending a slash to
+ * it produced `"/"`, which joined to a GitHub URL as `"/https://github.com/…"`
+ * and made every download fail with "unsupported protocol: /https" — the
+ * default setting, so the updater could not download at all.
+ */
 export function mirrorPrefix(settings: Pick<Settings, "updateMirror">): string {
-  return settings.updateMirror.replace(/\/?$/, "/");
+  const raw = settings.updateMirror.trim();
+  if (!raw) return "";
+  return raw.replace(/\/+$/, "") + "/";
 }
 
+/**
+ * Join a mirror prefix and a release URL.
+ *
+ * A prefix has to be an absolute URL, or the result stops being one. A bare
+ * host (`gh-proxy.com`) is treated as https, and anything that still is not
+ * http(s) — a stale value, a typo, a scheme this client cannot speak — is
+ * ignored so the download falls back to the direct route instead of failing
+ * with a protocol error the user cannot act on.
+ */
 export function applyMirror(url: string, prefix: string): string {
-  if (!prefix) return url;
-  // Normalize here too: callers may pass a raw mirror string that lacks the
-  // trailing slash, and the prefix form requires exactly one.
-  return prefix.replace(/\/?$/, "/") + url;
+  const base = prefix.trim();
+  if (!base) return url;
+  const absolute = /^[a-z][a-z0-9+.-]*:\/\//i.test(base) ? base : `https://${base}`;
+  const trimmed = absolute.replace(/\/+$/, "");
+  // It has to be an http(s) URL with a real host. A bare "/" turns into
+  // "https:" after trimming, and a host with a space is not a host — joining
+  // either of those would put a second scheme inside the URL.
+  if (!/^https?:\/\/[^/]/i.test(trimmed) || /\s/.test(trimmed)) return url;
+  return trimmed + "/" + url;
 }
 
 export interface ReleaseAsset {

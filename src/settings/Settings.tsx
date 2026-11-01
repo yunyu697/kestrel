@@ -1780,7 +1780,9 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
       .catch(() => setInstallMode("perMachine"));
   }, []);
 
-  const normPrefix = (p: string) => p.replace(/\/?$/, "/");
+  // Same normalisation as `mirrorPrefix`, including the empty case: "" means
+  // "direct", not "the prefix /".
+  const normPrefix = (p: string) => (p ? p.replace(/\/+$/, "") + "/" : "");
   const mirrorId =
     s.updateMirror === ""
       ? "direct"
