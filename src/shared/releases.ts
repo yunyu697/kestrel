@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.9",
+    date: "2026-11-02",
+    title: {
+      zh: "QS 栏和全局搜索栏可以互相接替，不再互相顶掉",
+      en: "Quick Switch and the launcher hand the window back and forth",
+      ja: "クイックスイッチとランチャーがウィンドウを譲り合うようになりました",
+      es: "Quick Switch y el lanzador se ceden la ventana en lugar de anularse",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "对话框开着 QS 栏时去用全局搜索栏，QS 会话以前会被直接结束，回到对话框就再也回不来。现在两个会话共用一个窗口：搜索栏出现时 QS 只是让位，关掉搜索栏 QS 栏就回到原对话框",
+          en: "Using the global search bar while a Quick Switch box was attached used to end the Quick Switch session outright, so returning to the dialog never brought it back. The two sessions now share the window: the launcher only takes it over, and closing the launcher puts the box back under the same dialog",
+          ja: "クイックスイッチ表示中にグローバル検索バーを使うとセッションが終了してしまい、ダイアログに戻っても復活しませんでした。2 つのセッションがウィンドウを共有するようになり、検索バーを閉じると元のダイアログに戻ります",
+          es: "Usar la barra de búsqueda global con un cuadro de Quick Switch adjunto terminaba la sesión, así que al volver al diálogo ya no reaparecía. Ahora ambas sesiones comparten la ventana: el lanzador solo la ocupa y, al cerrarlo, el cuadro vuelve bajo el mismo diálogo",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "7-Zip 这类「只给一个文件夹输入框」的对话框也能吸附 QS 栏了：解压到、复制到、移动到都能直接选目标文件夹。识别靠输入框里装的是文件夹还是文件名，所以「压缩文件名」这种框不会被误判",
+          en: "Dialogs that ask for a folder with nothing but a text field are now supported too — 7-Zip's \"extract to\", \"copy to\" and \"move to\" boxes all accept a destination folder. Recognition is based on whether the field holds a folder or a file name, so an \"archive name\" box is never mistaken for one",
+          ja: "フォルダーを 1 つの入力欄だけで尋ねるダイアログにも対応しました。7-Zip の「展開先」「コピー先」「移動先」で保存先フォルダーを選べます。判定は入力欄がフォルダーかファイル名かで行うため、「圧縮ファイル名」を誤認しません",
+          es: "Los diálogos que piden una carpeta con solo un campo de texto ya se admiten: las cajas «extraer en», «copiar en» y «mover a» de 7-Zip aceptan la carpeta de destino. La detección mira si el campo contiene una carpeta o un nombre de archivo, así que «nombre del archivo» nunca se confunde",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "升级到新版本后仍然提示「检测到新版本」的问题修好了：那条记录存在浏览器本地，以前不看当前版本号，装完新版本也照样显示；现在只要发现它不比正在运行的版本新就直接清掉",
+          en: "The \"new version found\" banner no longer survives the upgrade: the record lives in local storage and was never compared against the running build, so installing the new version kept showing it. It is now dropped as soon as it is not newer than what is running",
+          ja: "新しいバージョンに更新しても「新しいバージョンがあります」と表示され続ける問題を修正しました。記録はローカル保存で、実行中のバージョンと比較していなかったためです。今は新しくない記録は即座に破棄されます",
+          es: "El aviso de «nueva versión encontrada» ya no sobrevive a la actualización: el registro se guardaba localmente y nunca se comparaba con la versión en ejecución. Ahora se descarta en cuanto deja de ser más reciente",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.8",
     date: "2026-11-02",
     title: {
