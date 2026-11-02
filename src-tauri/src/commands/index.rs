@@ -149,6 +149,15 @@ pub fn cancel_index(state: State<'_, Arc<AppState>>) {
 /// different entry layout) — it is deleted right away and rebuilt, which also
 /// frees the hundreds of megabytes the old uncompressed format occupied.
 pub fn load_persisted(state: &Arc<AppState>) -> Option<u32> {
+    // Check the version before decoding: a stale file is about to be deleted,
+    // and decoding it first would keep the old index in memory alongside the
+    // rebuild that replaces it.
+    if let Some(v) = idx::peek_version(&state.paths.index()) {
+        if v != idx::CURRENT_VERSION {
+            let _ = std::fs::remove_file(state.paths.index());
+            return None;
+        }
+    }
     let version = idx::load(&state.index, &state.paths.index());
     if let Some(v) = version {
         if v != idx::CURRENT_VERSION {

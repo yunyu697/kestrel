@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.10",
+    date: "2026-11-02",
+    title: {
+      zh: "索引占用的内存少了一半以上",
+      en: "The index takes less than half the memory it used to",
+      ja: "インデックスのメモリ使用量が半分以下になりました",
+      es: "El índice ocupa menos de la mitad de memoria que antes",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "每条索引记录以前把同一份东西存了两遍到三遍：完整路径在记录里存一份、在路径索引表里又存一份；父目录单独存一份，而它本来就是路径的前半段；文件名的小写副本对本来就全小写的文件名也照存不误。三处都去掉了——路径只留一份，两张表共用；父目录改成用到时从路径里现切；小写副本只在真和原名不同时才留。71.5 万个文件，主进程内存从 718 MB 降到 320 MB",
+          en: "Every index entry used to store the same thing two or three times: the full path once in the entry and again as the lookup-table key, the parent folder as its own copy even though it is just the first half of the path, and a lowercased name even for names that were already lowercase. All three are gone — the path is stored once and shared by both tables, the parent folder is sliced off the path when needed, and the lowercase copy only exists when it actually differs. For 715k files that takes the main process from 718 MB down to 320 MB",
+          ja: "インデックスの各項目が同じ内容を 2〜3 回保存していました。完全なパスを項目内と検索テーブルのキーに二重保存し、パスの前半そのものである親フォルダーを別途保存し、もともと小文字だけの名前にも小文字コピーを持っていました。3 つとも廃止しました。パスは 1 回だけ保存して両方の表で共有し、親フォルダーは必要時にパスから切り出し、小文字コピーは実際に異なる場合のみ保持します。71.5 万ファイルで、メインプロセスのメモリが 718 MB から 320 MB になりました",
+          es: "Cada entrada del índice guardaba lo mismo dos o tres veces: la ruta completa una vez en la entrada y otra como clave de la tabla de búsqueda, la carpeta padre como copia propia aunque es solo la primera mitad de la ruta, y un nombre en minúsculas incluso para nombres que ya lo estaban. Las tres se han eliminado: la ruta se guarda una vez y la comparten ambas tablas, la carpeta padre se recorta de la ruta cuando hace falta y la copia en minúsculas solo existe si realmente difiere. Con 715 mil archivos, el proceso principal pasa de 718 MB a 320 MB",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "保存索引以前要把整份索引复制一遍再压缩，中途瞬间多占四百多 MB；读取时又先把解压出来的两百多 MB 整个摊在内存里再解析。现在保存是一边序列化一边压缩、读取是一边解压一边解析，中间不再有大块缓冲",
+          en: "Saving the index used to copy the whole thing before compressing it, spiking memory by over 400 MB, and loading first unpacked the entire 200-plus MB payload before parsing it. Saving now compresses while it serialises, and loading parses while it decompresses, so neither step needs a large buffer in between",
+          ja: "インデックスの保存時に全体を複製してから圧縮していたため、一時的に 400 MB 以上を余分に使っていました。読み込み時も、解凍した 200 MB 超を丸ごとメモリに広げてから解析していました。現在は保存はシリアライズしながら圧縮し、読み込みは解凍しながら解析するため、途中に大きなバッファを取りません",
+          es: "Guardar el índice copiaba todo antes de comprimirlo, con un pico de más de 400 MB, y al cargarlo se descomprimían los más de 200 MB completos antes de analizarlos. Ahora se comprime mientras se serializa y se analiza mientras se descomprime, sin búferes grandes por medio",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "索引文件本身也小了，18.8 MB 变成 16.4 MB。另外升级后第一次启动会重建一次索引（约一分钟），期间搜索会提示正在建立索引；这次格式变了，只此一次",
+          en: "The index file itself got smaller too, from 18.8 MB to 16.4 MB. Upgrading also rebuilds the index once on first launch (about a minute), with search showing the indexing hint meanwhile — the format changed this once",
+          ja: "インデックス ファイル自体も 18.8 MB から 16.4 MB に小さくなりました。また、アップグレード後の初回起動時に一度だけインデックスを再構築します（約 1 分）。その間は検索にインデックス作成中の表示が出ます。形式が変わったのは今回だけです",
+          es: "El archivo del índice también es más pequeño: de 18,8 MB a 16,4 MB. Además, tras actualizar se reconstruye una vez en el primer arranque (alrededor de un minuto), y mientras tanto la búsqueda muestra el aviso de indexación; el formato cambió solo esta vez",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.9",
     date: "2026-11-02",
     title: {

@@ -274,7 +274,7 @@ impl<'a> Scorer<'a> {
                 _ => {}
             }
         }
-        if !q.exts.is_empty() && (e.is_dir || !q.exts.iter().any(|x| x == &e.ext)) {
+        if !q.exts.is_empty() && (e.is_dir || !q.exts.iter().any(|x| x.as_str() == &*e.ext)) {
             return None;
         }
         if let Some(min) = q.min_size {
@@ -298,7 +298,7 @@ impl<'a> Scorer<'a> {
             }
         }
         if let Some(p) = &q.in_path {
-            if !contains_ci(&e.dir, p) && !contains_ci(&e.path, p) {
+            if !contains_ci(e.dir(), p) && !contains_ci(&e.path, p) {
                 return None;
             }
         }
@@ -311,7 +311,7 @@ impl<'a> Scorer<'a> {
             // those matches to be possible; otherwise skip straight to path
             // matching. One AND prunes most entries with zero string work.
             if tmask == 0 || (e.mask & tmask) == tmask {
-                merge_best(&mut best, match_score_ex(&e.lower, term, self.fuzzy));
+                merge_best(&mut best, match_score_ex(e.lower(), term, self.fuzzy));
                 if best.is_none() && self.pinyin && !e.py.is_empty() {
                     merge_best(&mut best, match_score_ex(&e.py, term, self.fuzzy).map(|s| s * 0.94));
                 }
@@ -325,7 +325,7 @@ impl<'a> Scorer<'a> {
             total += best?;
         }
 
-        let usage_boost = self.usage.get(&e.path).copied().unwrap_or(0).min(24) as f64 * 3.2;
+        let usage_boost = self.usage.get(&*e.path).copied().unwrap_or(0).min(24) as f64 * 3.2;
         let depth = e.path.matches('\\').count() as f64;
         let depth_penalty = depth.min(12.0) * 1.6;
         let dir_bonus = if e.is_dir { 8.0 } else { 0.0 };
@@ -344,14 +344,14 @@ pub fn kind_of(e: &Entry) -> &'static str {
 
 pub fn entry_to_hit(e: &Entry, score: f64) -> SearchHit {
     SearchHit {
-        id: e.path.clone(),
+        id: e.path.to_string(),
         kind: kind_of(e).to_string(),
-        title: e.name.clone(),
-        subtitle: e.dir.clone(),
-        path: Some(e.path.clone()),
+        title: e.name.to_string(),
+        subtitle: e.dir().to_string(),
+        path: Some(e.path.to_string()),
         icon: None,
         score,
-        badge: if e.is_dir { None } else { Some(e.ext.clone()) },
+        badge: if e.is_dir { None } else { Some(e.ext.to_string()) },
         meta: None,
     }
 }
@@ -381,4 +381,155 @@ pub fn search_entries(
         .map(|(i, s)| entry_to_hit(&entries[i], s))
         .collect();
     (hits, total)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::{Path, PathBuf};
+
+    /// A tiny tree with the three name shapes that matter: an all-lowercase
+    /// name (no lowercase copy is stored), a mixed-case one (a copy is), and a
+    /// CJK one (pinyin fields exist).
+    fn tree(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("kestrel-search-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("docs")).expect("docs");
+        std::fs::write(dir.join("README.TXT"), b"hello").expect("file");
+        std::fs::write(dir.join("docs").join("plain.md"), b"hi").expect("file");
+        std::fs::write(dir.join("docs").join("会议记录.txt"), b"hi").expect("file");
+        dir
+    }
+
+    fn entries(dir: &Path) -> Vec<Entry> {
+        ["README.TXT", r"docs\plain.md", r"docs\会议记录.txt", "docs"]
+            .iter()
+            .map(|p| crate::index::make_entry(&dir.join(p)).expect("entry"))
+            .collect()
+    }
+
+    fn run(dir: &Path, raw: &str, match_path: bool) -> Vec<SearchHit> {
+        let q = parse(raw);
+        let usage = HashMap::new();
+        let scorer = Scorer {
+            query: &q,
+            usage: &usage,
+            match_path,
+            pinyin: true,
+            fuzzy: true,
+        };
+        let entries = entries(dir);
+        search_entries(&entries, &scorer, 20).0
+    }
+
+    fn titles(hits: &[SearchHit]) -> Vec<&str> {
+        hits.iter().map(|h| h.title.as_str()).collect()
+    }
+
+    #[test]
+    fn matches_a_mixed_case_name_case_insensitively() {
+        let dir = tree("upper");
+        let hits = run(&dir, "readme", true);
+        assert!(titles(&hits).contains(&"README.TXT"), "got {:?}", titles(&hits));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The lowercase copy is only stored when it differs from the name; this
+    /// is the branch where it does not exist and the name has to be used.
+    #[test]
+    fn matches_a_name_that_is_already_lowercase() {
+        let dir = tree("lower");
+        let hits = run(&dir, "plain", true);
+        assert!(titles(&hits).contains(&"plain.md"), "got {:?}", titles(&hits));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn matches_a_cjk_name_by_its_pinyin_initials() {
+        let dir = tree("pinyin");
+        let hits = run(&dir, "hyjl", true);
+        assert!(titles(&hits).contains(&"会议记录.txt"), "got {:?}", titles(&hits));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `in:` reads the parent directory, which is now sliced out of the path
+    /// rather than stored — the filter has to keep behaving identically.
+    #[test]
+    fn filters_by_parent_directory() {
+        let dir = tree("inpath");
+        let hits = run(&dir, "in:docs", true);
+        let got = titles(&hits);
+        assert!(got.contains(&"plain.md"), "got {got:?}");
+        assert!(got.contains(&"会议记录.txt"), "got {got:?}");
+        assert!(!got.contains(&"README.TXT"), "README is not under docs: {got:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn filters_by_extension() {
+        let dir = tree("ext");
+        let hits = run(&dir, "ext:md", true);
+        let got = titles(&hits);
+        assert_eq!(got, vec!["plain.md"], "got {got:?}");
+
+        // Extensions are stored lowercased, so an uppercase name still matches.
+        let hits = run(&dir, "ext:txt", true);
+        assert!(titles(&hits).contains(&"README.TXT"), "got {:?}", titles(&hits));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_hit_shows_its_parent_directory_as_the_subtitle() {
+        let dir = tree("hit");
+        let entries = entries(&dir);
+        let e = entries.iter().find(|e| &*e.name == "plain.md").expect("entry");
+        let hit = entry_to_hit(e, 1.0);
+        assert_eq!(hit.title, "plain.md");
+        assert_eq!(hit.subtitle, e.dir());
+        assert!(hit.subtitle.ends_with("docs"), "subtitle was {:?}", hit.subtitle);
+        assert_eq!(hit.path.as_deref(), Some(&*e.path));
+        assert_eq!(hit.badge.as_deref(), Some("md"));
+    }
+
+    /// Run real queries against a real index file. Skipped unless
+    /// `KESTREL_INDEX` points at one, because it needs ~700k entries to say
+    /// anything useful.
+    ///
+    /// ```text
+    /// KESTREL_INDEX=%APPDATA%\com.kestrel.launcher\index.bin cargo test --lib \
+    ///   smoke_against_a_real_index -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "needs KESTREL_INDEX pointing at a real index.bin"]
+    fn smoke_against_a_real_index() {
+        let path = match std::env::var("KESTREL_INDEX") {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+        let index = crate::index::Index::new();
+        let t0 = std::time::Instant::now();
+        assert!(crate::index::load(&index, Path::new(&path)).is_some(), "load failed");
+        println!("loaded {} entries in {:?}", index.count(), t0.elapsed());
+
+        let usage = HashMap::new();
+        for raw in ["a", "report", "会议", "hyjl", "in:downloads", "ext:rs log", "设置"] {
+            let q = parse(raw);
+            let scorer = Scorer {
+                query: &q,
+                usage: &usage,
+                match_path: true,
+                pinyin: true,
+                fuzzy: true,
+            };
+            let store = index.store.read();
+            let t = std::time::Instant::now();
+            let (hits, total) = search_entries(&store.entries, &scorer, 10);
+            println!(
+                "{raw:>16} -> {total} matched, top {} in {:?}: {:?}",
+                hits.len(),
+                t.elapsed(),
+                hits.iter().take(3).map(|h| &h.title).collect::<Vec<_>>()
+            );
+        }
+    }
 }

@@ -179,14 +179,14 @@ fn do_search(st: &Arc<AppState>, query: &str, limit: Option<usize>) -> SearchRes
         recent.sort_by(|a, b| b.1.cmp(a.1));
         let store = st.index.store.read();
         for (path, count) in recent.iter().take(10) {
-            if let Some(&idx) = store.by_path.get(*path) {
+            if let Some(&idx) = store.by_path.get(path.as_str()) {
                 let e = &store.entries[idx];
                 hits.push(SearchHit {
-                    id: e.path.clone(),
+                    id: e.path.to_string(),
                     kind: if e.is_dir { "folder".into() } else { "file".into() },
-                    title: e.name.clone(),
-                    subtitle: e.dir.clone(),
-                    path: Some(e.path.clone()),
+                    title: e.name.to_string(),
+                    subtitle: e.dir().to_string(),
+                    path: Some(e.path.to_string()),
                     icon: None,
                     score: 900.0 - (**count as f64) * 0.1,
                     badge: Some(crate::i18n::tr(&settings.language, "badge.frequent").into()),
