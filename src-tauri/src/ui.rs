@@ -83,13 +83,25 @@ pub fn settings_window(app: &AppHandle) -> Option<WebviewWindow> {
 }
 
 pub fn show_launcher(app: &AppHandle, state: &Arc<AppState>) {
-    // End any attached Quick Switch session: the global launcher must never
-    // fight the follower over the window geometry.
-    crate::debug_log::qs_log("show_launcher (ends QS session)");
+    // Suspend any attached Quick Switch session instead of ending it.
+    //
+    // The launcher and the box share one window, so only one of them can be
+    // on screen at a time — but they are *sessions*, not a single mode. The
+    // dialog handle stays bound and `launcher_override` tells the follower to
+    // leave the window alone; closing the launcher then puts the box straight
+    // back under the dialog the user was working in. Clearing `dialog` here
+    // (which is what this used to do) threw the session away, so after a
+    // detour through the global search bar the box never came back.
+    let bound = state.dialog.lock().is_some();
+    crate::debug_log::qs_log(&format!(
+        "show_launcher (suspends QS, bound={bound})"
+    ));
     state
         .qs_active
         .store(false, std::sync::atomic::Ordering::Relaxed);
-    *state.dialog.lock() = None;
+    state
+        .launcher_override
+        .store(true, std::sync::atomic::Ordering::Relaxed);
     let Some(win) = launcher(app) else { return };
     if !state.launcher_visible.load(std::sync::atomic::Ordering::Relaxed) {
         // Restore the normal launcher footprint (Quick Switch shrinks it).
@@ -121,20 +133,39 @@ pub fn show_launcher(app: &AppHandle, state: &Arc<AppState>) {
 /// frontend has switched to Quick Switch mode — otherwise it would briefly
 /// display the normal launcher UI.
 pub fn show_quick_switch(app: &AppHandle, state: &Arc<AppState>, hwnd: isize) {
+    show_quick_switch_at(app, state, hwnd, true);
+}
+
+/// Attach the box to `hwnd`. `take_focus` is false when the box is merely
+/// coming back after the launcher was closed: the user is returning to the
+/// *dialog*, so stealing the caret into our own box would be wrong.
+fn show_quick_switch_at(app: &AppHandle, state: &Arc<AppState>, hwnd: isize, take_focus: bool) {
     let Some(win) = launcher(app) else { return };
     // Bind the box to this dialog FIRST: the follower thread keys off
     // `state.dialog` for following and for hiding when the dialog dies.
     // (The Ctrl+G path may reach here without the foreground monitor having
     // captured the dialog — forgetting this left the box glued to nothing.)
     *state.dialog.lock() = Some(hwnd);
+    // An explicit attach (Ctrl+G, a launcher round trip) overrides an earlier
+    // dismissal of this same dialog.
+    *state.qs_dismissed.lock() = None;
     state
         .qs_active
         .store(true, std::sync::atomic::Ordering::Relaxed);
+    // The window is no longer the global launcher's.
+    state
+        .launcher_override
+        .store(false, std::sync::atomic::Ordering::Relaxed);
     // Bail out instead of showing a stale/global launcher window.
     refresh_scale(app, state);
     let scale = launcher_scale(state);
     let Some((x, y, w, h)) = crate::win::monitor::compute_qs_geometry(hwnd, state.settings.read().qs_visible_rows, scale) else {
         crate::debug_log::qs_log(&format!("show_qs hwnd={hwnd:#x} geometry FAILED"));
+        // Nothing was shown, so the session is not running: leaving the flag
+        // set would make every later foreground event think the box is up.
+        state
+            .qs_active
+            .store(false, std::sync::atomic::Ordering::Relaxed);
         return;
     };
     crate::debug_log::qs_log(&format!("show_qs hwnd={hwnd:#x} geom=({x},{y},{w},{h})"));
@@ -160,7 +191,9 @@ pub fn show_quick_switch(app: &AppHandle, state: &Arc<AppState>, hwnd: isize) {
     if let Ok(h) = win.hwnd() {
         crate::win::keep_above(h.0 as isize, hwnd);
     }
-    let _ = win.set_focus();
+    if take_focus {
+        let _ = win.set_focus();
+    }
     state
         .launcher_visible
         .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -173,6 +206,9 @@ pub fn hide_launcher(app: &AppHandle) {
             .qs_active
             .store(false, std::sync::atomic::Ordering::Relaxed);
         state
+            .launcher_override
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        state
             .launcher_visible
             .store(false, std::sync::atomic::Ordering::Relaxed);
     }
@@ -182,6 +218,43 @@ pub fn hide_launcher(app: &AppHandle) {
         let _ = app.emit("launcher://hiding", ());
         let _ = win.hide();
     }
+}
+
+/// Close the launcher the way the user asked for — and, if a Quick Switch
+/// session was suspended by it, hand the window back to that session.
+///
+/// This is the "two sessions, one window" half of the design: the box is not
+/// destroyed when the global search bar appears, it steps aside and comes
+/// back. Anything that hides the launcher for its own reasons (`open_settings`,
+/// a dialog that went away) keeps using [`hide_launcher`] and does *not*
+/// resurrect the box.
+pub fn close_launcher(app: &AppHandle, state: &Arc<AppState>) {
+    let resume = state.dialog.lock().is_some();
+    hide_launcher(app);
+    if resume {
+        resume_quick_switch(app, state);
+    }
+}
+
+/// Put the box back under the dialog that is still bound, if any.
+fn resume_quick_switch(app: &AppHandle, state: &Arc<AppState>) {
+    let Some(dialog) = *state.dialog.lock() else {
+        return;
+    };
+    if crate::win::window::dialog_closing(dialog) {
+        // The dialog was closed while the launcher was up; there is nothing
+        // left to attach to.
+        *state.dialog.lock() = None;
+        *state.qs_dismissed.lock() = None;
+        crate::debug_log::qs_log("resume QS: dialog is gone, session dropped");
+        return;
+    }
+    if !state.settings.read().quick_switch_enabled {
+        return;
+    }
+    crate::debug_log::qs_log(&format!("resume QS on dialog {dialog:#x}"));
+    // No focus grab: the user is going back to the dialog, not to our box.
+    show_quick_switch_at(app, state, dialog, false);
 }
 
 pub fn toggle_launcher(app: &AppHandle, state: &Arc<AppState>) {
@@ -210,10 +283,22 @@ pub fn toggle_launcher(app: &AppHandle, state: &Arc<AppState>) {
     state
         .launcher_visible
         .store(visible, std::sync::atomic::Ordering::Relaxed);
-    if visible {
+    if !visible {
+        show_launcher(app, state);
+        return;
+    }
+    // Which of the two sessions is on screen decides what "close" means.
+    // The attached box is simply dismissed (its binding survives, so returning
+    // to the dialog brings it back); the global launcher hands the window back
+    // to the box if one is still bound.
+    if state.qs_active.load(std::sync::atomic::Ordering::Relaxed) {
+        // Remember the dismissal. Hiding the box gives the foreground back to
+        // the dialog, whose foreground event would otherwise re-attach the box
+        // immediately — making double Ctrl look like a no-op.
+        *state.qs_dismissed.lock() = *state.dialog.lock();
         hide_launcher(app);
     } else {
-        show_launcher(app, state);
+        close_launcher(app, state);
     }
 }
 

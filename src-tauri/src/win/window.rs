@@ -397,9 +397,75 @@ pub fn is_file_dialog(hwnd: HWND) -> bool {
 /// pick a folder as the shell's picker. What differs is only *how* the choice
 /// is applied — see [`apply_folder`].
 pub fn is_quick_switch_target(hwnd: HWND) -> bool {
-    dialog_shape(hwnd)
-        .map(|s| s.is_file_dialog() || s.is_folder_dialog())
-        .unwrap_or(false)
+    let Some(shape) = dialog_shape(hwnd) else {
+        return false;
+    };
+    if shape.is_file_dialog() || shape.is_folder_dialog() {
+        return true;
+    }
+    // Third shape: an app that asks "which folder?" with a dialog built from
+    // its own controls. 7-Zip's "copy to" / "move to" / "extract to" boxes are
+    // the model case — the path field need not be an editable combo, and the
+    // folder tree, when there is one at all, is not a `SysTreeView32`, so
+    // neither structural rule above can see them. What they always have is a
+    // text field holding a *folder*, and that folder is what the user is
+    // choosing.
+    folder_path_edit(hwnd).is_some()
+}
+
+/// The text field of an app dialog that holds a folder path.
+///
+/// 7-Zip asks "extract to where?" with an ordinary `#32770` whose only
+/// machine-readable clue is the content of one text field — `D:\Work\`. The
+/// content is also what keeps the rule narrow: a dialog whose text field holds
+/// a *file* name (WinRAR's "Archive name", 7-Zip's "Archive") is asking a
+/// different question, and gluing a folder box to it would be wrong.
+fn folder_path_edit(hwnd: HWND) -> Option<HWND> {
+    struct Ctx {
+        hit: Option<HWND>,
+    }
+    extern "system" fn cb(h: HWND, l: LPARAM) -> BOOL {
+        let ctx = unsafe { &mut *(l as *mut Ctx) };
+        if class_name(h) != "Edit" {
+            return 1;
+        }
+        if looks_like_folder_path(&get_text_timeout(h, 150)) {
+            ctx.hit = Some(h);
+            return 0; // stop enumerating
+        }
+        1
+    }
+    let mut ctx = Ctx { hit: None };
+    unsafe {
+        EnumChildWindows(hwnd, cb, &mut ctx as *mut Ctx as LPARAM);
+    }
+    crate::debug_log::qs_log_verbose(&format!(
+        "folder field probe {hwnd:#x} -> {:?}",
+        ctx.hit
+    ));
+    ctx.hit
+}
+
+/// Does `text` name a folder?
+///
+/// `D:\`, `D:\Work\`, `\\server\share` — or a path that exists as a directory.
+/// A path that neither exists nor ends with a separator is rejected, because
+/// that is exactly what a *file* name looks like.
+pub fn looks_like_folder_path(text: &str) -> bool {
+    let t = text.trim().trim_matches('"');
+    let b = t.as_bytes();
+    let absolute = (b.len() >= 3
+        && b[0].is_ascii_alphabetic()
+        && b[1] == b':'
+        && (b[2] == b'\\' || b[2] == b'/'))
+        || t.starts_with("\\\\");
+    if !absolute {
+        return false;
+    }
+    if t.ends_with('\\') || t.ends_with('/') {
+        return true;
+    }
+    std::path::Path::new(t).is_dir()
 }
 
 fn dialog_shape(hwnd: HWND) -> Option<DialogShape> {
@@ -435,7 +501,11 @@ pub fn dialog_edit(hwnd: HWND) -> Option<HWND> {
             return Some(edit);
         }
     }
-    find_child_deep(hwnd, "Edit")
+    // No editable combo: the field is a bare Edit. Take the one that holds a
+    // path — the first Edit in a dialog can be a search box or a password
+    // field, and writing a folder into one of those is worse than doing
+    // nothing at all.
+    folder_path_edit(hwnd).or_else(|| find_child_deep(hwnd, "Edit"))
 }
 
 /// The folder tree of an app's own folder dialog, if it has one.
@@ -460,6 +530,31 @@ pub fn set_text(hwnd: HWND, text: &str) {
     unsafe {
         SendMessageW(hwnd, WM_SETTEXT, 0, w.as_ptr() as LPARAM);
     }
+}
+
+/// Read a control's text without risking a hang.
+///
+/// `WM_GETTEXT` is a synchronous cross-process call: sent to a process that is
+/// not pumping messages it blocks the caller — and this runs on the foreground
+/// event queue, where blocking means every later dialog is missed.
+fn get_text_timeout(hwnd: HWND, timeout_ms: u32) -> String {
+    let mut buf = [0u16; 1024];
+    let mut out: usize = 0;
+    let ok = unsafe {
+        SendMessageTimeoutW(
+            hwnd,
+            WM_GETTEXT,
+            buf.len(),
+            buf.as_mut_ptr() as LPARAM,
+            SMTO_ABORTIFHUNG | SMTO_BLOCK,
+            timeout_ms,
+            &mut out,
+        )
+    };
+    if ok == 0 {
+        return String::new();
+    }
+    from_wide(&buf)
 }
 
 /// Best-effort guess of the folder currently shown in a file dialog.
@@ -811,25 +906,35 @@ pub fn navigate_to_folder(dialog: HWND, path: &str) -> bool {
 
 /// Apply a chosen folder to whatever kind of dialog is in front.
 ///
-/// The two kinds need different mechanics. A shell dialog has an address bar,
+/// The three kinds need different mechanics. A shell dialog has an address bar,
 /// and typing a folder there only navigates. An app's own folder dialog has a
 /// folder tree instead, and the tree is what the user is looking at — so the
 /// selection is moved there and the dialog works out the path itself. Only
 /// when the tree cannot express the path (a hidden or system folder has no
 /// node at all) does the path get written into the field, and even then
 /// nothing is pressed: Enter in WinRAR's extract dialog starts extracting.
+///
+/// A dialog recognised only by its folder field (7-Zip) has no standard tree
+/// to drive and no address bar to type into, so the field is the whole
+/// mechanism there — and the field is authoritative for that app.
 pub fn apply_folder(dialog: HWND, path: &str) -> bool {
-    match dialog_shape(dialog) {
-        Some(s) if s.is_file_dialog() => navigate_to_folder(dialog, path),
-        Some(s) if s.is_folder_dialog() => {
-            if super::tree::select_folder(dialog, path) {
-                activate(dialog);
-                return true;
-            }
-            fill_path_field(dialog, path)
-        }
-        _ => false,
+    let Some(shape) = dialog_shape(dialog) else {
+        return false;
+    };
+    if shape.is_file_dialog() {
+        return navigate_to_folder(dialog, path);
     }
+    if shape.is_folder_dialog() {
+        if super::tree::select_folder(dialog, path) {
+            activate(dialog);
+            return true;
+        }
+        return fill_path_field(dialog, path);
+    }
+    if folder_path_edit(dialog).is_some() {
+        return fill_path_field(dialog, path);
+    }
+    false
 }
 
 /// Write `path` into an app dialog's path field, without pressing anything.
@@ -907,9 +1012,29 @@ pub fn set_dark_titlebar(hwnd: HWND, dark: bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{EnumWindows, GetWindowTextW, IsWindowVisible, PostMessageW, BOOL, LPARAM};
+    use super::super::{EnumWindows, GetWindowTextW, IsWindowVisible, PostMessageW, BOOL, HWND, LPARAM};
     use super::DialogShape;
-    use super::{class_name, is_file_dialog, same_folder};
+    use super::{class_name, is_file_dialog, is_quick_switch_target, looks_like_folder_path, same_folder};
+
+    #[test]
+    fn tells_a_folder_field_from_a_file_field() {
+        // 7-Zip's "extract to" field holds a folder; its "archive" field holds
+        // a file. Only the first one means "pick a folder here" — attaching a
+        // folder box to the second would overwrite the archive name.
+        assert!(looks_like_folder_path("D:\\"));
+        assert!(looks_like_folder_path("D:\\Work\\"));
+        assert!(looks_like_folder_path("C:/Windows/"));
+        assert!(looks_like_folder_path("  \"C:\\Windows\\\\\"  "));
+        // No trailing separator: the path has to exist as a folder.
+        assert!(looks_like_folder_path("C:\\Windows"));
+        assert!(!looks_like_folder_path("D:\\Work\\archive.rar"));
+        assert!(!looks_like_folder_path("C:\\no-such-folder-here"));
+        assert!(!looks_like_folder_path("archive.rar"));
+        assert!(!looks_like_folder_path("D:"));
+        assert!(!looks_like_folder_path(""));
+        // A search box holds neither.
+        assert!(!looks_like_folder_path("report"));
+    }
 
     #[test]
     fn compares_folder_paths_the_way_the_shell_does() {
@@ -1370,6 +1495,163 @@ mod tests {
     #[test]
     fn rejects_message_boxes() {
         assert!(!shape_of(MESSAGE_BOX).is_file_dialog());
+    }
+
+    // ---- a dialog built at runtime ---------------------------------------
+    //
+    // 7-Zip's extract box cannot be opened from a test — it needs the app, an
+    // archive and a click — so the shape it has is built here instead: an
+    // ordinary `#32770` holding a bare `Edit` with a folder in it and a folder
+    // tree beside it. That is precisely what the structural rules cannot see
+    // (the field is not an editable combo), and what the content rule must.
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn CreateDialogIndirectParamW(
+            hinstance: isize,
+            template: *const u8,
+            parent: HWND,
+            dlgproc: isize,
+            init: isize,
+        ) -> HWND;
+        fn DestroyWindow(hwnd: HWND) -> BOOL;
+    }
+
+    #[link(name = "comctl32")]
+    extern "system" {
+        fn InitCommonControlsEx(icce: *const INITCOMMONCONTROLSEX) -> BOOL;
+    }
+
+    #[repr(C)]
+    struct INITCOMMONCONTROLSEX {
+        size: u32,
+        icc: u32,
+    }
+
+    /// `ICC_TREEVIEW_CLASSES` — without it `SysTreeView32` does not exist yet.
+    const ICC_TREEVIEW_CLASSES: u32 = 0x0000_0002;
+
+    fn align4(v: &mut Vec<u8>) {
+        while v.len() % 4 != 0 {
+            v.push(0);
+        }
+    }
+
+    fn w16(v: &mut Vec<u8>, x: u16) {
+        v.extend_from_slice(&x.to_le_bytes());
+    }
+
+    fn w32(v: &mut Vec<u8>, x: u32) {
+        v.extend_from_slice(&x.to_le_bytes());
+    }
+
+    fn wstr(v: &mut Vec<u8>, s: &str) {
+        for u in s.encode_utf16() {
+            w16(v, u);
+        }
+        w16(v, 0);
+    }
+
+    /// Append one control to a dialog template.
+    fn dialog_item(
+        v: &mut Vec<u8>,
+        class: &str,
+        text: &str,
+        style: u32,
+        id: u16,
+        rect: (i16, i16, i16, i16),
+    ) {
+        align4(v);
+        w32(v, style);
+        w32(v, 0); // extended style
+        w16(v, rect.0 as u16);
+        w16(v, rect.1 as u16);
+        w16(v, rect.2 as u16);
+        w16(v, rect.3 as u16);
+        w16(v, id);
+        wstr(v, class);
+        wstr(v, text);
+        w16(v, 0); // no creation data
+    }
+
+    /// Build a hidden `#32770` whose path field holds `path_text`, and hand
+    /// its handle to `f`.
+    fn with_app_dialog(path_text: &str, f: impl FnOnce(HWND)) {
+        unsafe {
+            let icc = INITCOMMONCONTROLSEX {
+                size: std::mem::size_of::<INITCOMMONCONTROLSEX>() as u32,
+                icc: ICC_TREEVIEW_CLASSES,
+            };
+            InitCommonControlsEx(&icc);
+        }
+        let mut t: Vec<u8> = Vec::new();
+        // WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME
+        w32(&mut t, 0x80C8_0080);
+        w32(&mut t, 0);
+        w16(&mut t, 2); // two controls
+        w16(&mut t, 0); // x
+        w16(&mut t, 0); // y
+        w16(&mut t, 220); // cx
+        w16(&mut t, 140); // cy
+        w16(&mut t, 0); // no menu
+        w16(&mut t, 0); // default class
+        w16(&mut t, 0); // empty title
+        // WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP
+        dialog_item(&mut t, "Edit", path_text, 0x5080_0080, 1000, (10, 10, 200, 14));
+        // WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASBUTTONS | TVS_LINESATROOT
+        dialog_item(
+            &mut t,
+            "SysTreeView32",
+            "",
+            0x5080_0005,
+            1001,
+            (10, 30, 200, 100),
+        );
+        let hwnd = unsafe { CreateDialogIndirectParamW(0, t.as_ptr(), 0, 0, 0) };
+        assert_ne!(hwnd, 0, "could not build the probe dialog");
+        f(hwnd);
+        unsafe { DestroyWindow(hwnd) };
+    }
+
+    #[test]
+    fn recognises_an_app_dialog_by_its_folder_field() {
+        with_app_dialog("C:\\Windows", |hwnd| {
+            let shape = super::scan_dialog_children(hwnd);
+            println!("probe dialog shape: {shape:?}");
+            // The structural rules cannot see this dialog: the path field is a
+            // bare `Edit`, not the text half of an editable combo.
+            assert!(shape.has_edit, "the probe dialog lost its text field");
+            assert!(!shape.is_file_dialog());
+            assert!(!shape.is_folder_dialog());
+            // It is still a place to pick a folder, and that is what counts.
+            assert!(
+                is_quick_switch_target(hwnd),
+                "a folder field was not recognised"
+            );
+        });
+    }
+
+    #[test]
+    fn an_app_dialog_showing_a_file_is_not_a_folder_target() {
+        // The same dialog with a *file* in the field — WinRAR's "Archive
+        // name", 7-Zip's "Archive". Writing a folder there would destroy what
+        // the user typed.
+        with_app_dialog("C:\\Windows\\notepad.exe", |hwnd| {
+            assert!(
+                !is_quick_switch_target(hwnd),
+                "a file name was treated as a folder field"
+            );
+        });
+    }
+
+    #[test]
+    fn choosing_a_folder_writes_it_into_an_app_dialog() {
+        with_app_dialog("C:\\Windows", |hwnd| {
+            let path = "C:\\Windows\\System32";
+            assert!(super::apply_folder(hwnd, path), "the folder was not applied");
+            let edit = super::dialog_edit(hwnd).expect("no path field");
+            assert_eq!(super::get_text(edit), path);
+        });
     }
 
     #[test]

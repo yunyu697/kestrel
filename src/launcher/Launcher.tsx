@@ -169,9 +169,11 @@ export default function Launcher() {
   const runUpdateCheck = useCallback(() => {
     return api
       .buildInfo()
-      .then((b) => checkForUpdate(b.version))
-      .then((r) => {
-        if (r.hasUpdate) setUpdateFound(foundUpdate());
+      .then((b) => checkForUpdate(b.version).then((r) => ({ r, current: b.version })))
+      .then(({ r, current }) => {
+        // Clearing on "no update" matters as much as showing: a banner left
+        // over from a previous version must not survive a clean check.
+        setUpdateFound(r.hasUpdate ? foundUpdate(current) : null);
       })
       .catch(() => {});
   }, []);
@@ -191,8 +193,12 @@ export default function Launcher() {
       // Update check: a previous result may still be pending, and a fresh
       // one runs on startup when the settings ask for it. All async and
       // silent — the banner appears only when something was actually found.
-      const fu = foundUpdate();
-      if (fu) setUpdateFound(fu);
+      // The stored record is filtered against the running version, otherwise
+      // a banner for the version that has just been installed never goes away.
+      void api.buildInfo().then((b) => {
+        const fu = foundUpdate(b.version);
+        if (fu) setUpdateFound(fu);
+      });
       if (shouldCheckAtStartup(s)) {
         void runUpdateCheck();
       }

@@ -52,9 +52,25 @@ pub struct AppState {
     pub self_pid: u32,
     /// HWND of the file dialog we are currently serving (Quick Switch).
     pub dialog: Mutex<Option<isize>>,
+    /// Dialog whose box the user dismissed with double Ctrl.
+    ///
+    /// Hiding the box hands the foreground back to the dialog, which raises
+    /// another foreground event — and the box attached itself again 20 ms
+    /// later, so "double Ctrl to close it" looked like it did nothing. While
+    /// this holds the dialog's handle, a foreground event will not re-attach;
+    /// Ctrl+G (or a launcher round trip) still can.
+    pub qs_dismissed: Mutex<Option<isize>>,
     /// True while an attached Quick Switch session is running: the launcher
     /// window must NOT hide on blur (clicking the dialog steals focus).
     pub qs_active: std::sync::atomic::AtomicBool,
+    /// True while the **global** launcher owns the shared window.
+    ///
+    /// The launcher and the Quick Switch box are the same window, so they
+    /// cannot be on screen together — but showing the launcher must not *end*
+    /// the Quick Switch session. The dialog handle stays bound (`dialog`), the
+    /// follower is told to leave the window alone, and closing the launcher
+    /// puts the box back under the dialog the user was working in.
+    pub launcher_override: std::sync::atomic::AtomicBool,
     /// Recent folders visited in file dialogs / Explorer windows (Quick Switch history).
     pub qs_history: Mutex<Vec<String>>,
     /// Path of the last focused Explorer window with a timestamp (ms, mono).
@@ -125,7 +141,9 @@ impl AppState {
             paths,
             self_pid: std::process::id(),
             dialog: Mutex::new(None),
+            qs_dismissed: Mutex::new(None),
             qs_active: std::sync::atomic::AtomicBool::new(false),
+            launcher_override: std::sync::atomic::AtomicBool::new(false),
             qs_history: Mutex::new(qs_history),
             explorer_path: Mutex::new(None),
             launcher_visible: std::sync::atomic::AtomicBool::new(false),

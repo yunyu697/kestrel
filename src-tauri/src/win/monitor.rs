@@ -304,10 +304,21 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
         }
 
         let already = *state.dialog.lock() == Some(hwnd);
-        let visible = crate::ui::launcher_visible(state);
+        // A window that is on screen as the *global launcher* is not an
+        // attached box: re-raising or re-positioning it would move the
+        // launcher around while the user is typing in it.
+        let launcher_up = state.launcher_override.load(Ordering::Relaxed);
+        // `qs_active` counts as "on screen" too: attaching sets it before the
+        // window is actually shown (the frontend needs 40 ms to switch into
+        // Quick Switch mode), and an event arriving inside that window used to
+        // run a *second* attach — which grabbed the focus the first one had
+        // deliberately not taken.
+        let visible = (crate::ui::launcher_visible(state)
+            || state.qs_active.load(Ordering::Relaxed))
+            && !launcher_up;
         *state.dialog.lock() = Some(hwnd);
         crate::debug_log::qs_log(&format!(
-            "dialog captured hwnd={hwnd:#x} already={already} visible={visible}"
+            "dialog captured hwnd={hwnd:#x} already={already} visible={visible} launcher={launcher_up}"
         ));
         if let Some(dir) = window::dialog_current_folder(hwnd) {
             state.push_qs_dir(dir);
@@ -348,7 +359,15 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
             return;
         }
         maybe_auto_jump(app, state, hwnd, already);
-        if qs_auto_show {
+        // While the global launcher is on screen the dialog is only *bound*:
+        // turning the shared window into a Quick Switch box right now would
+        // hijack the launcher the user is typing in. Closing the launcher
+        // hands the window to this binding (see `ui::close_launcher`).
+        // A box the user dismissed with double Ctrl stays dismissed: hiding it
+        // gives this dialog the foreground back, and without this check that
+        // very event re-attached it.
+        let dismissed = *state.qs_dismissed.lock() == Some(hwnd);
+        if qs_auto_show && !launcher_up && !dismissed {
             crate::ui::show_quick_switch(app, state, hwnd);
         }
         return;
@@ -787,6 +806,9 @@ fn end_session(app: &AppHandle, state: &Arc<AppState>) {
         .qs_active
         .store(false, std::sync::atomic::Ordering::Relaxed);
     *state.dialog.lock() = None;
+    // The handle is about to be free for reuse; keeping it would silence the
+    // box for whatever dialog Windows hands that value to next.
+    *state.qs_dismissed.lock() = None;
     if crate::ui::launcher_visible(state) {
         crate::ui::hide_launcher(app);
     }
@@ -836,6 +858,28 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
                 last_rows = u32::MAX;
                 continue;
             };
+
+            // The global launcher owns the shared window right now. Keep the
+            // binding — that is what lets the box return when the launcher
+            // closes — but do not touch the window at all: resizing it would
+            // fight the launcher's own layout, and hiding it would take the
+            // launcher off screen while the user is typing in it.
+            if state.launcher_override.load(Ordering::Relaxed) {
+                if unsafe { IsWindow(h) } == 0 {
+                    *state.dialog.lock() = None;
+                }
+                hidden_since = None;
+                hidden_for_iconic = false;
+                last = (0, 0, 0, 0);
+                last_rect = RECT {
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                };
+                last_rows = u32::MAX;
+                continue;
+            }
 
             let exists = unsafe { IsWindow(h) != 0 };
             let on_screen = exists && unsafe { IsWindowVisible(h) != 0 };

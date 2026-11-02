@@ -10,7 +10,6 @@ import { SCHEMES, schemeById, schemePalette } from "../shared/palettes";
 import { pick, RELEASES, type ReleaseKind } from "../shared/releases";
 import {
   checkForUpdate,
-  foundUpdate,
   lastCheckAt,
   mirrorPrefix,
   MIRRORS,

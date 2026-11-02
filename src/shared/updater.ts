@@ -378,11 +378,24 @@ export interface FoundUpdate {
   htmlUrl: string;
 }
 
-/** What a previous check found, if anything. */
-export function foundUpdate(): FoundUpdate | null {
+/** The stored "update found" record, but only while it really is newer than
+ *  the running build.
+ *
+ *  The record outlives the update it describes: localStorage survives the
+ *  installer, so after upgrading from 1.2.7 to 1.2.8 the entry still said
+ *  "1.2.8 is available" and the banner stayed up on the version that had just
+ *  been installed. Passing the running version lets the stale record be
+ *  dropped on the spot. */
+export function foundUpdate(current?: string): FoundUpdate | null {
   try {
     const raw = localStorage.getItem(LS_FOUND);
-    return raw ? (JSON.parse(raw) as FoundUpdate) : null;
+    if (!raw) return null;
+    const found = JSON.parse(raw) as FoundUpdate;
+    if (current && compareVersions(found.version, current) <= 0) {
+      localStorage.removeItem(LS_FOUND);
+      return null;
+    }
+    return found;
   } catch {
     return null;
   }
