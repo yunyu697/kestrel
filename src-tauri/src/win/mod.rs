@@ -167,6 +167,8 @@ pub const WS_EX_NOACTIVATE: isize = 0x0800_0000;
 pub const SHGFI_ICON: u32 = 0x0000_0100;
 pub const SHGFI_LARGEICON: u32 = 0x0000_0000;
 pub const SHGFI_SMALLICON: u32 = 0x0000_0001;
+/// `pszName` is a PIDL, not a path (shell namespace items).
+pub const SHGFI_PIDL: u32 = 0x0000_0008;
 pub const SHGFI_USEFILEATTRIBUTES: u32 = 0x0000_0010;
 pub const SHGFI_TYPENAME: u32 = 0x0000_0400;
 pub const SHGFI_DISPLAYNAME: u32 = 0x0000_0200;

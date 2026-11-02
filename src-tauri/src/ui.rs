@@ -111,6 +111,9 @@ pub fn show_launcher(app: &AppHandle, state: &Arc<AppState>) {
     crate::debug_log::qs_log_verbose("show: scale");
     let _ = app.emit("launcher://shown", ());
     crate::debug_log::qs_log_verbose("show: emitted");
+    // A program installed a moment ago has to be searchable right away; this
+    // costs one directory walk on a worker thread and nothing on the UI.
+    crate::apps::refresh_if_stale(app, state);
 }
 
 /// Show the launcher glued below the captured file dialog in Quick Switch mode.

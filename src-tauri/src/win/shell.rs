@@ -26,10 +26,56 @@ struct DROPFILES {
 
 /// Open a file/folder/url with the default handler.
 pub fn open_path(path: &str) -> bool {
+    // A Store app has no file behind it: it is addressed as a shell namespace
+    // item (`shell:AppsFolder\<AUMID>`). `ShellExecuteW` on that string only
+    // resolves on a thread with a shell-initialised COM apartment, and the
+    // Tauri worker that runs commands has none — the call "succeeds" and
+    // nothing appears. Explorer resolves it for us, which is what the Start
+    // Menu itself does.
+    if path.starts_with("shell:") {
+        return open_shell_target(path);
+    }
     let verb = wide("open");
     let file = wide(path);
     let h = unsafe { ShellExecuteW(0, verb.as_ptr(), file.as_ptr(), ptr::null(), ptr::null(), SW_SHOWNORMAL) };
     h as isize > 32
+}
+
+/// Hand a shell namespace path to the shell (used for Store apps).
+///
+/// The namespace only resolves inside a shell-initialised apartment, and the
+/// thread that runs a Tauri command has none (WebView2 leaves it MTA, which
+/// the shell refuses with RPC_E_CHANGED_MODE). A throwaway STA thread is the
+/// cheapest way to guarantee the right apartment — it costs a few hundred
+/// microseconds and only runs when the user opens a Store app.
+pub fn open_shell_target(target: &str) -> bool {
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
+
+    let target = target.to_string();
+    std::thread::Builder::new()
+        .name("kestrel-shell-open".into())
+        .spawn(move || {
+            let ready = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.is_ok();
+            if !ready {
+                return false;
+            }
+            let verb = wide("open");
+            let file = wide(&target);
+            let h = unsafe {
+                ShellExecuteW(
+                    0,
+                    verb.as_ptr(),
+                    file.as_ptr(),
+                    ptr::null(),
+                    ptr::null(),
+                    SW_SHOWNORMAL,
+                )
+            };
+            unsafe { CoUninitialize() };
+            h as isize > 32
+        })
+        .map(|t| t.join().unwrap_or(false))
+        .unwrap_or(false)
 }
 
 /// Show the "Open with…" picker.

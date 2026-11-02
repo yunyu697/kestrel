@@ -177,19 +177,11 @@ pub fn run() {
             }
             debug_log::qs_log("setup: index ok");
 
-            // Discover applications in the background.
-            {
-                let h = handle.clone();
-                let st = state.clone();
-                std::thread::spawn(move || {
-                    let list = apps::scan_apps();
-                    if !list.is_empty() {
-                        *st.apps.write() = list;
-                        st.save_apps();
-                        let _ = tauri::Emitter::emit(&h, "apps://refreshed", ());
-                    }
-                });
-            }
+            // Discover applications in the background, then keep the list
+            // live: a shortcut created by an installer has to become
+            // searchable without a restart.
+            apps::start(handle.clone(), state.clone());
+            debug_log::qs_log("setup: apps ok");
 
             clipboard::start(state.clone(), handle.clone());
             debug_log::qs_log("setup: clipboard ok");

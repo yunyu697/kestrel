@@ -50,6 +50,9 @@ function glyphFor(hit: SearchHit): string {
 function buildActions(hit: SearchHit) {
   const isFolder = hit.kind === "folder" || hit.kind === "favorite";
   const isApp = hit.kind === "app";
+  // A Store app is a `shell:AppsFolder` id, not a file: revealing, renaming,
+  // deleting or hashing it cannot work, so those actions are not offered.
+  const isUwp = isApp && hit.meta?.source === "uwp";
   const list: { id: string; label: string; icon: string; danger?: boolean; key?: string }[] = [
     { id: "open", label: t("打开"), icon: "external", key: "↵" },
     { id: "reveal", label: t("在资源管理器中显示"), icon: "folder", key: "Ctrl ↵" },
@@ -67,7 +70,22 @@ function buildActions(hit: SearchHit) {
   list.push({ id: "rename", label: t("重命名…"), icon: "pen" });
   list.push({ id: "props", label: t("属性"), icon: "info" });
   list.push({ id: "del", label: t("删除到回收站"), icon: "trash", danger: true, key: "Del" });
-  return list;
+  if (!isUwp) return list;
+  const fileOnly = new Set([
+    "reveal",
+    "openwith",
+    "admin",
+    "copyfile",
+    "copypath",
+    "copypathq",
+    "checksum",
+    "notepad",
+    "term",
+    "rename",
+    "props",
+    "del",
+  ]);
+  return list.filter((a) => !fileOnly.has(a.id));
 }
 
 export default function Launcher() {

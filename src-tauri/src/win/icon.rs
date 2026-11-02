@@ -52,6 +52,11 @@ pub fn icon_for_extension(ext: &str, size: u32) -> String {
 }
 
 fn render_icon(path: &str, size: u32) -> Option<Vec<u8>> {
+    // Store apps live in the shell namespace: there is no file to ask about,
+    // only a PIDL, so `SHGetFileInfoW` needs the parsed id list instead.
+    if path.starts_with("shell:") {
+        return render_shell_item_icon(path, size);
+    }
     let wide_path = wide(path);
     let attrs = if std::path::Path::new(path).exists() {
         0
@@ -88,8 +93,62 @@ fn render_icon(path: &str, size: u32) -> Option<Vec<u8>> {
     png
 }
 
-unsafe fn hicon_to_png(hicon: HICON, size: i32) -> Option<Vec<u8>> {
-    let hdc_screen = GetDC(0);
+/// Icon of a shell namespace item (`shell:AppsFolder\<AUMID>`).
+///
+/// The shell resolves these names only inside an initialised apartment, so
+/// this may return `None` on a bare worker thread; the caller then falls back
+/// to the generic glyph, which is ugly but never breaks the list.
+fn render_shell_item_icon(path: &str, size: u32) -> Option<Vec<u8>> {
+    use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED};
+    use windows::Win32::UI::Shell::SHParseDisplayName;
+
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+    }
+    let name = wide(path);
+    let mut pidl: *mut c_void = std::ptr::null_mut();
+    let parsed = unsafe {
+        SHParseDisplayName(
+            windows::core::PCWSTR(name.as_ptr()),
+            None,
+            &mut pidl as *mut *mut c_void as *mut _,
+            0,
+            None,
+        )
+    };
+    if parsed.is_err() || pidl.is_null() {
+        return None;
+    }
+
+    let mut info = SHFILEINFOW {
+        hIcon: 0,
+        iIcon: 0,
+        dwAttributes: 0,
+        szDisplayName: [0; MAX_PATH],
+        szTypeName: [0; 80],
+    };
+    let ok = unsafe {
+        SHGetFileInfoW(
+            pidl as *const u16,
+            0,
+            &mut info,
+            std::mem::size_of::<SHFILEINFOW>() as u32,
+            SHGFI_PIDL | SHGFI_ICON | SHGFI_LARGEICON,
+        )
+    };
+    unsafe { CoTaskMemFree(Some(pidl)) };
+
+    if ok == 0 || info.hIcon == 0 {
+        return None;
+    }
+    let png = unsafe { hicon_to_png(info.hIcon, size as i32) };
+    unsafe {
+        DestroyIcon(info.hIcon);
+    }
+    png
+}
+
+unsafe fn hicon_to_png(hicon: HICON, size: i32) -> Option<Vec<u8>> {    let hdc_screen = GetDC(0);
     if hdc_screen == 0 {
         return None;
     }
