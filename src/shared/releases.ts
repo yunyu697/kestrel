@@ -27,6 +27,54 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.8",
+    date: "2026-11-02",
+    title: {
+      zh: "刚装好的软件立刻就能搜到",
+      en: "Programs you just installed are searchable right away",
+      ja: "インストールしたばかりのアプリがすぐ検索できます",
+      es: "Los programas recién instalados se encuentran al instante",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "应用列表以前只在启动时扫描一次，装完软件必须重启 Kestrel 才搜得到。现在开始菜单和桌面是常驻监听的，安装完成后一两秒内就能搜到，不用重启",
+          en: "The app list used to be scanned once at startup, so a program installed afterwards stayed invisible until Kestrel was restarted. The Start Menu and both desktops are now watched continuously: a new shortcut becomes searchable within a second or two, no restart needed",
+          ja: "アプリ一覧は起動時に一度だけスキャンされていたため、後からインストールしたアプリは Kestrel を再起動するまで検索できませんでした。スタート メニューとデスクトップを常時監視するようになり、インストールから 1〜2 秒で検索できます",
+          es: "La lista de aplicaciones se escaneaba una sola vez al arrancar, así que un programa instalado después no aparecía hasta reiniciar Kestrel. Ahora se vigilan el menú Inicio y ambos escritorios: un acceso nuevo se puede buscar en uno o dos segundos, sin reiniciar",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "支持 Microsoft Store 应用：记事本、计算器、设置、终端、画图、照片、截图工具等 30 多个以前完全搜不到的商店应用，现在都能搜到并直接启动，图标也是真实的",
+          en: "Microsoft Store apps are supported: Notepad, Calculator, Settings, Terminal, Paint, Photos, Snipping Tool and the other 30-odd Store apps that used to be entirely absent can now be found and launched, with their real icons",
+          ja: "Microsoft Store アプリに対応しました。メモ帳、電卓、設定、ターミナル、ペイント、フォト、切り取りツールなど、以前はまったく検索できなかった 30 以上のストア アプリを検索して起動できます。アイコンも本物です",
+          es: "Se admiten aplicaciones de Microsoft Store: Notepad, Calculadora, Configuración, Terminal, Paint, Fotos, Recortes y las más de 30 aplicaciones de la Store que antes no aparecían ahora se encuentran y se abren, con sus iconos reales",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "公共桌面（`%PUBLIC%\\Desktop`）以前没有被扫描。只在公共桌面放图标的程序，无论重启多少次都搜不到",
+          en: "The all-users desktop (`%PUBLIC%\\Desktop`) was never scanned. A program that only put its shortcut there could not be found no matter how often you restarted",
+          ja: "共有デスクトップ（`%PUBLIC%\\Desktop`）がスキャン対象外でした。そこにしかショートカットを置かないアプリは、何度再起動しても検索できませんでした",
+          es: "El escritorio de todos los usuarios (`%PUBLIC%\\Desktop`) no se escaneaba. Un programa que solo dejaba ahí su acceso directo no se encontraba por muchas veces que reiniciaras",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "打开搜索栏时，如果距上次扫描已超过 10 秒，会顺手在后台补扫一次——即使文件系统通知漏掉了，也不会出现「明明装了却搜不到」",
+          en: "Opening the search box rescans in the background when the list is more than ten seconds old, so even a missed filesystem notification cannot leave an installed program unsearchable",
+          ja: "検索バーを開いたとき、前回のスキャンから 10 秒以上経っていればバックグラウンドで再スキャンします。ファイル システム通知を取りこぼしても「入れたのに出てこない」ことはありません",
+          es: "Al abrir el buscador se vuelve a escanear en segundo plano si la lista tiene más de diez segundos, de modo que ni siquiera una notificación perdida deja un programa sin encontrar",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.7",
     date: "2026-11-01",
     title: {
