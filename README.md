@@ -95,7 +95,7 @@ npm run app:dev
 | `npm run build` | 仅构建前端（含类型检查） |
 | `node scripts/check-i18n.mjs` | 校验四语字典键完整性 |
 | `node scripts/make-icon.mjs` | 重新生成应用图标 |
-| `python scripts/make-portable.py <version>` | 生成便携版 zip |
+| `python scripts/make-portable.py --out dist-release` | 生成便携版 zip（版本号取自 `tauri.conf.json`） |
 
 ## 项目结构
 
