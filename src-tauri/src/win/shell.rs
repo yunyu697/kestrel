@@ -11,6 +11,23 @@ extern "system" {
     fn SetClipboardData(format: u32, mem: HANDLE) -> HANDLE;
     fn CloseClipboard() -> BOOL;
     fn IsClipboardFormatAvailable(format: u32) -> BOOL;
+    fn AllowSetForegroundWindow(pid: u32) -> BOOL;
+}
+
+/// `ASFW_ANY`: hand the right to take the foreground to anybody.
+const ASFW_ANY: u32 = 0xFFFF_FFFF;
+
+/// Let the program we are about to start come to the front.
+///
+/// The launcher hides itself *before* it hands a path to the shell, so by the
+/// time the target window is created our own window is already gone — and a
+/// process that is not the foreground process may not raise a window, which
+/// looks like "the app started behind everything". Windows does allow the
+/// process that received the click to pass that right on; this is that call.
+fn grant_foreground() {
+    unsafe {
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
+    }
 }
 
 const CF_HDROP: u32 = 15;
@@ -37,6 +54,7 @@ pub fn open_path(path: &str) -> bool {
     }
     let verb = wide("open");
     let file = wide(path);
+    grant_foreground();
     let h = unsafe { ShellExecuteW(0, verb.as_ptr(), file.as_ptr(), ptr::null(), ptr::null(), SW_SHOWNORMAL) };
     h as isize > 32
 }
@@ -61,6 +79,7 @@ pub fn open_shell_target(target: &str) -> bool {
             }
             let verb = wide("open");
             let file = wide(&target);
+            grant_foreground();
             let h = unsafe {
                 ShellExecuteW(
                     0,
@@ -82,6 +101,7 @@ pub fn open_shell_target(target: &str) -> bool {
 pub fn open_with(path: &str) -> bool {
     let verb = wide("openas");
     let file = wide(path);
+    grant_foreground();
     let h = unsafe { ShellExecuteW(0, verb.as_ptr(), file.as_ptr(), ptr::null(), ptr::null(), SW_SHOWNORMAL) };
     h as isize > 32
 }
@@ -90,6 +110,7 @@ pub fn open_with(path: &str) -> bool {
 pub fn run_as_admin(path: &str) -> bool {
     let verb = wide("runas");
     let file = wide(path);
+    grant_foreground();
     let h = unsafe { ShellExecuteW(0, verb.as_ptr(), file.as_ptr(), ptr::null(), ptr::null(), SW_SHOWNORMAL) };
     h as isize > 32
 }
@@ -282,6 +303,7 @@ pub fn open_url(url: &str) -> bool {
 
 /// Reveal a path inside Explorer, selecting it when it is a file.
 pub fn reveal(path: &str) -> bool {
+    grant_foreground();
     let wide_path = wide(path);
     unsafe {
         let pidl = ILCreateFromPathW(wide_path.as_ptr());
@@ -320,6 +342,7 @@ pub fn show_properties(path: &str) -> bool {
 pub fn open_terminal(dir: &str) -> bool {
     let params = wide(&format!("-d \"{dir}\""));
     let wt = wide("wt.exe");
+    grant_foreground();
     let ok = unsafe { ShellExecuteW(0, ptr::null(), wt.as_ptr(), params.as_ptr(), ptr::null(), SW_SHOWNORMAL) as isize > 32 };
     if ok {
         return true;

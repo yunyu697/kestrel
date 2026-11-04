@@ -185,42 +185,62 @@ pub async fn icons_for(paths: Vec<String>, size: Option<u32>) -> Result<HashMap<
     .map_err(|e| e.to_string())
 }
 
+/// Tauri requires a `Result` from an async command that borrows its inputs
+/// (`State` is a reference); the failure case never happens, so the frontend
+/// always sees a plain `true`/`false`.
 #[tauri::command]
-pub fn open_path(state: State<'_, Arc<AppState>>, path: String) -> bool {
-    let ok = shell::open_path(&path);
+pub async fn open_path(state: State<'_, Arc<AppState>>, path: String) -> Result<bool, String> {
+    let st = state.inner().clone();
+    let ok = run_detached(path.clone(), shell::open_path).await;
     if ok {
-        state.bump_usage(&path);
+        st.bump_usage(&path);
     }
-    ok
+    Ok(ok)
+}
+
+/// Run a shell hand-off away from the thread that drives the UI.
+///
+/// These calls block until the shell has taken over, and the shell is not in a
+/// hurry: an executable comes up in ~70ms, but opening a *folder* takes 1.6s
+/// (Explorer receives the request through DDE). The launcher hides itself
+/// before any of this runs, so the wait is invisible — but it must not sit in
+/// the command thread, where it would stall every later call.
+async fn run_detached<F>(path: String, f: F) -> bool
+where
+    F: FnOnce(&str) -> bool + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(move || f(&path))
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
-pub fn open_url(url: String) -> bool {
-    shell::open_url(&url)
+pub async fn open_url(url: String) -> bool {
+    run_detached(url, shell::open_url).await
 }
 
 #[tauri::command]
-pub fn reveal_path(path: String) -> bool {
-    shell::reveal(&path)
+pub async fn reveal_path(path: String) -> bool {
+    run_detached(path, shell::reveal).await
 }
 
 #[tauri::command]
-pub fn open_with(path: String) -> bool {
-    shell::open_with(&path)
+pub async fn open_with(path: String) -> bool {
+    run_detached(path, shell::open_with).await
 }
 
 #[tauri::command]
-pub fn run_as_admin(path: String) -> bool {
-    shell::run_as_admin(&path)
+pub async fn run_as_admin(path: String) -> bool {
+    run_detached(path, shell::run_as_admin).await
 }
 
 #[tauri::command]
-pub fn show_properties(path: String) -> bool {
-    shell::show_properties(&path)
+pub async fn show_properties(path: String) -> bool {
+    run_detached(path, shell::show_properties).await
 }
 
 #[tauri::command]
-pub fn open_terminal(path: String) -> bool {
+pub async fn open_terminal(path: String) -> bool {
     let dir = if Path::new(&path).is_dir() {
         path
     } else {
@@ -229,7 +249,7 @@ pub fn open_terminal(path: String) -> bool {
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default()
     };
-    shell::open_terminal(&dir)
+    run_detached(dir, shell::open_terminal).await
 }
 
 #[tauri::command]
@@ -288,8 +308,8 @@ pub fn bump_usage(state: State<'_, Arc<AppState>>, path: String) {
 
 /// Open a folder in Explorer (used by the Quick Switch panel).
 #[tauri::command]
-pub fn browse_folder(path: String) -> bool {
-    shell::open_path(&path)
+pub async fn browse_folder(path: String) -> bool {
+    run_detached(path, shell::open_path).await
 }
 
 #[tauri::command]

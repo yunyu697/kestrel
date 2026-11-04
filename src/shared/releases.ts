@@ -27,6 +27,63 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.11",
+    date: "2026-11-04",
+    title: {
+      zh: "点开搜索结果不再空等一秒半",
+      en: "Opening a result no longer leaves you waiting second and a half",
+      ja: "検索結果を開くときに 1.5 秒待たされなくなりました",
+      es: "Abrir un resultado ya no te hace esperar segundo y medio",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "点击搜索结果后，搜索栏先立刻收起，再把路径交给系统。以前顺序是反的——先等系统把程序拉起来、再收窗口，而系统并不快：本机实测，启动 exe 约 70 毫秒，打开网址约 120 毫秒，「在资源管理器中显示」约 460 毫秒，打开一个文件夹要 1.6 秒（Explorer 通过 DDE 应答）。点文件夹时，搜索栏就是在屏幕上干等了一秒半",
+          en: "A click now takes the search bar off the screen first and hands the path to the shell afterwards. It used to be the other way round — wait for the shell to bring the program up, then hide — and the shell is not quick: measured here, an .exe takes ~70 ms, a URL ~120 ms, \"show in Explorer\" ~460 ms and opening a folder a full 1.6 s (Explorer answers over DDE). Clicking a folder meant the bar sat there for a second and a half doing nothing",
+          ja: "検索結果をクリックすると、まず検索バーが即座に引っ込み、そのあとでパスをシェルに渡すようになりました。以前は逆で、シェルがプログラムを起動するのを待ってからウィンドウを閉じていました。シェルは速くありません。実測では exe の起動に約 70 ミリ秒、URL で約 120 ミリ秒、「エクスプローラーで表示」で約 460 ミリ秒、フォルダーを開くには 1.6 秒かかります（Explorer が DDE で応答するため）。フォルダーをクリックすると、検索バーは 1.5 秒間そのまま画面に残っていました",
+          es: "Ahora, al hacer clic, la barra de búsqueda desaparece primero y después se entrega la ruta al shell. Antes era al revés: se esperaba a que el shell abriera el programa y luego se ocultaba, y el shell no es rápido. Medido en este equipo, un .exe tarda unos 70 ms, una URL unos 120 ms, «mostrar en el Explorador» unos 460 ms y abrir una carpeta 1,6 s completos (el Explorador responde por DDE). Al hacer clic en una carpeta, la barra se quedaba en pantalla segundo y medio sin hacer nada",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "打开动作也挪出了命令线程。以前它占着那个线程，那一秒半里连再次按热键唤出、打开设置都要排队",
+          en: "The launch itself also moved off the command thread. It used to hold that thread for the whole wait, so summoning the launcher again or opening settings queued up behind it",
+          ja: "起動処理もコマンドスレッドの外に出しました。以前はその待ち時間ずっとスレッドを占有していたため、その間にホットキーで呼び出したり設定を開いたりしても順番待ちになっていました",
+          es: "La apertura también salió del hilo de comandos. Antes lo ocupaba durante toda la espera, así que volver a invocar el buscador o abrir los ajustes se quedaba en cola detrás",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "「以管理员身份运行」不再只对应用列表里的程序生效：任何能被提权的文件都有这一项了（exe、com、bat、cmd、msi、cpl、msc、ps1、vbs/jse/wsf、reg、lnk），位置也从第三项挪到「打开」下面的第二项",
+          en: "\"Run as administrator\" is no longer limited to programs from the app list: any file the shell can elevate offers it now (.exe, .com, .bat, .cmd, .msi, .cpl, .msc, .ps1, .vbs/.jse/.wsf, .reg, .lnk). It also moved up from third place to right below \"Open\"",
+          ja: "「管理者として実行」がアプリ一覧のプログラムだけではなくなりました。昇格できるファイルなら何でも表示されます（exe、com、bat、cmd、msi、cpl、msc、ps1、vbs/jse/wsf、reg、lnk）。位置も 3 番目から「開く」のすぐ下の 2 番目に移しました",
+          es: "«Ejecutar como administrador» ya no se limita a los programas de la lista de aplicaciones: ahora aparece en cualquier archivo que el shell pueda elevar (.exe, .com, .bat, .cmd, .msi, .cpl, .msc, .ps1, .vbs/.jse/.wsf, .reg, .lnk). Además pasó del tercer puesto a justo debajo de «Abrir»",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "Ctrl+Shift+Enter 现在真的以管理员身份运行了。菜单上一直标着这个快捷键，但代码里从没实现过，按下去执行的其实是「打开方式」",
+          en: "Ctrl+Shift+Enter really runs as administrator now. The menu has always advertised that shortcut, but it was never wired up — pressing it opened the \"Open with\" picker instead",
+          ja: "Ctrl+Shift+Enter が実際に管理者として実行するようになりました。メニューには以前からこのショートカットが書かれていましたが、実装されておらず、押すと「プログラムから開く」が動いていました",
+          es: "Ctrl+Mayús+Intro ahora sí ejecuta como administrador. El menú siempre mostró ese atajo, pero nunca estuvo implementado: al pulsarlo se abría «Abrir con»",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "先收窗口再启动程序，会有新程序开在后台的风险（不是前台进程就没有置顶权）。现在启动前显式把前台权限转交给马上要运行的程序",
+          en: "Hiding before launching risks the new program opening behind everything (a process that is not in the foreground cannot raise its window). The launcher now explicitly passes the foreground right to the program it is about to start",
+          ja: "先にウィンドウを隠してから起動すると、新しいプログラムが背面に開いてしまう恐れがあります（前面のプロセスでないとウィンドウを最前面に出せません）。起動直前に、前面に出る権利をこれから動くプログラムへ明示的に渡すようにしました",
+          es: "Ocultar la ventana antes de lanzar el programa puede hacer que la nueva ventana aparezca detrás de todo (un proceso que no está en primer plano no puede elevar su ventana). Ahora el buscador cede explícitamente ese derecho al programa que va a iniciar",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.10",
     date: "2026-11-02",
     title: {
