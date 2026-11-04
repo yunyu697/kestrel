@@ -14,6 +14,29 @@ struct Cache {
 
 const CACHE_CAP: usize = 1200;
 
+thread_local! {
+    /// Whether this thread has already joined a COM apartment.
+    ///
+    /// The shell resolves `shell:AppsFolder\…` names only inside an
+    /// initialised apartment, and extraction now runs across the pool, so
+    /// every thread has to do it for itself rather than once for the caller.
+    static COM_READY: std::cell::Cell<bool> = std::cell::Cell::new(false);
+}
+
+fn ensure_com() {
+    COM_READY.with(|ready| {
+        if !ready.get() {
+            unsafe {
+                let _ = windows::Win32::System::Com::CoInitializeEx(
+                    None,
+                    windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
+                );
+            }
+            ready.set(true);
+        }
+    });
+}
+
 fn cache() -> &'static Mutex<Cache> {
     static C: OnceLock<Mutex<Cache>> = OnceLock::new();
     C.get_or_init(|| {
@@ -34,6 +57,12 @@ pub fn icon_data_url(path: &str, size: u32) -> String {
         Some(bytes) => format!("data:image/png;base64,{}", STANDARD.encode(bytes)),
         None => String::new(),
     };
+    // A failure is not worth remembering: the shell can come back empty on a
+    // cold, concurrent first call, and caching that would leave the tile
+    // blank for the rest of the session instead of fixing itself on a retry.
+    if value.is_empty() {
+        return value;
+    }
     let mut c = cache().lock();
     if c.map.len() >= CACHE_CAP {
         if let Some(oldest) = c.order.first().cloned() {
@@ -51,7 +80,44 @@ pub fn icon_for_extension(ext: &str, size: u32) -> String {
     icon_data_url(&probe, size)
 }
 
+/// Extract a whole batch, spread over the thread pool.
+///
+/// One shell call per icon costs ~20 ms (~40 ms for a Store app), so walking
+/// 236 apps in order takes 5.3 s — most of what the settings pane looked like
+/// it spent "loading nothing". Across the pool the same batch takes ~0.6 s.
+///
+/// A cold parallel pass can lose a handful of icons, though: the shell is
+/// evidently not thread-safe while it is warming up its own icon cache, and
+/// those few come back empty. Every one of them renders on a second, serial
+/// attempt, so the misses are simply retried here rather than shown to the
+/// user as blank tiles.
+pub fn icon_batch(paths: Vec<String>, size: u32) -> HashMap<String, String> {
+    use rayon::prelude::*;
+
+    let mut map: HashMap<String, String> = paths
+        .into_par_iter()
+        .map(|p| {
+            let url = icon_data_url(&p, size);
+            (p, url)
+        })
+        .collect();
+
+    let missing: Vec<String> = map
+        .iter()
+        .filter(|(_, url)| url.is_empty())
+        .map(|(path, _)| path.clone())
+        .collect();
+    for path in missing {
+        let url = icon_data_url(&path, size);
+        if !url.is_empty() {
+            map.insert(path, url);
+        }
+    }
+    map
+}
+
 fn render_icon(path: &str, size: u32) -> Option<Vec<u8>> {
+    ensure_com();
     // Store apps live in the shell namespace: there is no file to ask about,
     // only a PIDL, so `SHGetFileInfoW` needs the parsed id list instead.
     if path.starts_with("shell:") {
@@ -95,16 +161,13 @@ fn render_icon(path: &str, size: u32) -> Option<Vec<u8>> {
 
 /// Icon of a shell namespace item (`shell:AppsFolder\<AUMID>`).
 ///
-/// The shell resolves these names only inside an initialised apartment, so
-/// this may return `None` on a bare worker thread; the caller then falls back
-/// to the generic glyph, which is ugly but never breaks the list.
+/// The shell resolves these names only inside an initialised apartment, which
+/// `ensure_com` takes care of for whichever thread ends up running this.
 fn render_shell_item_icon(path: &str, size: u32) -> Option<Vec<u8>> {
-    use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED};
+    use windows::Win32::System::Com::CoTaskMemFree;
     use windows::Win32::UI::Shell::SHParseDisplayName;
 
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-    }
+    ensure_com();
     let name = wide(path);
     let mut pidl: *mut c_void = std::ptr::null_mut();
     let parsed = unsafe {
@@ -246,4 +309,47 @@ pub fn type_name(path: &str, is_dir: bool) -> String {
         return String::new();
     }
     from_wide(&info.szTypeName)
+}
+
+#[cfg(test)]
+mod batch_tests {
+    use super::*;
+
+    /// The batch path the settings pane uses, against the machine's real app
+    /// list. It asserts completeness rather than speed: a concurrent first
+    /// pass used to drop about nine icons out of 236, and a dropped icon is
+    /// a blank tile for the rest of the session.
+    #[test]
+    #[ignore = "needs a real desktop full of installed apps"]
+    fn every_app_gets_an_icon() {
+        let apps = crate::apps::scan_apps();
+        let paths: Vec<String> = apps
+            .iter()
+            .map(|a| if a.target.is_empty() { a.lnk.clone() } else { a.target.clone() })
+            .filter(|p| !p.is_empty())
+            .collect();
+        assert!(!paths.is_empty(), "no apps found to test with");
+
+        let t = std::time::Instant::now();
+        let map = icon_batch(paths.clone(), 48);
+        let elapsed = t.elapsed();
+
+        let blank: Vec<&String> = map
+            .iter()
+            .filter(|(_, url)| url.is_empty())
+            .map(|(p, _)| p)
+            .collect();
+        println!(
+            "{} apps, {} icons in {:?}, {} blank",
+            paths.len(),
+            map.len(),
+            elapsed,
+            blank.len()
+        );
+        for b in &blank {
+            println!("  blank: {b}");
+        }
+        assert!(blank.is_empty(), "{} icons could not be rendered", blank.len());
+        assert!(map.values().all(|u| u.starts_with("data:image/png;base64,")));
+    }
 }

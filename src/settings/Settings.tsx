@@ -1695,15 +1695,32 @@ function AppsPane({
   useEffect(() => {
     api.listApps().then(setApps).catch(() => {});
   }, [setApps]);
-  // Extract real icons for the first batch of apps; fall back to a glyph.
+  // Icons are asked for in small batches so the grid fills in as they arrive.
+  // One request for the whole list left every tile on its placeholder until
+  // the last icon had been extracted — seconds of a blank-looking page.
   useEffect(() => {
     if (!apps.length) return;
     const paths = apps
-      .slice(0, 150)
+      .slice(0, 400)
       .map((a) => a.target || a.lnk)
       .filter(Boolean);
     if (!paths.length) return;
-    api.iconsFor(paths, 48).then(setAppIcons).catch(() => {});
+    let cancelled = false;
+    const CHUNK = 24;
+    void (async () => {
+      for (let i = 0; i < paths.length; i += CHUNK) {
+        try {
+          const got = await api.iconsFor(paths.slice(i, i + CHUNK), 48);
+          if (cancelled) return;
+          setAppIcons((prev) => ({ ...prev, ...got }));
+        } catch {
+          // Leave those tiles on their glyph and keep going.
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [apps]);
 
   return (

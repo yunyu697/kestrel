@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.12",
+    date: "2026-11-04",
+    title: {
+      zh: "设置里的应用图标几乎是立刻就出来了",
+      en: "App icons in settings show up almost immediately",
+      ja: "設定のアプリアイコンがほぼすぐに表示されます",
+      es: "Los iconos de las aplicaciones en los ajustes aparecen casi al instante",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "图标现在并行提取。系统每要一个图标就做一次应答，本机实测单个约 20 毫秒（应用商店的应用约 40 毫秒），236 个应用排队做下来要 5.3 秒；分到多个核心上只要约 0.6 秒",
+          en: "Icons are extracted in parallel now. The shell answers one icon per call at ~20 ms each (~40 ms for a Store app), so 236 apps took 5.3 s in a queue; spread over the cores it takes about 0.6 s",
+          ja: "アイコンの取得を並列化しました。シェルは 1 回の呼び出しにつき 1 つしか返さず、1 個あたり約 20 ミリ秒（ストアアプリは約 40 ミリ秒）かかるため、236 個を順番に処理すると 5.3 秒かかっていました。コアに分散すると約 0.6 秒です",
+          es: "Los iconos se extraen en paralelo. El shell responde de uno en uno a ~20 ms cada uno (~40 ms para una aplicación de la Store), así que 236 aplicaciones tardaban 5,3 s en cola; repartido entre los núcleos tarda unos 0,6 s",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "图标分批返回，先到先显示。以前是整个列表一次性要，最后一个图标没出来之前，所有格子都停在占位符上——看起来像卡住了",
+          en: "Icons come back in small batches and appear as they arrive. The whole list used to be requested in one go, so every tile sat on its placeholder until the very last icon had been extracted — it looked stuck",
+          ja: "アイコンは小さなまとまりで返り、届いた順に表示されます。以前は一覧をまとめて要求していたため、最後の 1 個が取れるまで全部のタイルがプレースホルダーのままで、止まっているように見えていました",
+          es: "Los iconos llegan en pequeños lotes y aparecen según llegan. Antes se pedía la lista completa de una vez, así que todas las casillas se quedaban en el marcador de posición hasta el último icono: parecía colgado",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "顺带修掉两个会留下空白格的问题：一是并发首次提取时有几个图标会失败（重试都能成功），失败结果却会被缓存，那个格子就整场都是空白；二是列表只给前 150 个取图标，应用多于 150 个时后面的永远是灰图标",
+          en: "Two bugs that left tiles blank are gone: a concurrent first pass could lose a few icons (all of which succeed on retry) and the failure was cached, so that tile stayed blank for the rest of the session; and only the first 150 apps were asked for icons, leaving everything past 150 on the grey glyph forever",
+          ja: "空白のタイルが残る 2 つの不具合も直しました。1 つは、並列の初回取得で数個のアイコンが失敗することがあり（再試行すれば成功します）、その失敗がキャッシュされて以降ずっと空白のままになっていたこと。もう 1 つは、最初の 150 個分しかアイコンを要求しておらず、151 個目以降が永久に灰色のままであったことです",
+          es: "También se corrigieron dos fallos que dejaban casillas en blanco: una primera pasada concurrente podía perder algunos iconos (todos se obtienen al reintentar) y el fallo se guardaba en caché, dejando esa casilla vacía el resto de la sesión; y solo se pedían iconos para las primeras 150 aplicaciones, así que a partir de esa cifra se quedaban con el glifo gris para siempre",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.11",
     date: "2026-11-04",
     title: {

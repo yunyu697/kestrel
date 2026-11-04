@@ -170,19 +170,15 @@ fn decode_capped(path: &Path) -> Option<image::DynamicImage> {
 }
 
 /// Batch icon lookup — one round trip for a whole result list.
+///
+/// The work is spread over the pool and the few icons a cold pass can miss
+/// are retried; see `icon::icon_batch`.
 #[tauri::command]
 pub async fn icons_for(paths: Vec<String>, size: Option<u32>) -> Result<HashMap<String, String>, String> {
     let px = size.unwrap_or(48).clamp(16, 256);
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut map = HashMap::new();
-        for p in paths {
-            let url = winicon::icon_data_url(&p, px);
-            map.insert(p, url);
-        }
-        map
-    })
-    .await
-    .map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || winicon::icon_batch(paths, px))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Tauri requires a `Result` from an async command that borrows its inputs
