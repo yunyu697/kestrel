@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.13",
+    date: "2026-11-04",
+    title: {
+      zh: "更新可以直接挑镜像，仅下载回到「下载」文件夹",
+      en: "Pick a mirror in the update panel; downloads land in Downloads",
+      ja: "更新画面でミラーを選択、ダウンロードは「ダウンロード」フォルダーへ",
+      es: "Elige el espejo al actualizar; las descargas van a Descargas",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "发现新版本时，更新面板多了一个镜像下拉框：官方直连、三个内置加速镜像，以及自定义前缀。「更新」和「仅下载」都用当前选中的镜像，选择会写回设置；设置页的镜像选择也从一排按钮改成同款下拉，测速结果仍然显示",
+          en: "The update panel now has a mirror drop-down: direct GitHub, three built-in accelerators, and a custom prefix. Both Update and Download only use the selected one, and the choice is saved back to settings. The settings page uses the same drop-down and still shows the speed-test results",
+          ja: "更新パネルにミラーのドロップダウンを追加しました（直接接続・3 つの加速ミラー・カスタム接頭辞）。「更新」と「ダウンロードのみ」は選択中のミラーを使い、選択は設定に保存されます。設定画面も同じドロップダウンになり、速度測定の結果もそのまま表示されます",
+          es: "El panel de actualización tiene ahora un desplegable de espejos: acceso directo, tres aceleradores integrados y un prefijo personalizado. Actualizar y Solo descargar usan el elegido, y la elección se guarda en los ajustes. La página de ajustes usa el mismo desplegable y sigue mostrando los resultados de la prueba de velocidad",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "「仅下载」现在把安装包存到系统的「下载」文件夹（跟随你在资源管理器里改过的下载位置），不再是藏在 AppData 里的临时目录。完成后显示保存路径，并给出「立即安装」和「打开所在文件夹」；重复下载同名文件会自动加 (1)，不会覆盖之前那份",
+          en: "Download only now saves the installer to your real Downloads folder (including a location you redirected in Explorer), not a hidden AppData folder. When it finishes you get the path, an Install now button and Show in folder. Downloading the same release twice appends (1) instead of overwriting the earlier file",
+          ja: "「ダウンロードのみ」は、AppData の隠しフォルダーではなくシステムの「ダウンロード」フォルダー（エクスプローラーで移動した場合もその場所）に保存するようになりました。完了後は保存先、「今すぐインストール」「フォルダーを開く」を表示します。同じファイル名は上書きせず (1) を付けます",
+          es: "Solo descargar guarda el instalador en tu carpeta Descargas real (incluida una ubicación redirigida en el Explorador), no en una carpeta oculta de AppData. Al terminar muestra la ruta, Instalar ahora y Mostrar en la carpeta. Descargar dos veces lo mismo añade (1) en lugar de sobrescribir",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复 QS 栏出现在不该出现的地方：IDM 的「下载文件信息」这类对话框里有一个「保存到」文件夹路径，被误当成「请选择文件夹」。现在输入框很多的表单、含下载链接的对话框、以及下载管理器自己的窗口都不再触发；它们打开的系统文件对话框仍然照常吸附",
+          en: "Quick Switch no longer appears where it does not belong. IDM's download-information dialog shows the folder a file will be saved to, which the folder-field rule mistook for a folder picker. Forms with many input fields, dialogs containing a download link, and download-manager windows are now skipped — while the real system file dialogs they open still attach as before",
+          ja: "不要な場所に QS バーが出る問題を修正しました。IDM の「ダウンロードファイル情報」にある保存先フォルダーを、フォルダー選択欄と誤認していました。入力欄の多いフォーム、ダウンロードリンクを含むダイアログ、ダウンロードマネージャー自身のウィンドウは除外されますが、そこから開くシステムのファイルダイアログには今までどおり表示されます",
+          es: "Quick Switch ya no aparece donde no debe. El diálogo de información de descarga de IDM muestra la carpeta de destino y la regla del campo de carpeta lo confundía con un selector. Ahora se descartan los formularios con muchos campos, los diálogos con un enlace de descarga y las ventanas propias del gestor; los diálogos de archivo del sistema que abren siguen funcionando igual",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.12",
     date: "2026-11-04",
     title: {

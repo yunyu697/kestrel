@@ -36,12 +36,62 @@ pub struct UpdateProgress {
     pub ms: u64,
 }
 
-/// Where downloaded installers are kept.
+/// Where installers that are about to be installed right away are kept.
+///
+/// This is a private folder: those files are a means to an end, not something
+/// the user asked to keep.
 pub fn update_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
         .join("Kestrel")
         .join("updates")
+}
+
+/// The user's real Downloads folder, honouring a relocation made through
+/// Explorer's folder properties (known-folder redirection), not a hard-coded
+/// `%USERPROFILE%\Downloads`.
+pub fn downloads_dir() -> Option<PathBuf> {
+    dirs::download_dir().or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
+}
+
+/// Pick the folder for a download. `mode` is "download" (the user pressed
+/// "仅下载" and expects the installer to land in Downloads) or "install"
+/// (the file is consumed immediately by the install helper).
+fn dest_dir(mode: &str) -> PathBuf {
+    if mode == "download" {
+        if let Some(dir) = downloads_dir() {
+            return dir;
+        }
+    }
+    update_dir()
+}
+
+/// Never overwrite a file the user already has in Downloads. A second
+/// "仅下载" of the same release becomes `Kestrel_1.2.13_x64 (1).msi`.
+fn unique_path(path: PathBuf) -> PathBuf {
+    if !path.exists() {
+        return path;
+    }
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "kestrel-update".into());
+    let ext = path
+        .extension()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    for n in 1..100 {
+        let name = if ext.is_empty() {
+            format!("{stem} ({n})")
+        } else {
+            format!("{stem} ({n}).{ext}")
+        };
+        let candidate = path.with_file_name(name);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    path
 }
 
 /// Keep only the file name: a caller must never be able to write outside the
@@ -60,8 +110,14 @@ fn safe_name(name: &str) -> String {
     }
 }
 
-/// Drop the installers of older versions. Only one update is ever relevant,
-/// and the folder would otherwise grow with every release.
+/// Drop the installers of older versions from our private update folder.
+/// Only one update is ever relevant, and the folder would otherwise grow with
+/// every release.
+///
+/// Two things keep this harmless: it is never called on the user's Downloads
+/// folder, and it only removes files we produced ourselves (the `Kestrel_`
+/// prefix). Deleting every .exe/.msi/.zip in a shared folder would destroy
+/// somebody else's downloads.
 fn prune_old_installers(dir: &Path, keep: &Path) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
@@ -71,8 +127,13 @@ fn prune_old_installers(dir: &Path, keep: &Path) {
         if path == keep {
             continue;
         }
-        let name = path.to_string_lossy().to_ascii_lowercase();
-        if name.ends_with(".msi") || name.ends_with(".exe") || name.ends_with(".zip") {
+        let Some(name) = path.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+            continue;
+        };
+        let lower = name.to_ascii_lowercase();
+        if (lower.starts_with("kestrel_") || lower.starts_with("kestrel-"))
+            && (lower.ends_with(".msi") || lower.ends_with(".exe") || lower.ends_with(".zip"))
+        {
             let _ = std::fs::remove_file(&path);
         }
     }
@@ -80,15 +141,24 @@ fn prune_old_installers(dir: &Path, keep: &Path) {
 
 /// Start downloading an installer in the background.
 ///
-/// Returns a job id; the progress arrives through the `update://progress`
-/// event.
+/// `mode` is "install" (the file is handed to the installer as soon as it is
+/// ready) or "download" (the user wants to keep it — save to the real
+/// Downloads folder). Returns a job id; progress arrives through the
+/// `update://progress` event.
 #[tauri::command]
-pub fn update_download(app: AppHandle, url: String, file_name: String) -> String {
+pub fn update_download(
+    app: AppHandle,
+    url: String,
+    file_name: String,
+    mode: Option<String>,
+) -> String {
     let id = format!("u{}", crate::commands::now_ms());
     let cancel = Arc::new(AtomicBool::new(false));
     jobs().lock().unwrap().insert(id.clone(), cancel.clone());
 
-    let dir = update_dir();
+    let mode = mode.unwrap_or_else(|| "install".into());
+    let keep_file = mode == "download";
+    let dir = dest_dir(&mode);
     if std::fs::create_dir_all(&dir).is_err() {
         jobs().lock().unwrap().remove(&id);
         let _ = app.emit(
@@ -105,11 +175,12 @@ pub fn update_download(app: AppHandle, url: String, file_name: String) -> String
         );
         return id;
     }
-    let dest = dir.join(safe_name(&file_name));
+    let dest = unique_path(dir.join(safe_name(&file_name)));
 
     let thread_id = id.clone();
     let thread_cancel = cancel.clone();
     let thread_dest = dest.clone();
+    let thread_keep = keep_file;
     std::thread::spawn(move || {
         let started = std::time::Instant::now();
         let emit = |app: &AppHandle, status: &str, received: u64, total: u64, path: &str, error: &str| {
@@ -137,7 +208,11 @@ pub fn update_download(app: AppHandle, url: String, file_name: String) -> String
 
         match result {
             Ok(n) => {
-                prune_old_installers(&dir, &thread_dest);
+                // Only the private update folder is ours to clean. The user's
+                // Downloads folder may contain anything — never prune it.
+                if !thread_keep {
+                    prune_old_installers(&dir, &thread_dest);
+                }
                 emit(&app, "done", n, n, &thread_dest.to_string_lossy(), "");
             }
             Err(e) => {
@@ -207,7 +282,15 @@ pub fn install_mode() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::safe_name;
+    use super::{dest_dir, downloads_dir, safe_name, unique_path, update_dir};
+    use std::path::PathBuf;
+
+    fn scratch(tag: &str) -> PathBuf {
+        let p = std::env::temp_dir().join(format!("kestrel-update-test-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&p);
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    }
 
     #[test]
     fn keeps_a_plain_file_name() {
@@ -232,5 +315,41 @@ mod tests {
     fn falls_back_when_nothing_is_left() {
         assert_eq!(safe_name(""), "kestrel-update.bin");
         assert_eq!(safe_name("..."), "kestrel-update.bin");
+    }
+
+    #[test]
+    fn download_only_uses_the_users_downloads_folder() {
+        let expected = downloads_dir().expect("Windows always has a Downloads folder");
+        assert_eq!(dest_dir("download"), expected);
+        assert!(expected.to_string_lossy().to_ascii_lowercase().contains("download"));
+        assert_ne!(dest_dir("download"), update_dir());
+    }
+
+    #[test]
+    fn install_mode_uses_the_private_folder() {
+        assert_eq!(dest_dir("install"), update_dir());
+        assert_eq!(dest_dir(""), update_dir());
+    }
+
+    #[test]
+    fn repeated_downloads_do_not_overwrite_each_other() {
+        let dir = scratch("repeat");
+        let first = dir.join("Kestrel_1.2.13_x64.msi");
+        std::fs::write(&first, b"first").unwrap();
+        let second = unique_path(first.clone());
+        assert_eq!(second, dir.join("Kestrel_1.2.13_x64 (1).msi"));
+        assert_eq!(std::fs::read(&first).unwrap(), b"first", "original kept");
+        std::fs::write(&second, b"second").unwrap();
+        let third = unique_path(first.clone());
+        assert_eq!(third, dir.join("Kestrel_1.2.13_x64 (2).msi"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_fresh_path_is_used_unchanged() {
+        let dir = scratch("fresh");
+        let p = dir.join("new.msi");
+        assert_eq!(unique_path(p.clone()), p);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

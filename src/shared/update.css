@@ -2,11 +2,64 @@
    that follow. Shared by the settings pane and the launcher banner, so the
    styles live on their own. */
 
+.upd-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .upd-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* ---- mirror picker ---- */
+.upd-mirror {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.upd-mirror-label {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.upd-mirror-select {
+  min-width: 148px;
+  flex: 0 1 220px;
+  font-size: 12px;
+}
+.upd-mirror-custom {
+  flex: 1 1 180px;
+  min-width: 140px;
+  height: 30px;
+  font-size: 12px;
+}
+.upd-block[data-compact="true"] .upd-mirror-select {
+  min-width: 128px;
+  flex-basis: 180px;
+}
+
+.upd-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+/* ---- finished download ---- */
+.upd-done-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.upd-path {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 /* ---- progress ---- */

@@ -56,6 +56,16 @@ export function mirrorPrefix(settings: Pick<Settings, "updateMirror">): string {
   return raw.replace(/\/+$/, "") + "/";
 }
 
+/** Which drop-down entry a stored prefix corresponds to. "custom" covers
+ *  any prefix that is not one of the built-in mirrors. */
+export function mirrorIdFor(prefix: string): string {
+  const norm = (s: string) => (s ? s.replace(/\/+$/, "") + "/" : "");
+  if (!norm(prefix)) return "direct";
+  return (
+    MIRRORS.find((m) => m.prefix && norm(m.prefix) === norm(prefix))?.id ?? "custom"
+  );
+}
+
 /**
  * Join a mirror prefix and a release URL.
  *

@@ -811,6 +811,15 @@ export default function Launcher() {
   // The sidebar is driven by one setting only, so it can never flicker on and
   // off: the footer button and the settings page toggle the same value.
   const isPanelMode = ["clipboard", "windows", "notes"].includes(mode);
+  // The update panel can pick a mirror directly; persist it so the settings
+  // page and the next launcher session use the same one.
+  const changeMirror = (prefix: string) => {
+    if (!settings) return;
+    const next = { ...settings, updateMirror: prefix };
+    setSettings(next);
+    void api.saveSettings(next);
+  };
+
   const showPreview = !!settings?.showPreview && !narrow && !isPanelMode;
   const togglePreview = () => {
     if (!settings) return;
@@ -857,6 +866,7 @@ export default function Launcher() {
                   assetUrl={updateFound.assetUrl}
                   htmlUrl={updateFound.htmlUrl}
                   mirror={mirrorPrefix({ updateMirror: settings?.updateMirror ?? "" })}
+                  onMirrorChange={changeMirror}
                   compact
                 />
               </div>

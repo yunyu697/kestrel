@@ -31,6 +31,7 @@ const {
   testMirrorLatency,
   MIRRORS,
   applyMirror,
+  mirrorIdFor,
   pickInstallAsset,
   assetFileName,
   compareVersions,
@@ -68,6 +69,13 @@ check("gh-proxy.com 测速返回延迟", typeof ghproxy === "number" && ghproxy 
 check("镜像前缀拼接正确", applyMirror("https://x/y", "https://m/") === "https://m/https://x/y");
 check("无前缀时原样返回", applyMirror("https://x/y", "") === "https://x/y");
 check("镜像列表非空", MIRRORS.length >= 2, `${MIRRORS.length} 个`);
+check("空前缀对应官方直连", mirrorIdFor("") === "direct");
+check(
+  "内置镜像可被下拉识别",
+  mirrorIdFor("https://gh-proxy.com") === "ghproxycom" &&
+    mirrorIdFor("https://gh-proxy.com/") === "ghproxycom",
+);
+check("自定义前缀不会掉回直连", mirrorIdFor("https://my-mirror.example/") === "custom");
 
 // 4) The installer must match how this copy was installed, otherwise the
 //    update installs a second Kestrel instead of replacing this one.

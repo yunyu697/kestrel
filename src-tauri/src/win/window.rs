@@ -263,6 +263,12 @@ pub struct DialogShape {
     pub has_tree_view: bool,
     /// The legacy list box of the old-style file dialog.
     pub has_list_box: bool,
+    /// How many text inputs / pickers the dialog has. A folder picker asks
+    /// one question; a form (IDM's "download file information", a login box,
+    /// an options page) asks many, and one of them merely happens to show a
+    /// folder.
+    pub edits: usize,
+    pub combos: usize,
     pub children: usize,
 }
 
@@ -271,12 +277,14 @@ impl DialogShape {
     fn add_class(&mut self, class: &str) {
         if class.eq_ignore_ascii_case("ComboBoxEx32") || class.eq_ignore_ascii_case("ComboBox") {
             self.has_name_combo = true;
+            self.combos += 1;
+        } else if class.eq_ignore_ascii_case("Edit") {
+            self.has_edit = true;
+            self.edits += 1;
         } else if class.eq_ignore_ascii_case("SHELLDLL_DefView")
             || class.eq_ignore_ascii_case("DUIViewWndClassName")
         {
             self.has_shell_view = true;
-        } else if class.eq_ignore_ascii_case("Edit") {
-            self.has_edit = true;
         } else if class.eq_ignore_ascii_case("SysListView32") {
             self.has_list_view = true;
         } else if class.eq_ignore_ascii_case("SysTreeView32")
@@ -327,6 +335,18 @@ impl DialogShape {
     /// a folder in it.
     pub fn is_folder_dialog(&self) -> bool {
         self.has_path_edit && self.has_tree_view
+    }
+
+    /// Too many input fields to be "pick a folder".
+    ///
+    /// A download manager's "file information" dialog also shows a folder
+    /// (where the file will be saved), but it is a form: URL, file name,
+    /// credentials, comments, several drop-downs. IDM 6.43's dialog has nine
+    /// edits and four combos; 7-Zip's extract box has one edit. The threshold
+    /// is deliberately loose — only clearly form-shaped windows are rejected,
+    /// so a real folder picker with an extra option or two still works.
+    pub fn is_form(&self) -> bool {
+        self.edits > 4 || self.combos > 2
     }
 }
 
@@ -410,7 +430,45 @@ pub fn is_quick_switch_target(hwnd: HWND) -> bool {
     // neither structural rule above can see them. What they always have is a
     // text field holding a *folder*, and that folder is what the user is
     // choosing.
+    //
+    // Reading control *contents* is the weakest signal we have, so it gets
+    // two guards. Without them a dialog that merely displays a folder (IDM's
+    // "download file information": URL + "save to" folder + a dozen other
+    // fields) was taken for a folder picker and got a stray Quick Switch.
+    if shape.is_form() {
+        crate::debug_log::qs_log_verbose(&format!(
+            "dialog {hwnd:#x} has {} edits / {} combos -> form, not a folder picker",
+            shape.edits, shape.combos
+        ));
+        return false;
+    }
+    if blocks_content_rule(hwnd) {
+        crate::debug_log::qs_log_verbose(&format!(
+            "dialog {hwnd:#x} belongs to a download manager -> content rule skipped"
+        ));
+        return false;
+    }
     folder_path_edit(hwnd).is_some()
+}
+
+/// Executables whose own dialogs display a folder but never ask the user to
+/// pick one: download managers show the "save to" folder next to the link.
+///
+/// This only gates the weak content rule. A *system* Open/Save dialog opened
+/// by the same app has a shell view and a name combo, so the structural rule
+/// above still attaches the Quick Switch where it belongs.
+fn is_download_manager_exe(path: &str) -> bool {
+    let exe = path.rsplit(['\\', '/']).next().unwrap_or("");
+    exe.eq_ignore_ascii_case("idman.exe") || exe.eq_ignore_ascii_case("fdm.exe")
+}
+
+fn blocks_content_rule(hwnd: HWND) -> bool {
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
+    if pid == 0 {
+        return false;
+    }
+    is_download_manager_exe(&process_path(pid))
 }
 
 /// The text field of an app dialog that holds a folder path.
@@ -423,27 +481,58 @@ pub fn is_quick_switch_target(hwnd: HWND) -> bool {
 fn folder_path_edit(hwnd: HWND) -> Option<HWND> {
     struct Ctx {
         hit: Option<HWND>,
+        saw_url: bool,
     }
     extern "system" fn cb(h: HWND, l: LPARAM) -> BOOL {
         let ctx = unsafe { &mut *(l as *mut Ctx) };
         if class_name(h) != "Edit" {
             return 1;
         }
-        if looks_like_folder_path(&get_text_timeout(h, 150)) {
+        let text = get_text_timeout(h, 150);
+        // A URL field means "this is about a download", not "choose a folder".
+        // Download managers show both a link and the folder it will be saved
+        // to; the folder alone would otherwise look exactly like 7-Zip's
+        // extract-to field.
+        if is_url_like(&text) {
+            ctx.saw_url = true;
+            return 0;
+        }
+        if ctx.hit.is_none() && looks_like_folder_path(&text) {
             ctx.hit = Some(h);
-            return 0; // stop enumerating
         }
         1
     }
-    let mut ctx = Ctx { hit: None };
+    let mut ctx = Ctx {
+        hit: None,
+        saw_url: false,
+    };
     unsafe {
         EnumChildWindows(hwnd, cb, &mut ctx as *mut Ctx as LPARAM);
     }
     crate::debug_log::qs_log_verbose(&format!(
-        "folder field probe {hwnd:#x} -> {:?}",
-        ctx.hit
+        "folder field probe {hwnd:#x} -> {:?} (url={})",
+        ctx.hit, ctx.saw_url
     ));
-    ctx.hit
+    if ctx.saw_url {
+        None
+    } else {
+        ctx.hit
+    }
+}
+
+/// A field holding a link, not a path. Deliberately narrow: a Windows path
+/// contains `:\` but never `://`.
+fn is_url_like(text: &str) -> bool {
+    let t = text.trim();
+    if t.len() > 2048 {
+        return false;
+    }
+    let lower = t.to_ascii_lowercase();
+    lower.starts_with("http://")
+        || lower.starts_with("https://")
+        || lower.starts_with("ftp://")
+        || lower.starts_with("magnet:")
+        || lower.starts_with("www.")
 }
 
 /// Does `text` name a folder?
@@ -1425,6 +1514,17 @@ mod tests {
         "Button",
     ];
 
+    /// IDM 6.43's "下载文件信息" dialog, captured live on 2026-11-04. It is a
+    /// `#32770` form: 9 `Edit`s (3 of them inside a combo), 4 combos, 8
+    /// buttons and 6 labels. One edit holds the folder the download will be
+    /// saved to — the content rule used to mistake that for a folder picker.
+    const IDM_DOWNLOAD_INFO: &[&str] = &[
+        "Edit", "Edit", "Edit", "Edit", "Edit", "Edit", "ComboBox>Edit",
+        "ComboBox>Edit", "ComboBox>Edit", "ComboBox", "Button", "Button",
+        "Button", "Button", "Button", "Button", "Button", "Button",
+        "Static", "Static", "Static", "Static", "Static", "Static",
+    ];
+
     /// A plain message box: static text, an icon and two buttons.
     const MESSAGE_BOX: &[&str] = &["Static", "Static", "Button", "Button"];
 
@@ -1495,6 +1595,35 @@ mod tests {
     #[test]
     fn rejects_message_boxes() {
         assert!(!shape_of(MESSAGE_BOX).is_file_dialog());
+    }
+
+    #[test]
+    fn only_download_managers_are_excluded_by_process() {
+        assert!(super::is_download_manager_exe(
+            r"C:\Program Files (x86)\Internet Download Manager\IDMan.exe"
+        ));
+        assert!(!super::is_download_manager_exe(r"C:\Program Files\7-Zip\7zFM.exe"));
+        assert!(!super::is_download_manager_exe(r"C:\Windows\explorer.exe"));
+        assert!(!super::is_download_manager_exe(""));
+    }
+
+    #[test]
+    fn idms_download_dialog_is_a_form_not_a_folder_picker() {
+        let s = shape_of(IDM_DOWNLOAD_INFO);
+        assert_eq!(s.edits, 9);
+        assert_eq!(s.combos, 4);
+        assert!(s.is_form(), "a nine-field form must not reach the content rule");
+        assert!(!s.is_file_dialog(), "no shell view");
+        assert!(!s.is_folder_dialog(), "no folder tree");
+    }
+
+    #[test]
+    fn real_folder_dialogs_are_not_mistaken_for_forms() {
+        assert!(!shape_of(OPEN_DIALOG).is_form());
+        assert!(!shape_of(SAVE_DIALOG).is_form());
+        assert!(!shape_of(WINRAR_EXTRACT).is_form());
+        assert!(!shape_of(MODERN_FOLDER_PICKER).is_form());
+        assert!(!shape_of(IDM_MAIN).is_form());
     }
 
     // ---- a dialog built at runtime ---------------------------------------
@@ -1611,6 +1740,76 @@ mod tests {
         assert_ne!(hwnd, 0, "could not build the probe dialog");
         f(hwnd);
         unsafe { DestroyWindow(hwnd) };
+    }
+
+    /// Build a hidden `#32770` with one `Edit` per entry. Lets the tests feed
+    /// real control text to the content rule instead of only a class list.
+    fn with_edits(texts: &[&str], f: impl FnOnce(HWND)) {
+        let mut t: Vec<u8> = Vec::new();
+        w32(&mut t, 0x80C8_0080); // WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME
+        w32(&mut t, 0);
+        w16(&mut t, texts.len() as u16);
+        w16(&mut t, 0); // x
+        w16(&mut t, 0); // y
+        w16(&mut t, 260); // cx
+        w16(&mut t, (24 + 20 * texts.len()) as u16); // cy
+        w16(&mut t, 0); // no menu
+        w16(&mut t, 0); // default class
+        w16(&mut t, 0); // empty title
+        for (i, text) in texts.iter().enumerate() {
+            let y = 8 + 20 * i as i16;
+            dialog_item(
+                &mut t,
+                "Edit",
+                text,
+                0x5080_0080, // WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP
+                1000 + i as u16,
+                (10, y, 230, 14),
+            );
+        }
+        let hwnd = unsafe { CreateDialogIndirectParamW(0, t.as_ptr(), 0, 0, 0) };
+        assert_ne!(hwnd, 0, "could not build the probe dialog");
+        f(hwnd);
+        unsafe { DestroyWindow(hwnd) };
+    }
+
+    #[test]
+    fn a_download_form_is_not_a_folder_target() {
+        // A URL, the folder it will be saved to, and a dozen unrelated
+        // fields: the shape guard must reject this before any text is read.
+        with_edits(
+            &[
+                "https://example.com/archive.zip",
+                "C:\\Windows",
+                "", "", "", "", "", "", "",
+            ],
+            |hwnd| {
+                let shape = super::scan_dialog_children(hwnd);
+                assert!(shape.is_form());
+                assert!(!is_quick_switch_target(hwnd), "stray Quick Switch on a form");
+            },
+        );
+    }
+
+    #[test]
+    fn a_link_beside_a_folder_is_not_a_folder_target() {
+        // Only two fields, so the shape guard cannot help: the URL guard has
+        // to do the work on its own.
+        with_edits(&["https://example.com/archive.zip", "C:\\Windows"], |hwnd| {
+            let shape = super::scan_dialog_children(hwnd);
+            assert!(!shape.is_form());
+            assert!(!is_quick_switch_target(hwnd), "a download link was read as a folder");
+        });
+    }
+
+    #[test]
+    fn a_lone_folder_field_is_still_a_target() {
+        with_edits(&["C:\\Windows"], |hwnd| {
+            assert!(
+                is_quick_switch_target(hwnd),
+                "the 7-Zip case must keep working"
+            );
+        });
     }
 
     #[test]

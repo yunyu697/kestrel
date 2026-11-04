@@ -11,6 +11,7 @@ import { pick, RELEASES, type ReleaseKind } from "../shared/releases";
 import {
   checkForUpdate,
   lastCheckAt,
+  mirrorIdFor,
   mirrorPrefix,
   MIRRORS,
   pickInstallAsset,
@@ -1807,6 +1808,10 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
   const [customMirror, setCustomMirror] = useState(
     mirrorId === "custom" ? s.updateMirror : "",
   );
+  // "Custom" is a UI mode before it is a saved value: switching to it must
+  // not write an empty prefix (that would mean "direct" and snap the
+  // drop-down straight back).
+  const [customMode, setCustomMode] = useState(mirrorId === "custom");
 
   const runCheck = useCallback(async () => {
     setChkState("checking");
@@ -1829,10 +1834,11 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
 
   const setMirror = (id: string) => {
     if (id === "custom") {
-      update("updateMirror", customMirror);
-    } else {
-      update("updateMirror", MIRRORS.find((m) => m.id === id)?.prefix ?? "");
+      setCustomMode(true);
+      return;
     }
+    setCustomMode(false);
+    update("updateMirror", MIRRORS.find((m) => m.id === id)?.prefix ?? "");
   };
 
   return (
@@ -1901,6 +1907,10 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
                 assetUrl={pickInstallAsset(chkResult.info.assets, installMode)?.url ?? ""}
                 htmlUrl={chkResult.info.htmlUrl}
                 mirror={mirrorPrefix(s)}
+                onMirrorChange={(v) => {
+                  update("updateMirror", v);
+                  setCustomMode(mirrorIdFor(v) === "custom");
+                }}
               />
             </div>
           )}
@@ -1922,20 +1932,24 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
             />
           </Row>
           <Row label={t("下载镜像")} desc={t("GitHub 直连缓慢时，用镜像加速安装包下载")}>
-            <Seg
-              value={mirrorId}
-              options={[
-                ...MIRRORS.map((m) => {
-                  const sp = speeds?.[m.id];
-                  const tag =
-                    sp === undefined ? "" : sp === null ? " ×" : ` ${sp}ms`;
-                  // Proper-noun mirror names stay untranslated on purpose.
-                  return { v: m.id, label: (m.id === "direct" ? t(m.name) : m.name) + tag };
-                }),
-                { v: "custom", label: t("自定义") },
-              ]}
-              onChange={setMirror}
-            />
+            <select
+              className="select"
+              style={{ minWidth: 200 }}
+              value={customMode ? "custom" : mirrorId}
+              onChange={(e) => setMirror(e.target.value)}
+            >
+              {MIRRORS.map((m) => {
+                const sp = speeds?.[m.id];
+                const tag = sp === undefined ? "" : sp === null ? " ×" : ` ${sp}ms`;
+                // Proper-noun mirror names stay untranslated on purpose.
+                return (
+                  <option key={m.id} value={m.id}>
+                    {(m.id === "direct" ? t(m.name) : m.name) + tag}
+                  </option>
+                );
+              })}
+              <option value="custom">{t("自定义")}…</option>
+            </select>
           </Row>
           <Row
             label={t("镜像测速")}
@@ -1951,7 +1965,7 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
               {testing ? t("正在测速…") : t("测速")}
             </button>
           </Row>
-          {mirrorId === "custom" && (
+          {(customMode || mirrorId === "custom") && (
             <Row label={t("自定义镜像前缀")} desc={t("形如 https://gh-proxy.com/ ，会拼在下载地址前面")}>
               <input
                 className="input"
@@ -1961,7 +1975,7 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
                 spellCheck={false}
                 onChange={(e) => {
                   setCustomMirror(e.target.value);
-                  update("updateMirror", e.target.value);
+                  if (e.target.value.trim()) update("updateMirror", e.target.value);
                 }}
               />
             </Row>

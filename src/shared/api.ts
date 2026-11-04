@@ -63,9 +63,11 @@ export const api = {
   /** Network probe on the Rust side; `rangeBytes` asks for a partial body. */
   httpProbe: (url: string, timeoutMs?: number, rangeBytes?: number) =>
     call<HttpProbeResult>("http_probe", { url, timeoutMs, rangeBytes }),
-  /** Start an installer download in the background; returns the job id. */
-  updateDownload: (url: string, fileName: string) =>
-    call<string>("update_download", { url, fileName }),
+  /** Start an installer download in the background; returns the job id.
+   *  `mode` = "install" (temp folder, installed on arrival) or "download"
+   *  (the user's Downloads folder, kept for later). */
+  updateDownload: (url: string, fileName: string, mode: "install" | "download") =>
+    call<string>("update_download", { url, fileName, mode }),
   updateCancel: (id: string) => call<boolean>("update_cancel", { id }),
   /** Hand the installer to a helper that waits for this process to exit. */
   updateInstall: (path: string) => call<boolean>("update_install", { path }),
