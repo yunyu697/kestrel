@@ -21,7 +21,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workdirs: src-tauri
+          workspaces: src-tauri
 
       - name: Install dependencies
         run: npm ci

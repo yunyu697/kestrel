@@ -530,14 +530,28 @@ mod tests {
 
 #[cfg(test)]
 mod icon_tests {
+    use super::uwp_apps;
+
     /// A Store app has no file path to ask about; the icon has to come from
     /// the shell namespace, otherwise all 30-odd of them show a blank glyph.
+    ///
+    /// The app is taken from whatever this machine actually has rather than
+    /// named outright: a CI runner is a bare Windows Server with no Store
+    /// apps installed, so a hard-coded AUMID fails there for a reason that
+    /// has nothing to do with the code under test.
     #[test]
     fn a_store_app_has_an_icon() {
-        let url = crate::win::icon::icon_data_url(
-            "shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
-            48,
+        let apps = uwp_apps();
+        let Some(app) = apps.first() else {
+            println!("no Store apps installed here, nothing to render");
+            return;
+        };
+        let url = crate::win::icon::icon_data_url(&app.target, 48);
+        println!("icon for {}: {} bytes", app.target, url.len());
+        assert!(
+            url.starts_with("data:image/png;base64,"),
+            "no icon rendered for {}",
+            app.target
         );
-        assert!(url.starts_with("data:image/png;base64,"), "no icon rendered");
     }
 }
