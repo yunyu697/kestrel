@@ -27,6 +27,54 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.14",
+    date: "2026-11-05",
+    title: {
+      zh: "QS 栏只在真正要选文件夹时出现",
+      en: "Quick Switch only appears where a folder is actually being chosen",
+      ja: "フォルダーを選ぶ場面だけに QS バーを表示",
+      es: "Quick Switch solo aparece cuando se está eligiendo una carpeta",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "重写了判定逻辑：以前只要对话框里有一个输入框看起来像文件夹路径，就会吸附 QS 栏，于是软件卸载界面、设置页等地方频繁误弹。现在必须有明确的「选择文件夹」证据（窗口标题、浏览按钮或已知压缩/文件管理器），安装、卸载、向导类窗口一律排除",
+          en: "Rewrote the detection rule. Previously any dialog with a field that looked like a folder path got a Quick Switch, so uninstallers and settings pages kept showing one by mistake. An app dialog now needs positive evidence of a folder choice (title, browse button, or a known archive/file manager), and installers, uninstallers and wizards are excluded outright",
+          ja: "判定ロジックを作り直しました。以前はフォルダーのパスに見える入力欄が 1 つあるだけで QS バーが付き、アンインストール画面や設定画面に頻繁に誤表示されていました。今は「フォルダー選択」の明確な根拠（タイトル・参照ボタン・既知のアーカイブ/ファイルマネージャー）が必要で、インストーラー、アンインストーラー、ウィザードは除外されます",
+          es: "Se reescribió la regla de detección. Antes, cualquier diálogo con un campo parecido a una ruta de carpeta mostraba Quick Switch, por lo que aparecía por error en desinstaladores y páginas de ajustes. Ahora un diálogo propio de la app necesita una evidencia clara de elección de carpeta (título, botón Examinar o un gestor conocido), y los instaladores, desinstaladores y asistentes quedan excluidos",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "只读输入框（只显示安装位置、保存位置）不再被当成可写入的路径框；下载链接、多字段表单仍然排除。系统打开/保存对话框、7-Zip / WinRAR 的「解压到 / 复制到」照常可用",
+          en: "Read-only fields that only display an install or save location are no longer treated as writable path boxes; download links and multi-field forms stay excluded. System Open/Save dialogs and 7-Zip / WinRAR extract and copy dialogs still work as before",
+          ja: "インストール先や保存先を表示するだけの読み取り専用欄は、書き込み可能なパス欄として扱われません。ダウンロードリンクや入力欄の多いフォームも引き続き除外します。システムの開く/保存ダイアログ、7-Zip / WinRAR の「展開先 / コピー先」は従来どおり使えます",
+          es: "Los campos de solo lectura que muestran una ubicación de instalación o guardado ya no se confunden con campos de ruta editables; los enlaces de descarga y los formularios con muchos campos siguen excluidos. Los diálogos del sistema y los de extraer/copiar de 7-Zip y WinRAR siguen funcionando igual",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "自动吸附变严格后留了手动通道：万一某个软件的文件夹对话框没被自动识别，在它里面按 Ctrl+G 仍可主动唤起 QS 栏（卸载向导、下载表单、只读输入框依然拒绝）",
+          en: "The stricter auto-attach keeps a manual escape hatch: if an app's folder dialog is not recognised automatically, press Ctrl+G inside it to summon Quick Switch explicitly. Uninstall wizards, download forms and read-only fields are still refused",
+          ja: "自動表示を厳しくした代わりに手動操作を残しました。フォルダーダイアログが自動認識されない場合でも、その中で Ctrl+G を押せば QS バーを呼び出せます（アンインストール画面、ダウンロードフォーム、読み取り専用欄は引き続き除外）",
+          es: "El pegado automático más estricto conserva una vía manual: si el diálogo de carpetas de una app no se reconoce, pulsa Ctrl+G dentro de él para abrir Quick Switch explícitamente. Los asistentes de desinstalación, formularios de descarga y campos de solo lectura siguen excluidos",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "同时打开多个文件对话框时，QS 栏现在服务你正在使用的那一个：切换对话框只是平滑移动，不重置输入、不抢焦点；其中某个对话框关闭或隐藏后，会自动交给仍打开的那个，而不是跟着一起消失。每个对话框各自记住你是否手动关过 QS 栏；从资源管理器带回来的自动跳转也不会被顺手点开的另一个对话框消耗掉",
+          en: "With several file dialogs open, Quick Switch now serves the one you are actually using: switching dialogs just moves the box smoothly, without clearing your input or stealing focus. When one dialog closes or hides, the box is handed to another one that is still open instead of disappearing. Each dialog remembers its own manual dismissal, and an Explorer round trip is no longer consumed by a dialog you merely clicked past",
+          ja: "複数のファイルダイアログを開いている場合、QS バーは操作中のダイアログに追従します。切り替えても位置を滑らかに動かすだけで、入力内容は消えずフォーカスも奪いません。1 つ閉じたり隠したりしても、開いている別のダイアログに引き継がれ、消えてしまいません。手動で閉じた状態はダイアログごとに記憶され、エクスプローラーで訪れたフォルダーへの自動ジャンプも、通りすがりにクリックした別のダイアログに消費されません",
+          es: "Con varios diálogos de archivo abiertos, Quick Switch ahora atiende al que estás usando: al cambiar de diálogo la caja solo se desplaza, sin borrar lo escrito ni robar el foco. Si un diálogo se cierra u oculta, la caja pasa a otro que siga abierto en vez de desaparecer. Cada diálogo recuerda su propio cierre manual, y la visita al Explorador ya no la consume un diálogo en el que solo hiciste clic de pasada",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.13",
     date: "2026-11-04",
     title: {

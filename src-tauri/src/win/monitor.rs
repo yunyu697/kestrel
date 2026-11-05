@@ -11,10 +11,11 @@
 use crate::state::AppState;
 use crate::win::{
     class_name, EnumWindows, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId,
-    IsIconic, IsWindow, IsWindowVisible, BOOL, HWND, LPARAM, MSG, RECT,
+    IsIconic, IsWindow, IsWindowEnabled, IsWindowVisible, BOOL, HWND, LPARAM, MSG, RECT,
 };
 use parking_lot::Mutex;
-use std::sync::atomic::{AtomicIsize, AtomicU32, AtomicU64, Ordering};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, WebviewWindow};
@@ -157,11 +158,123 @@ extern "system" fn win_event_proc(
     }
 }
 
+// ---------------- More than one dialog ----------------
+
+/// What a foreground event on a recognised dialog should do to the box.
+///
+/// There is exactly one Quick Switch window, but any number of dialogs can be
+/// open at once. The binding therefore has to follow the dialog the user is
+/// working in: `quick_switch_apply` writes to whatever `state.dialog` points
+/// at, so leaving it on A while the box sits under B would navigate A.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AttachAction {
+    /// First sight of this dialog, or the box was hidden: full attach.
+    Show,
+    /// The box is up but bound to a different dialog: move it, keep the session.
+    Retarget,
+    /// Same dialog again: only re-assert geometry and z-order.
+    Refresh,
+    /// The user closed the box on this dialog: keep the binding, stay hidden.
+    StayHidden,
+}
+
+fn attach_action(
+    prev: Option<HWND>,
+    next: HWND,
+    box_visible: bool,
+    dismissed: bool,
+) -> AttachAction {
+    if dismissed {
+        return AttachAction::StayHidden;
+    }
+    match prev {
+        Some(p) if p == next => {
+            if box_visible {
+                AttachAction::Refresh
+            } else {
+                AttachAction::Show
+            }
+        }
+        Some(_) if box_visible => AttachAction::Retarget,
+        _ => AttachAction::Show,
+    }
+}
+
+/// Which dialog should inherit the box when the bound one is destroyed?
+///
+/// `candidates` is in z-order (topmost first). Prefer a dialog from the
+/// foreground process — that is where the user's attention went — then fall
+/// back to the topmost one. Never resurrect a box the user dismissed.
+fn choose_next_dialog(
+    candidates: &[(HWND, u32)],
+    fg_pid: u32,
+    dismissed: &[HWND],
+) -> Option<HWND> {
+    let live: Vec<(HWND, u32)> = candidates
+        .iter()
+        .copied()
+        .filter(|(h, _)| !dismissed.contains(h))
+        .collect();
+    if fg_pid != 0 {
+        if let Some((h, _)) = live.iter().find(|(_, p)| *p == fg_pid) {
+            return Some(*h);
+        }
+    }
+    live.first().map(|(h, _)| *h)
+}
+
+static DIALOG_SCAN_EXCLUDE_PID: AtomicU32 = AtomicU32::new(0);
+static DIALOG_SCAN_HITS: Mutex<Vec<(HWND, u32)>> = Mutex::new(Vec::new());
+
+extern "system" fn scan_dialogs_cb(hwnd: HWND, _l: LPARAM) -> BOOL {
+    if class_name(hwnd) != "#32770" {
+        return 1;
+    }
+    unsafe {
+        // A modal child disables its owner. The owner is still visible and
+        // still a file dialog, but it is not the window the user can use.
+        if IsWindowVisible(hwnd) == 0 || IsIconic(hwnd) != 0 || IsWindowEnabled(hwnd) == 0 {
+            return 1;
+        }
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
+    if pid == 0 || pid == DIALOG_SCAN_EXCLUDE_PID.load(Ordering::Relaxed) {
+        return 1;
+    }
+    if window::is_quick_switch_target(hwnd) {
+        DIALOG_SCAN_HITS.lock().push((hwnd, pid));
+    }
+    1
+}
+
+/// Every other usable dialog currently on screen, in z-order (top first).
+/// Only called when a session is about to end, so the per-window text scan is
+/// not on any hot path.
+fn quick_switch_candidates(self_pid: u32, exclude: HWND) -> Vec<(HWND, u32)> {
+    DIALOG_SCAN_EXCLUDE_PID.store(self_pid, Ordering::Relaxed);
+    DIALOG_SCAN_HITS.lock().clear();
+    unsafe { EnumWindows(scan_dialogs_cb, 0) };
+    DIALOG_SCAN_HITS
+        .lock()
+        .iter()
+        .copied()
+        .filter(|(h, _)| *h != exclude)
+        .collect()
+}
+
 fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
+    // HWNDs are recycled. Drop dismissals for windows that no longer exist,
+    // or a brand-new dialog handed a reused handle would inherit an old
+    // "the user closed the box here" decision.
+    state
+        .qs_dismissed
+        .lock()
+        .retain(|h| unsafe { IsWindow(*h) } != 0);
     // Bumped for every foreground event. A late-attach poller (see
     // `spawn_late_attach`) remembers the generation it belongs to, so as soon
     // as the user activates anything else its work becomes stale.
-    let gen = LATE_GEN.fetch_add(1, Ordering::SeqCst) + 1;
+    let gen = bump_late_gen(hwnd);
     let mut pid = 0u32;
     unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
     // Our own windows (launcher/settings) never reset Quick Switch state.
@@ -303,7 +416,8 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
             }
         }
 
-        let already = *state.dialog.lock() == Some(hwnd);
+        let prev = *state.dialog.lock();
+        let already = prev == Some(hwnd);
         // A window that is on screen as the *global launcher* is not an
         // attached box: re-raising or re-positioning it would move the
         // launcher around while the user is typing in it.
@@ -316,12 +430,23 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
         let visible = (crate::ui::launcher_visible(state)
             || state.qs_active.load(Ordering::Relaxed))
             && !launcher_up;
-        *state.dialog.lock() = Some(hwnd);
+        let dismissed = state.is_qs_dismissed(hwnd);
+        let action = attach_action(prev, hwnd, visible, dismissed);
         crate::debug_log::qs_log(&format!(
-            "dialog captured hwnd={hwnd:#x} already={already} visible={visible} launcher={launcher_up}"
+            "dialog captured hwnd={hwnd:#x} prev={prev:?} action={action:?} visible={visible} launcher={launcher_up}"
         ));
-        if let Some(dir) = window::dialog_current_folder(hwnd) {
-            state.push_qs_dir(dir);
+
+        // Bind first: the follower, `quick_switch_apply` and the resume path
+        // all read `state.dialog`. With two dialogs open, leaving the old
+        // binding in place would navigate the wrong one.
+        *state.dialog.lock() = Some(hwnd);
+        // Only a *new* dialog contributes its folder to the history. Reading
+        // it on every focus change rewrote the JSON file and shuffled the
+        // list each time the user clicked between two dialogs.
+        if !already {
+            if let Some(dir) = window::dialog_current_folder(hwnd) {
+                state.push_qs_dir(dir);
+            }
         }
         // Read only the two flags we need: cloning the whole settings
         // (favorites, engines, commands) on every focus change was pure
@@ -333,42 +458,55 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
         if !quick_switch_enabled {
             return;
         }
-        if already && visible {
-            // Same dialog already served: refresh position but NEVER steal
-            // focus back — otherwise the dialog could never be closed.
-            // Coming back to the dialog means Windows just raised it to the
-            // top of the normal band, which pushes the box behind it: put the
-            // box back one slot above, still in the same band.
-            crate::ui::set_topmost(app, false);
-            if let Some(win) = crate::ui::launcher(app) {
-                let rows = state.settings.read().qs_visible_rows;
-                let scale = crate::ui::launcher_scale(state);
-                // Re-raise above the dialog without focus. Both windows are
-                // plain normal-band windows, so this lands the box directly
-                // above the dialog instead of in a separate topmost layer.
-                if let Ok(h) = win.hwnd() {
-                    crate::win::keep_above(h.0 as isize, hwnd);
+        match action {
+            AttachAction::StayHidden => {
+                // The user closed the box on *this* dialog. Keep the binding
+                // so Ctrl+G can still bring it back, but never auto-show it.
+                // Other dialogs are unaffected.
+                if visible && !launcher_up {
+                    crate::ui::hide_launcher(app);
                 }
-                position_for_dialog(win, hwnd, rows, scale);
             }
-            // ...but do honour the "came back from Explorer" jump. Skipping it
-            // here is what broke the feature: the box was already attached, so
-            // the branch above returned before the jump was ever considered,
-            // and returning to the dialog after visiting a folder did nothing.
-            maybe_auto_jump(app, state, hwnd, true);
-            return;
-        }
-        maybe_auto_jump(app, state, hwnd, already);
-        // While the global launcher is on screen the dialog is only *bound*:
-        // turning the shared window into a Quick Switch box right now would
-        // hijack the launcher the user is typing in. Closing the launcher
-        // hands the window to this binding (see `ui::close_launcher`).
-        // A box the user dismissed with double Ctrl stays dismissed: hiding it
-        // gives this dialog the foreground back, and without this check that
-        // very event re-attached it.
-        let dismissed = *state.qs_dismissed.lock() == Some(hwnd);
-        if qs_auto_show && !launcher_up && !dismissed {
-            crate::ui::show_quick_switch(app, state, hwnd);
+            AttachAction::Refresh => {
+                // Same dialog already served: refresh position but NEVER steal
+                // focus back — otherwise the dialog could never be closed.
+                // Coming back to the dialog means Windows just raised it to
+                // the top of the normal band, which pushes the box behind it:
+                // put the box back one slot above, still in the same band.
+                crate::ui::set_topmost(app, false);
+                if let Some(win) = crate::ui::launcher(app) {
+                    let rows = state.settings.read().qs_visible_rows;
+                    let scale = crate::ui::launcher_scale(state);
+                    if let Ok(h) = win.hwnd() {
+                        crate::win::keep_above(h.0 as isize, hwnd);
+                    }
+                    position_for_dialog(win, hwnd, rows, scale);
+                }
+                // This is the one case where an Explorer round trip is meant
+                // to be consumed: the user came back to the dialog they left.
+                maybe_auto_jump(app, state, hwnd, true);
+            }
+            AttachAction::Retarget => {
+                // A second dialog took over. Move the box without restarting
+                // the session: no `quickswitch://show` (which would wipe a
+                // half-typed query), no focus grab, no 40 ms sleep.
+                //
+                // Deliberately no auto-jump: the pending Explorer folder was
+                // visited for whatever dialog the user returns to, and
+                // spending it on a dialog they only clicked past loses the
+                // jump for the intended one.
+                crate::ui::retarget_quick_switch(app, state, hwnd);
+            }
+            AttachAction::Show => {
+                maybe_auto_jump(app, state, hwnd, false);
+                // While the global launcher is on screen the dialog is only
+                // *bound*: turning the shared window into a Quick Switch box
+                // now would hijack the launcher. Closing it resumes the box
+                // under this binding (see `ui::close_launcher`).
+                if qs_auto_show && !launcher_up {
+                    crate::ui::show_quick_switch(app, state, hwnd);
+                }
+            }
         }
         return;
     }
@@ -386,11 +524,29 @@ fn handle_foreground(app: &AppHandle, state: &Arc<AppState>, hwnd: HWND) {
     }
 }
 
-/// Generation counter bumped by every foreground event. A late-attach poller
-/// remembers the generation it was started for and abandons its work as soon as
-/// the user activates something else, so a stale poll can never pop the box on
-/// top of an unrelated window.
-static LATE_GEN: AtomicU64 = AtomicU64::new(0);
+/// Generation counter for late-attach pollers, **per dialog**.
+///
+/// A single global counter made two slow dialogs cancel each other: opening B
+/// invalidated A's poller even though A was still coming up and still the
+/// window the user wanted. Keying by HWND means only a newer event for the
+/// *same* window supersedes its poller.
+static LATE_GEN: once_cell::sync::Lazy<Mutex<HashMap<isize, u64>>> =
+    once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn bump_late_gen(hwnd: HWND) -> u64 {
+    let mut m = LATE_GEN.lock();
+    // HWNDs get recycled; do not let a stale entry grow forever.
+    if m.len() > 16 {
+        m.retain(|h, _| unsafe { IsWindow(*h) } != 0);
+    }
+    let g = m.entry(hwnd).or_insert(0);
+    *g += 1;
+    *g
+}
+
+fn late_gen_is_current(hwnd: HWND, gen: u64) -> bool {
+    LATE_GEN.lock().get(&hwnd).copied() == Some(gen)
+}
 
 /// Retry attaching to a dialog that was still hidden when its foreground event
 /// arrived.
@@ -406,7 +562,7 @@ fn spawn_late_attach(hwnd: HWND, gen: u64) {
         // zombie window cannot keep a poller alive forever.
         for _ in 0..40 {
             std::thread::sleep(Duration::from_millis(200));
-            if LATE_GEN.load(Ordering::SeqCst) != gen {
+            if !late_gen_is_current(hwnd, gen) {
                 crate::debug_log::qs_log("late attach: superseded by newer focus");
                 return;
             }
@@ -800,15 +956,39 @@ fn wait_dialog_visible(hwnd: HWND, timeout: Duration) -> bool {
     }
 }
 
+/// Hand the running session to another dialog that is still on screen.
+///
+/// Returns the new binding, or `None` when nobody qualifies (the caller then
+/// ends the session). Retargeting never *shows* the window: if the box was
+/// hidden it stays hidden until the user activates the new dialog, which is
+/// when a foreground event will attach it properly. Forcing a show here would
+/// grab focus out of whatever the user is typing in.
+fn hand_over_dialog(app: &AppHandle, state: &Arc<AppState>, gone: HWND) -> Option<HWND> {
+    // `gone` may be destroyed or merely hidden. The caller decides whether
+    // to forget its dismissal: a hidden dialog can come back and must keep
+    // the user's "close the box" decision, a destroyed one must not.
+    let candidates = quick_switch_candidates(state.self_pid, gone);
+    let mut fg_pid = 0u32;
+    unsafe {
+        GetWindowThreadProcessId(GetForegroundWindow(), &mut fg_pid);
+    }
+    let next = choose_next_dialog(&candidates, fg_pid, &state.qs_dismissed_snapshot())?;
+    crate::debug_log::qs_log(&format!(
+        "follower: dialog {gone:#x} gone -> hand over to {next:#x}"
+    ));
+    crate::ui::retarget_quick_switch(app, state, next);
+    Some(next)
+}
+
 /// Drop the attached session and get the box off screen.
 fn end_session(app: &AppHandle, state: &Arc<AppState>) {
     state
         .qs_active
         .store(false, std::sync::atomic::Ordering::Relaxed);
     *state.dialog.lock() = None;
-    // The handle is about to be free for reuse; keeping it would silence the
-    // box for whatever dialog Windows hands that value to next.
-    *state.qs_dismissed.lock() = None;
+    // Dismissal records are managed by the caller: a *destroyed* dialog must
+    // forget its own (HWNDs get recycled), while a merely hidden one must
+    // keep it so the box does not spring back when the dialog reappears.
     if crate::ui::launcher_visible(state) {
         crate::ui::hide_launcher(app);
     }
@@ -818,6 +998,10 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
     crate::supervise_forever("kestrel-qs-follow", move || {
         // Last applied geometry: (x, y, width, height).
         let mut last: (i32, i32, u32, u32) = (0, 0, 0, 0);
+        // Which dialog those cached values belong to. A foreground event or
+        // a hand-over can change `state.dialog` between two ticks; every
+        // cached value below is per-dialog and must be dropped when it does.
+        let mut last_h: Option<HWND> = None;
         // Last seen dialog rectangle. As long as it does not change there is
         // nothing to follow: recomputing the geometry every tick used to ask
         // the UI thread for the scale factor 60 times a second, which starved
@@ -846,6 +1030,7 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
                 continue;
             };
             let Some(h) = *state.dialog.lock() else {
+                last_h = None;
                 hidden_since = None;
                 hidden_for_iconic = false;
                 last = (0, 0, 0, 0);
@@ -859,6 +1044,24 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
                 continue;
             };
 
+            // All follower state is per-dialog. Without this reset, hiding
+            // the box because A was minimised and then switching to B would
+            // make the "restored" branch re-show the box a second time under
+            // B — clearing the user's query and grabbing focus.
+            if Some(h) != last_h {
+                last_h = Some(h);
+                hidden_since = None;
+                hidden_for_iconic = false;
+                last = (0, 0, 0, 0);
+                last_rect = RECT {
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                };
+                last_rows = u32::MAX;
+            }
+
             // The global launcher owns the shared window right now. Keep the
             // binding — that is what lets the box return when the launcher
             // closes — but do not touch the window at all: resizing it would
@@ -866,7 +1069,15 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
             // launcher off screen while the user is typing in it.
             if state.launcher_override.load(Ordering::Relaxed) {
                 if unsafe { IsWindow(h) } == 0 {
-                    *state.dialog.lock() = None;
+                    // Even while the global launcher owns the window, keep
+                    // the *binding* alive for another dialog if there is one:
+                    // closing the launcher must resume the box under the
+                    // dialog that still exists.
+                    state.forget_qs_dialog(h);
+                    if hand_over_dialog(&app, &state, h).is_none() {
+                        *state.dialog.lock() = None;
+                        last_h = None;
+                    }
                 }
                 hidden_since = None;
                 hidden_for_iconic = false;
@@ -885,8 +1096,30 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
             let on_screen = exists && unsafe { IsWindowVisible(h) != 0 };
             let iconic = exists && unsafe { IsIconic(h) != 0 };
 
-            // Really destroyed: the dialog is gone, so is the box.
+            // Really destroyed: hand the box to another dialog that is still
+            // open, or end the session if there is none.
+            //
+            // Closing A while B is still on screen used to hide the box for
+            // good. Windows usually raises B and sends a foreground event,
+            // but if focus goes to an owner/main window instead (very common
+            // with modal chains) no #32770 event ever arrives, and the user
+            // has to click B once to get the box back — precisely the "does
+            // not appear when it should" case.
             if !exists {
+                state.forget_qs_dialog(h);
+                if hand_over_dialog(&app, &state, h).is_some() {
+                    hidden_since = None;
+                    hidden_for_iconic = false;
+                    last = (0, 0, 0, 0);
+                    last_rect = RECT {
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                    };
+                    last_rows = u32::MAX;
+                    continue;
+                }
                 crate::debug_log::qs_log(&format!("follower: dialog {h:#x} destroyed -> hide"));
                 end_session(&app, &state);
                 hidden_since = None;
@@ -917,6 +1150,24 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
             if !on_screen {
                 let since = *hidden_since.get_or_insert_with(Instant::now);
                 if since.elapsed() > Duration::from_millis(1500) {
+                    // A dialog that stays hidden this long is either closing
+                    // or tucked away by its app. If another dialog is still
+                    // on screen, the box belongs there rather than vanishing;
+                    // the hidden one keeps its dismissal state in case it
+                    // comes back.
+                    if hand_over_dialog(&app, &state, h).is_some() {
+                        hidden_since = None;
+                        hidden_for_iconic = false;
+                        last = (0, 0, 0, 0);
+                        last_rect = RECT {
+                            left: 0,
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                        };
+                        last_rows = u32::MAX;
+                        continue;
+                    }
                     crate::debug_log::qs_log(&format!(
                         "follower: dialog {h:#x} hidden for {}ms -> hide",
                         since.elapsed().as_millis()
@@ -1017,4 +1268,110 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
             last_rows = rows;
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{attach_action, bump_late_gen, choose_next_dialog, late_gen_is_current, AttachAction};
+
+    const A: isize = 0x1111;
+    const B: isize = 0x2222;
+    const C: isize = 0x3333;
+
+    #[test]
+    fn a_first_dialog_gets_a_full_attach() {
+        assert_eq!(attach_action(None, A, false, false), AttachAction::Show);
+    }
+
+    #[test]
+    fn returning_to_the_same_dialog_only_refreshes() {
+        assert_eq!(
+            attach_action(Some(A), A, true, false),
+            AttachAction::Refresh
+        );
+        // Box was hidden (dismissed session, launcher detour): show again.
+        assert_eq!(attach_action(Some(A), A, false, false), AttachAction::Show);
+    }
+
+    #[test]
+    fn switching_to_a_second_dialog_retargets_without_restarting() {
+        assert_eq!(
+            attach_action(Some(A), B, true, false),
+            AttachAction::Retarget
+        );
+        // Nothing on screen to move: a fresh attach is needed instead.
+        assert_eq!(attach_action(Some(A), B, false, false), AttachAction::Show);
+    }
+
+    #[test]
+    fn a_dismissed_dialog_stays_hidden_but_keeps_its_binding() {
+        for prev in [None, Some(A), Some(B)] {
+            for visible in [true, false] {
+                assert_eq!(
+                    attach_action(prev, A, visible, true),
+                    AttachAction::StayHidden
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn handover_prefers_the_foreground_process() {
+        // z-order says B first, but the user's attention is in C's process.
+        let candidates = [(B, 20), (C, 30)];
+        assert_eq!(choose_next_dialog(&candidates, 30, &[]), Some(C));
+        assert_eq!(choose_next_dialog(&candidates, 20, &[]), Some(B));
+    }
+
+    #[test]
+    fn handover_falls_back_to_z_order() {
+        let candidates = [(B, 20), (C, 30)];
+        assert_eq!(choose_next_dialog(&candidates, 0, &[]), Some(B));
+        assert_eq!(choose_next_dialog(&candidates, 99, &[]), Some(B));
+    }
+
+    #[test]
+    fn handover_never_resurrects_a_dismissed_box() {
+        let candidates = [(A, 10), (B, 20), (C, 30)];
+        assert_eq!(choose_next_dialog(&candidates, 10, &[A]), Some(B));
+        assert_eq!(choose_next_dialog(&candidates, 0, &[A, B, C]), None);
+        // A dismissed foreground dialog does not block the other one.
+        assert_eq!(choose_next_dialog(&candidates, 10, &[B]), Some(A));
+    }
+
+    #[test]
+    fn handover_with_no_other_dialog_ends_the_session() {
+        assert_eq!(choose_next_dialog(&[], 0, &[]), None);
+    }
+
+    /// The candidate scan is only exercised when a session ends. Run it once
+    /// against the real desktop to make sure the Win32 predicates behave and
+    /// that a disabled modal owner never shows up as a hand-over target.
+    #[test]
+    #[ignore = "inspects the live desktop"]
+    fn candidate_scan_only_returns_usable_dialogs() {
+        let self_pid = std::process::id();
+        let found = super::quick_switch_candidates(self_pid, 0);
+        println!("qs candidates: {found:?}");
+        for (h, pid) in found {
+            assert_ne!(pid, self_pid, "our own windows are never candidates");
+            assert_eq!(super::class_name(h), "#32770");
+            unsafe {
+                assert_ne!(super::IsWindowVisible(h), 0);
+                assert_eq!(super::IsIconic(h), 0);
+                assert_ne!(super::IsWindowEnabled(h), 0, "disabled modal owner");
+            }
+        }
+    }
+
+    #[test]
+    fn a_second_slow_dialog_does_not_cancel_the_first_poller() {
+        let a = bump_late_gen(A);
+        let _b = bump_late_gen(B);
+        assert!(late_gen_is_current(A, a), "B's event must not supersede A");
+        let a2 = bump_late_gen(A);
+        assert!(!late_gen_is_current(A, a));
+        assert!(late_gen_is_current(A, a2));
+        assert!(late_gen_is_current(B, _b));
+    }
 }

@@ -410,75 +410,323 @@ pub fn is_file_dialog(hwnd: HWND) -> bool {
         .unwrap_or(false)
 }
 
-/// Can the Quick Switch attach here?
+/// Everything the Quick Switch decision is allowed to look at, gathered in one
+/// walk of the dialog's child tree.
 ///
-/// Broader than [`is_file_dialog`] on purpose: an app that asks "which folder?"
-/// with its own dialog (WinRAR's extract-to dialog) is just as good a place to
-/// pick a folder as the shell's picker. What differs is only *how* the choice
-/// is applied — see [`apply_folder`].
+/// Plain data on purpose: [`qs_decision`] is a pure function of this struct,
+/// so an uninstaller, a download form or a 7-Zip extract box can be tested
+/// without creating a window.
+#[derive(Debug, Default)]
+struct DialogFacts {
+    shape: DialogShape,
+    /// Bare executable name, lower-cased.
+    exe: String,
+    /// Window title, lower-cased.
+    title: String,
+    /// Visible button captions, lower-cased.
+    buttons: Vec<String>,
+    /// A writable edit that holds a folder path.
+    has_folder_edit: bool,
+    /// Some edit holds a link: this dialog is *about* a download.
+    saw_url: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QsDecision {
+    Attach(&'static str),
+    Skip(&'static str),
+}
+
+/// Installers, uninstallers and their wizards.
+///
+/// They are the biggest source of stray Quick Switches: a wizard page shows
+/// the install folder, often beside a "Browse" button and a feature tree, so
+/// it can satisfy every weak signal the old content rule had. What it never
+/// does is offer to *navigate to* a folder. Reject the whole category instead
+/// of adding one more exception per app.
+///
+/// This gates only an app's own dialogs. If an installer opens a real system
+/// folder picker, rule 1 in [`qs_decision`] still attaches there.
+fn is_setup_or_uninstall(f: &DialogFacts) -> bool {
+    const EXE: &[&str] = &[
+        "unins",
+        "uninstall",
+        "setup",
+        "install",
+        "msiexec",
+        "au_.exe",
+        "installshield",
+        "_iu",
+    ];
+    const TITLE: &[&str] = &[
+        "卸载",
+        "解除安装",
+        "安装",
+        "向导",
+        "维护",
+        "修复",
+        "更改程序",
+        "uninstall",
+        "uninstal",
+        "setup",
+        "install",
+        "wizard",
+        "maintenance",
+        "repair",
+        "modify",
+        "remove programs",
+        "programs and features",
+    ];
+    const BUTTON: &[&str] = &[
+        "卸载",
+        "解除安装",
+        "安装",
+        "下一步",
+        "完成",
+        "修复",
+        "更改",
+        "uninstall",
+        "install",
+        "next",
+        "finish",
+        "repair",
+        "remove",
+        "modify",
+    ];
+    EXE.iter().any(|k| f.exe.contains(k))
+        || TITLE.iter().any(|k| f.title.contains(k))
+        || f.buttons
+            .iter()
+            .any(|b| BUTTON.iter().any(|k| b.contains(k)))
+}
+
+/// Positive evidence that this dialog asks the user to choose a folder.
+///
+/// The old rule was "no reason *not* to": any `#32770` with a folder-looking
+/// edit got a Quick Switch, which is why it appeared on uninstallers,
+/// settings pages and download-information forms. An app dialog now has to
+/// say what it is for — in its title, through a browse button next to a
+/// writable path field, or by belonging to an app known to ask for a
+/// destination folder.
+fn has_folder_intent(f: &DialogFacts) -> bool {
+    const TITLE: &[&str] = &[
+        "解压",
+        "提取",
+        "复制到",
+        "移动到",
+        "选择文件夹",
+        "浏览文件夹",
+        "目标文件夹",
+        "目标路径",
+        "输出目录",
+        "保存位置",
+        // Deliberately no bare "文件夹" / "folder": Explorer's own
+        // "文件夹选项 / Folder Options" would otherwise qualify as a picker.
+        "extract",
+        "copy to",
+        "move to",
+        "select folder",
+        "choose folder",
+        "browse for folder",
+        "destination",
+        "output folder",
+        "unpack",
+    ];
+    if TITLE.iter().any(|k| f.title.contains(k)) {
+        return true;
+    }
+
+    const BROWSE: &[&str] = &[
+        "...",
+        "…",
+        "浏览",
+        "browse",
+        "choose",
+        "选择文件夹",
+        "select folder",
+    ];
+    if f.has_folder_edit
+        && f.buttons
+            .iter()
+            .any(|b| BROWSE.iter().any(|k| b.contains(k)))
+    {
+        return true;
+    }
+
+    // Archive managers and file managers ask "which folder?" with their own
+    // controls, and some of them leave the title empty or generic.
+    const APPS: &[&str] = &[
+        "7zfm",
+        "7zg",
+        "7z.exe",
+        "winrar",
+        "unrar",
+        "bandizip",
+        "peazip",
+        "winzip",
+        "nanazip",
+        "360zip",
+        "haozip",
+        "totalcmd",
+        "freecommander",
+        "dopus",
+        "xyplorer",
+        "explorer++",
+        "q-dir",
+    ];
+    APPS.iter().any(|k| f.exe.contains(k))
+}
+
+/// The whole rule, in one place.
+fn qs_decision(f: &DialogFacts) -> QsDecision {
+    use QsDecision::*;
+
+    // 1. The shell's own Open/Save/folder picker. Two structural markers, no
+    //    text guessing and no exceptions: this is what Quick Switch is for.
+    if f.shape.is_file_dialog() {
+        return Attach("shell file dialog");
+    }
+    // 2. A wizard is never a folder picker, whatever it happens to display.
+    if is_setup_or_uninstall(f) {
+        return Skip("installer / uninstaller / wizard");
+    }
+    // 3. An app's own dialog needs to *say* it is choosing a folder.
+    if !has_folder_intent(f) {
+        return Skip("no folder-picking intent");
+    }
+    // 4. Cheap guards that also make the reason visible in the debug log.
+    if f.shape.is_form() {
+        return Skip("form, not a folder picker");
+    }
+    if f.saw_url {
+        return Skip("download link, not a folder picker");
+    }
+    // 5. Either WinRAR's editable-combo + tree shape, or 7-Zip's bare path
+    //    field. In both cases there is a writable folder field to fill.
+    if f.shape.is_folder_dialog() || f.has_folder_edit {
+        return Attach("app folder dialog");
+    }
+    Skip("no writable folder field")
+}
+
+/// Read the parts of a dialog that the weak rules need. Called only after the
+/// fast structural test has failed, so the common case never pays for a
+/// cross-process text read.
+fn scan_dialog_facts(hwnd: HWND, shape: DialogShape) -> DialogFacts {
+    const GWL_STYLE: i32 = -16;
+    const ES_READONLY: isize = 0x0800;
+
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
+    let exe = process_path(pid)
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or("")
+        .to_lowercase();
+
+    let mut f = DialogFacts {
+        shape,
+        exe,
+        title: hwnd_string(hwnd).to_lowercase(),
+        ..Default::default()
+    };
+
+    // A wizard can often be rejected from its process and title alone; no
+    // reason to touch a single control in another process in that case.
+    if is_setup_or_uninstall(&f) {
+        return f;
+    }
+
+    let mut stack: Vec<HWND> = Vec::new();
+    unsafe {
+        let mut c = GetWindow(hwnd, GW_CHILD);
+        while c != 0 {
+            stack.push(c);
+            c = GetWindow(c, GW_HWNDNEXT);
+        }
+    }
+    while let Some(h) = stack.pop() {
+        let class = class_name(h);
+        if class.eq_ignore_ascii_case("Edit") {
+            // A read-only field only *displays* a folder (the install location
+            // on an uninstaller page, the save-to path on a download form).
+            // There is nothing for Quick Switch to write into it.
+            let readonly = unsafe { GetWindowLongPtrW(h, GWL_STYLE) } & ES_READONLY != 0;
+            if !readonly {
+                let text = get_text_timeout(h, 150);
+                if is_url_like(&text) {
+                    f.saw_url = true;
+                } else if !f.has_folder_edit && looks_like_folder_path(&text) {
+                    f.has_folder_edit = true;
+                }
+            }
+        } else if class.eq_ignore_ascii_case("Button") && f.buttons.len() < 24 {
+            let t = get_text_timeout(h, 100).trim().to_lowercase();
+            if !t.is_empty() {
+                f.buttons.push(t);
+            }
+        }
+        unsafe {
+            let mut c = GetWindow(h, GW_CHILD);
+            while c != 0 {
+                stack.push(c);
+                c = GetWindow(c, GW_HWNDNEXT);
+            }
+        }
+    }
+    f
+}
+
+/// Can the Quick Switch attach here?
 pub fn is_quick_switch_target(hwnd: HWND) -> bool {
     let Some(shape) = dialog_shape(hwnd) else {
         return false;
     };
-    if shape.is_file_dialog() || shape.is_folder_dialog() {
+    // Fast path: the common case needs no text reads at all.
+    if shape.is_file_dialog() {
         return true;
     }
-    // Third shape: an app that asks "which folder?" with a dialog built from
-    // its own controls. 7-Zip's "copy to" / "move to" / "extract to" boxes are
-    // the model case — the path field need not be an editable combo, and the
-    // folder tree, when there is one at all, is not a `SysTreeView32`, so
-    // neither structural rule above can see them. What they always have is a
-    // text field holding a *folder*, and that folder is what the user is
-    // choosing.
-    //
-    // Reading control *contents* is the weakest signal we have, so it gets
-    // two guards. Without them a dialog that merely displays a folder (IDM's
-    // "download file information": URL + "save to" folder + a dozen other
-    // fields) was taken for a folder picker and got a stray Quick Switch.
-    if shape.is_form() {
-        crate::debug_log::qs_log_verbose(&format!(
-            "dialog {hwnd:#x} has {} edits / {} combos -> form, not a folder picker",
-            shape.edits, shape.combos
-        ));
-        return false;
-    }
-    if blocks_content_rule(hwnd) {
-        crate::debug_log::qs_log_verbose(&format!(
-            "dialog {hwnd:#x} belongs to a download manager -> content rule skipped"
-        ));
-        return false;
-    }
-    folder_path_edit(hwnd).is_some()
+    let facts = scan_dialog_facts(hwnd, shape);
+    let decision = qs_decision(&facts);
+    crate::debug_log::qs_log_verbose(&format!(
+        "quick switch {hwnd:#x}: exe={} title={:?} edits={} combos={} decision={decision:?}",
+        facts.exe, facts.title, facts.shape.edits, facts.shape.combos
+    ));
+    matches!(decision, QsDecision::Attach(_))
 }
 
-/// Executables whose own dialogs display a folder but never ask the user to
-/// pick one: download managers show the "save to" folder next to the link.
+/// Ctrl+G is an explicit request, so it gets a wider rule than the automatic
+/// attach.
 ///
-/// This only gates the weak content rule. A *system* Open/Save dialog opened
-/// by the same app has a shell view and a name combo, so the structural rule
-/// above still attaches the Quick Switch where it belongs.
-fn is_download_manager_exe(path: &str) -> bool {
-    let exe = path.rsplit(['\\', '/']).next().unwrap_or("");
-    exe.eq_ignore_ascii_case("idman.exe") || exe.eq_ignore_ascii_case("fdm.exe")
-}
-
-fn blocks_content_rule(hwnd: HWND) -> bool {
-    let mut pid = 0u32;
-    unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
-    if pid == 0 {
+/// The strict rule above deliberately ignores apps it cannot name: a false
+/// positive is far more annoying than a missing box. But if the user *asks*
+/// for Quick Switch on a dialog we failed to recognise, refusing would make
+/// the feature useless there. Accept any `#32770` with a writable folder field
+/// — while still refusing wizards, forms, download links and read-only fields,
+/// because even an explicit keypress has nothing to write into those.
+pub fn is_manual_quick_switch_target(hwnd: HWND) -> bool {
+    let Some(shape) = dialog_shape(hwnd) else {
+        return false;
+    };
+    if shape.is_file_dialog() {
+        return true;
+    }
+    let facts = scan_dialog_facts(hwnd, shape);
+    if is_setup_or_uninstall(&facts) || facts.shape.is_form() || facts.saw_url {
         return false;
     }
-    is_download_manager_exe(&process_path(pid))
+    facts.has_folder_edit || facts.shape.is_folder_dialog()
 }
 
 /// The text field of an app dialog that holds a folder path.
 ///
-/// 7-Zip asks "extract to where?" with an ordinary `#32770` whose only
-/// machine-readable clue is the content of one text field — `D:\Work\`. The
-/// content is also what keeps the rule narrow: a dialog whose text field holds
-/// a *file* name (WinRAR's "Archive name", 7-Zip's "Archive") is asking a
-/// different question, and gluing a folder box to it would be wrong.
+/// Used to *locate* the field once the dialog has been accepted. The decision
+/// itself lives in [`qs_decision`]; this helper deliberately applies the same
+/// read-only rule so a rejected dialog can never be written into by accident.
 fn folder_path_edit(hwnd: HWND) -> Option<HWND> {
+    const GWL_STYLE: i32 = -16;
+    const ES_READONLY: isize = 0x0800;
+
     struct Ctx {
         hit: Option<HWND>,
         saw_url: bool,
@@ -488,11 +736,10 @@ fn folder_path_edit(hwnd: HWND) -> Option<HWND> {
         if class_name(h) != "Edit" {
             return 1;
         }
+        if unsafe { GetWindowLongPtrW(h, GWL_STYLE) } & ES_READONLY != 0 {
+            return 1;
+        }
         let text = get_text_timeout(h, 150);
-        // A URL field means "this is about a download", not "choose a folder".
-        // Download managers show both a link and the folder it will be saved
-        // to; the folder alone would otherwise look exactly like 7-Zip's
-        // extract-to field.
         if is_url_like(&text) {
             ctx.saw_url = true;
             return 0;
@@ -581,7 +828,9 @@ fn dialog_shape(hwnd: HWND) -> Option<DialogShape> {
 /// dialog (WinRAR's destination path) it is the editable combo's field. Both
 /// are the place a chosen path belongs.
 pub fn dialog_edit(hwnd: HWND) -> Option<HWND> {
-    if !is_quick_switch_target(hwnd) {
+    // Manual Ctrl+G uses a wider rule than the automatic attach; a box that
+    // is already on screen must still be able to reach its path field.
+    if !is_manual_quick_switch_target(hwnd) {
         return None;
     }
     // Prefer an Edit nested in a ComboBox (that is the filename field).
@@ -1101,9 +1350,13 @@ pub fn set_dark_titlebar(hwnd: HWND, dark: bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{EnumWindows, GetWindowTextW, IsWindowVisible, PostMessageW, BOOL, HWND, LPARAM};
-    use super::DialogShape;
-    use super::{class_name, is_file_dialog, is_quick_switch_target, looks_like_folder_path, same_folder};
+    use super::super::{
+        EnumWindows, GetWindowTextW, IsWindowVisible, PostMessageW, BOOL, HWND, LPARAM,
+    };
+    use super::{
+        class_name, is_file_dialog, is_manual_quick_switch_target, is_quick_switch_target,
+        looks_like_folder_path, qs_decision, same_folder, DialogFacts, DialogShape, QsDecision,
+    };
 
     #[test]
     fn tells_a_folder_field_from_a_file_field() {
@@ -1519,10 +1772,30 @@ mod tests {
     /// buttons and 6 labels. One edit holds the folder the download will be
     /// saved to — the content rule used to mistake that for a folder picker.
     const IDM_DOWNLOAD_INFO: &[&str] = &[
-        "Edit", "Edit", "Edit", "Edit", "Edit", "Edit", "ComboBox>Edit",
-        "ComboBox>Edit", "ComboBox>Edit", "ComboBox", "Button", "Button",
-        "Button", "Button", "Button", "Button", "Button", "Button",
-        "Static", "Static", "Static", "Static", "Static", "Static",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Edit",
+        "ComboBox>Edit",
+        "ComboBox>Edit",
+        "ComboBox>Edit",
+        "ComboBox",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Button",
+        "Static",
+        "Static",
+        "Static",
+        "Static",
+        "Static",
+        "Static",
     ];
 
     /// A plain message box: static text, an icon and two buttons.
@@ -1597,14 +1870,117 @@ mod tests {
         assert!(!shape_of(MESSAGE_BOX).is_file_dialog());
     }
 
+    /// A decision input with one writable folder field, no window needed.
+    fn facts(exe: &str, title: &str, buttons: &[&str]) -> DialogFacts {
+        let mut f = DialogFacts {
+            exe: exe.to_lowercase(),
+            title: title.to_lowercase(),
+            buttons: buttons.iter().map(|b| b.to_lowercase()).collect(),
+            has_folder_edit: true,
+            ..Default::default()
+        };
+        f.shape.has_edit = true;
+        f.shape.edits = 1;
+        f
+    }
+
+    fn attaches(exe: &str, title: &str, buttons: &[&str]) -> bool {
+        matches!(
+            qs_decision(&facts(exe, title, buttons)),
+            QsDecision::Attach(_)
+        )
+    }
+
     #[test]
-    fn only_download_managers_are_excluded_by_process() {
-        assert!(super::is_download_manager_exe(
-            r"C:\Program Files (x86)\Internet Download Manager\IDMan.exe"
-        ));
-        assert!(!super::is_download_manager_exe(r"C:\Program Files\7-Zip\7zFM.exe"));
-        assert!(!super::is_download_manager_exe(r"C:\Windows\explorer.exe"));
-        assert!(!super::is_download_manager_exe(""));
+    fn uninstallers_are_never_targets() {
+        // Inno Setup, NSIS, MSI and their many one-off wrappers. Some of them
+        // show the install folder in an editable field next to a Browse
+        // button, so every weak signal can be present at once.
+        for (exe, title, buttons) in [
+            ("unins000.exe", "Foo 卸载", &["卸载(&U)"][..]),
+            ("Au_.exe", "Foo Uninstall", &["Uninstall"][..]),
+            ("FooUninstaller.exe", "Foo", &["卸载", "取消"][..]),
+            ("msiexec.exe", "Foo Setup", &["Next >", "Cancel"][..]),
+            ("Foo_Setup.exe", "欢迎使用 Foo", &["下一步(&N)"][..]),
+            ("setup.exe", "Foo Maintenance", &["Repair", "Remove"][..]),
+            (
+                "foo.exe",
+                "Programs and Features",
+                &["Uninstall/Change"][..],
+            ),
+        ] {
+            assert!(
+                !attaches(exe, title, buttons),
+                "stray Quick Switch on {exe} / {title}"
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_dialogs_need_evidence_of_a_folder_choice() {
+        // The regression the old content rule caused: merely displaying a
+        // folder path was enough. Titles like these are everywhere.
+        for title in [
+            "选项",
+            "首选项",
+            "关于 Foo",
+            "下载文件信息",
+            "Properties",
+            "Preferences",
+            "",
+        ] {
+            assert!(
+                !attaches("someapp.exe", title, &["确定", "取消"]),
+                "a folder path alone must not trigger Quick Switch: {title:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn real_folder_dialogs_keep_working() {
+        assert!(attaches("7zFM.exe", "解压到", &["确定", "取消"]));
+        assert!(attaches("7zG.exe", "Extract to", &["OK"]));
+        assert!(attaches("WinRAR.exe", "解压路径和选项", &["确定"]));
+        assert!(attaches("Bandizip.exe", "Copy to", &["OK"]));
+        // An app we do not know, but its title says exactly what it is for.
+        assert!(attaches("mytool.exe", "选择文件夹", &["确定"]));
+        assert!(attaches("mytool.exe", "Browse for Folder", &["OK"]));
+        // No title keyword, but a browse button next to a writable path.
+        assert!(attaches("mytool.exe", "输出", &["...", "确定"]));
+        // The archive managers also work when their title is generic.
+        assert!(attaches("7zFM.exe", "", &["OK"]));
+    }
+
+    #[test]
+    fn the_shell_file_dialog_wins_over_every_other_rule() {
+        // An installer may open a real system folder picker; that is still a
+        // file dialog and Quick Switch belongs there.
+        let mut f = facts("setup.exe", "Foo Setup", &["卸载"]);
+        f.shape.has_name_combo = true;
+        f.shape.has_shell_view = true;
+        assert!(matches!(qs_decision(&f), QsDecision::Attach(_)));
+    }
+
+    #[test]
+    fn forms_links_and_readonly_fields_are_still_rejected() {
+        let mut f = facts("7zFM.exe", "解压到", &["确定"]);
+        f.shape.edits = 9;
+        f.shape.combos = 4;
+        assert!(matches!(qs_decision(&f), QsDecision::Skip(_)), "a form");
+
+        let mut f = facts("7zFM.exe", "解压到", &["确定"]);
+        f.saw_url = true;
+        assert!(
+            matches!(qs_decision(&f), QsDecision::Skip(_)),
+            "a download link"
+        );
+
+        let mut f = facts("7zFM.exe", "解压到", &["确定"]);
+        f.has_folder_edit = false;
+        assert!(
+            matches!(qs_decision(&f), QsDecision::Skip(_)),
+            "no writable field"
+        );
     }
 
     #[test]
@@ -1612,7 +1988,10 @@ mod tests {
         let s = shape_of(IDM_DOWNLOAD_INFO);
         assert_eq!(s.edits, 9);
         assert_eq!(s.combos, 4);
-        assert!(s.is_form(), "a nine-field form must not reach the content rule");
+        assert!(
+            s.is_form(),
+            "a nine-field form must not reach the content rule"
+        );
         assert!(!s.is_file_dialog(), "no shell view");
         assert!(!s.is_folder_dialog(), "no folder tree");
     }
@@ -1724,9 +2103,16 @@ mod tests {
         w16(&mut t, 140); // cy
         w16(&mut t, 0); // no menu
         w16(&mut t, 0); // default class
-        w16(&mut t, 0); // empty title
-        // WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP
-        dialog_item(&mut t, "Edit", path_text, 0x5080_0080, 1000, (10, 10, 200, 14));
+        wstr(&mut t, "解压到"); // 7-Zip's extract-to box: an explicit folder intent
+                                // WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP
+        dialog_item(
+            &mut t,
+            "Edit",
+            path_text,
+            0x5080_0080,
+            1000,
+            (10, 10, 200, 14),
+        );
         // WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASBUTTONS | TVS_LINESATROOT
         dialog_item(
             &mut t,
@@ -1755,7 +2141,7 @@ mod tests {
         w16(&mut t, (24 + 20 * texts.len()) as u16); // cy
         w16(&mut t, 0); // no menu
         w16(&mut t, 0); // default class
-        w16(&mut t, 0); // empty title
+        wstr(&mut t, "解压到"); // 7-Zip's extract-to box: an explicit folder intent
         for (i, text) in texts.iter().enumerate() {
             let y = 8 + 20 * i as i16;
             dialog_item(
@@ -1773,6 +2159,131 @@ mod tests {
         unsafe { DestroyWindow(hwnd) };
     }
 
+    /// Build a hidden `#32770` with a title, push buttons and edit fields
+    /// (each optionally read-only). Lets the runtime probe be exercised on
+    /// realistic uninstaller and archive-manager dialogs.
+    fn with_dialog(title: &str, buttons: &[&str], edits: &[(&str, bool)], f: impl FnOnce(HWND)) {
+        let mut t: Vec<u8> = Vec::new();
+        w32(&mut t, 0x80C8_0080); // WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME
+        w32(&mut t, 0);
+        w16(&mut t, (buttons.len() + edits.len()) as u16);
+        w16(&mut t, 0);
+        w16(&mut t, 0);
+        w16(&mut t, 260);
+        w16(&mut t, (40 + 20 * (buttons.len() + edits.len())) as u16);
+        w16(&mut t, 0); // no menu
+        w16(&mut t, 0); // default class
+        wstr(&mut t, title);
+        let mut y = 8i16;
+        for (text, readonly) in edits {
+            let style = 0x5080_0080 | if *readonly { 0x0800 } else { 0 };
+            dialog_item(
+                &mut t,
+                "Edit",
+                text,
+                style,
+                1000 + y as u16,
+                (10, y, 230, 14),
+            );
+            y += 20;
+        }
+        for text in buttons {
+            // WS_CHILD | WS_VISIBLE | WS_TABSTOP, BS_PUSHBUTTON (0)
+            dialog_item(
+                &mut t,
+                "Button",
+                text,
+                0x5001_0000,
+                2000 + y as u16,
+                (10, y, 100, 16),
+            );
+            y += 20;
+        }
+        let hwnd = unsafe { CreateDialogIndirectParamW(0, t.as_ptr(), 0, 0, 0) };
+        assert_ne!(hwnd, 0, "could not build the probe dialog");
+        f(hwnd);
+        unsafe { DestroyWindow(hwnd) };
+    }
+
+    #[test]
+    fn an_uninstaller_page_never_gets_a_quick_switch() {
+        // The regression the user hit: an uninstall wizard shows the install
+        // folder in a field, with a browse button and buttons labelled 卸载.
+        with_dialog(
+            "Foo 卸载",
+            &["卸载(&U)", "取消"],
+            &[(r"C:\Program Files\Foo", false)],
+            |hwnd| {
+                assert!(!super::scan_dialog_children(hwnd).is_file_dialog());
+                assert!(!is_quick_switch_target(hwnd));
+            },
+        );
+    }
+
+    #[test]
+    fn a_generic_dialog_showing_a_folder_gets_nothing() {
+        with_dialog(
+            "选项",
+            &["确定", "取消"],
+            &[(r"C:\Windows", false)],
+            |hwnd| {
+                assert!(
+                    !is_quick_switch_target(hwnd),
+                    "a folder path alone is not a reason to attach"
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn an_extract_dialog_with_a_browse_button_still_works() {
+        with_dialog(
+            "解压到",
+            &["...", "确定"],
+            &[(r"C:\Windows", false)],
+            |hwnd| {
+                assert!(
+                    is_quick_switch_target(hwnd),
+                    "7-Zip's extract box regressed"
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_readonly_folder_field_is_not_a_target() {
+        with_dialog("解压到", &["..."], &[(r"C:\Windows", true)], |hwnd| {
+            assert!(
+                !is_quick_switch_target(hwnd),
+                "a read-only field has nothing to write into"
+            );
+        });
+    }
+
+    #[test]
+    fn ctrl_g_still_works_on_an_unrecognised_app_dialog() {
+        with_dialog("选项", &["确定", "取消"], &[(r"C://Windows", false)], |hwnd| {
+            assert!(!is_quick_switch_target(hwnd), "auto-attach must stay strict");
+            assert!(
+                is_manual_quick_switch_target(hwnd),
+                "Ctrl+G must still work when the user asks for it"
+            );
+        });
+    }
+
+    #[test]
+    fn ctrl_g_cannot_rescue_an_uninstaller_or_a_readonly_field() {
+        with_dialog(
+            "Foo 卸载",
+            &["卸载(&U)"],
+            &[(r"C://Program Files//Foo", false)],
+            |hwnd| assert!(!is_manual_quick_switch_target(hwnd)),
+        );
+        with_dialog("解压到", &["..."], &[(r"C://Windows", true)], |hwnd| {
+            assert!(!is_manual_quick_switch_target(hwnd));
+        });
+    }
+
     #[test]
     fn a_download_form_is_not_a_folder_target() {
         // A URL, the folder it will be saved to, and a dozen unrelated
@@ -1781,12 +2292,21 @@ mod tests {
             &[
                 "https://example.com/archive.zip",
                 "C:\\Windows",
-                "", "", "", "", "", "", "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
             ],
             |hwnd| {
                 let shape = super::scan_dialog_children(hwnd);
                 assert!(shape.is_form());
-                assert!(!is_quick_switch_target(hwnd), "stray Quick Switch on a form");
+                assert!(
+                    !is_quick_switch_target(hwnd),
+                    "stray Quick Switch on a form"
+                );
             },
         );
     }
@@ -1795,11 +2315,17 @@ mod tests {
     fn a_link_beside_a_folder_is_not_a_folder_target() {
         // Only two fields, so the shape guard cannot help: the URL guard has
         // to do the work on its own.
-        with_edits(&["https://example.com/archive.zip", "C:\\Windows"], |hwnd| {
-            let shape = super::scan_dialog_children(hwnd);
-            assert!(!shape.is_form());
-            assert!(!is_quick_switch_target(hwnd), "a download link was read as a folder");
-        });
+        with_edits(
+            &["https://example.com/archive.zip", "C:\\Windows"],
+            |hwnd| {
+                let shape = super::scan_dialog_children(hwnd);
+                assert!(!shape.is_form());
+                assert!(
+                    !is_quick_switch_target(hwnd),
+                    "a download link was read as a folder"
+                );
+            },
+        );
     }
 
     #[test]
@@ -1847,7 +2373,10 @@ mod tests {
     fn choosing_a_folder_writes_it_into_an_app_dialog() {
         with_app_dialog("C:\\Windows", |hwnd| {
             let path = "C:\\Windows\\System32";
-            assert!(super::apply_folder(hwnd, path), "the folder was not applied");
+            assert!(
+                super::apply_folder(hwnd, path),
+                "the folder was not applied"
+            );
             let edit = super::dialog_edit(hwnd).expect("no path field");
             assert_eq!(super::get_text(edit), path);
         });

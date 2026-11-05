@@ -147,8 +147,9 @@ fn show_quick_switch_at(app: &AppHandle, state: &Arc<AppState>, hwnd: isize, tak
     // captured the dialog — forgetting this left the box glued to nothing.)
     *state.dialog.lock() = Some(hwnd);
     // An explicit attach (Ctrl+G, a launcher round trip) overrides an earlier
-    // dismissal of this same dialog.
-    *state.qs_dismissed.lock() = None;
+    // dismissal of *this* dialog. Other dialogs keep theirs: dismissing the
+    // box on A must not silently re-enable it on B.
+    state.forget_qs_dialog(hwnd);
     state
         .qs_active
         .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -200,6 +201,40 @@ fn show_quick_switch_at(app: &AppHandle, state: &Arc<AppState>, hwnd: isize, tak
     refresh_scale(app, state);
 }
 
+/// Move an already-visible Quick Switch box from one dialog to another.
+///
+/// There is only one window, so with two dialogs open it has to serve the one
+/// the user is actually working in — otherwise `quick_switch_apply` would
+/// navigate the *old* dialog while the box sits under the new one. Re-running
+/// the full show path for that was wrong: it emits `quickswitch://show`
+/// (clearing a half-typed query), sleeps 40 ms on the caller's thread, and
+/// steals the focus the user just gave to the other dialog. Retargeting only
+/// rebinds and repositions, leaving the running session untouched.
+pub fn retarget_quick_switch(app: &AppHandle, state: &Arc<AppState>, hwnd: isize) {
+    *state.dialog.lock() = Some(hwnd);
+    // The global launcher owns the shared window right now. Keep the new
+    // binding — `resume_quick_switch` will use it — but leave the window
+    // alone so the launcher is not resized while the user types in it.
+    if state
+        .launcher_override
+        .load(std::sync::atomic::Ordering::Relaxed)
+    {
+        crate::debug_log::qs_log(&format!("retarget_qs {hwnd:#x} (launcher owns window)"));
+        return;
+    }
+    let Some(win) = launcher(app) else { return };
+    let rows = state.settings.read().qs_visible_rows;
+    let scale = launcher_scale(state);
+    crate::win::monitor::position_for_dialog(win.clone(), hwnd, rows, scale);
+    set_topmost(app, false);
+    // Same band as the dialog, one slot above it — never a separate topmost
+    // layer. `keep_above` is a no-op unless the dialog is in the foreground.
+    if let Ok(h) = win.hwnd() {
+        crate::win::keep_above(h.0 as isize, hwnd);
+    }
+    crate::debug_log::qs_log(&format!("retarget_qs -> {hwnd:#x}"));
+}
+
 pub fn hide_launcher(app: &AppHandle) {
     if let Some(state) = app.try_state::<Arc<AppState>>() {
         state
@@ -245,7 +280,7 @@ fn resume_quick_switch(app: &AppHandle, state: &Arc<AppState>) {
         // The dialog was closed while the launcher was up; there is nothing
         // left to attach to.
         *state.dialog.lock() = None;
-        *state.qs_dismissed.lock() = None;
+        state.forget_qs_dialog(dialog);
         crate::debug_log::qs_log("resume QS: dialog is gone, session dropped");
         return;
     }
@@ -295,7 +330,9 @@ pub fn toggle_launcher(app: &AppHandle, state: &Arc<AppState>) {
         // Remember the dismissal. Hiding the box gives the foreground back to
         // the dialog, whose foreground event would otherwise re-attach the box
         // immediately — making double Ctrl look like a no-op.
-        *state.qs_dismissed.lock() = *state.dialog.lock();
+        if let Some(h) = *state.dialog.lock() {
+            state.dismiss_qs(h);
+        }
         hide_launcher(app);
     } else {
         close_launcher(app, state);

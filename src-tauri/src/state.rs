@@ -52,14 +52,20 @@ pub struct AppState {
     pub self_pid: u32,
     /// HWND of the file dialog we are currently serving (Quick Switch).
     pub dialog: Mutex<Option<isize>>,
-    /// Dialog whose box the user dismissed with double Ctrl.
+    /// Dialogs whose box the user dismissed with double Ctrl.
     ///
     /// Hiding the box hands the foreground back to the dialog, which raises
     /// another foreground event — and the box attached itself again 20 ms
     /// later, so "double Ctrl to close it" looked like it did nothing. While
-    /// this holds the dialog's handle, a foreground event will not re-attach;
+    /// a handle is in here, a foreground event will not re-attach to it;
     /// Ctrl+G (or a launcher round trip) still can.
-    pub qs_dismissed: Mutex<Option<isize>>,
+    ///
+    /// This is a *set*, not a single handle: with two dialogs open, closing
+    /// the box on A must not resurrect it when the user switches to B and
+    /// back, and must not suppress the box on B either. Entries are dropped
+    /// when their dialog is destroyed so a recycled HWND stays silent only
+    /// for as long as it is the same window.
+    pub qs_dismissed: Mutex<Vec<isize>>,
     /// True while an attached Quick Switch session is running: the launcher
     /// window must NOT hide on blur (clicking the dialog steals focus).
     pub qs_active: std::sync::atomic::AtomicBool,
@@ -141,7 +147,7 @@ impl AppState {
             paths,
             self_pid: std::process::id(),
             dialog: Mutex::new(None),
-            qs_dismissed: Mutex::new(None),
+            qs_dismissed: Mutex::new(Vec::new()),
             qs_active: std::sync::atomic::AtomicBool::new(false),
             launcher_override: std::sync::atomic::AtomicBool::new(false),
             qs_history: Mutex::new(qs_history),
@@ -178,6 +184,29 @@ impl AppState {
             *u.entry(key.to_string()).or_insert(0) += 1;
         }
         self.save_usage();
+    }
+
+    /// Was the box explicitly closed on this dialog?
+    pub fn is_qs_dismissed(&self, hwnd: isize) -> bool {
+        self.qs_dismissed.lock().contains(&hwnd)
+    }
+
+    /// Remember an explicit dismissal (double Ctrl) for one dialog only.
+    pub fn dismiss_qs(&self, hwnd: isize) {
+        let mut dismissed = self.qs_dismissed.lock();
+        if !dismissed.contains(&hwnd) {
+            dismissed.push(hwnd);
+        }
+    }
+
+    /// Forget everything about a dialog that no longer exists.
+    pub fn forget_qs_dialog(&self, hwnd: isize) {
+        self.qs_dismissed.lock().retain(|h| *h != hwnd);
+    }
+
+    /// A snapshot of the dialogs the box must stay away from.
+    pub fn qs_dismissed_snapshot(&self) -> Vec<isize> {
+        self.qs_dismissed.lock().clone()
     }
 
     /// Record a folder visit at the front of the Quick Switch history.

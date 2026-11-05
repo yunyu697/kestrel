@@ -355,16 +355,30 @@ pub fn install_hook(app: AppHandle, state: Arc<AppState>) {
                     // When the box is on screen *it* owns the focus, so the
                     // foreground check below would never match — handle the
                     // attached case first.
-                    let attached = state.dialog.lock().is_some();
+                    let bound = *state.dialog.lock();
                     let visible = state.qs_active.load(Ordering::Relaxed)
                         && crate::ui::launcher(&app)
                             .map(|w| w.is_visible().unwrap_or(false))
                             .unwrap_or(false);
-                    if attached && visible {
+                    if bound.is_some() && visible {
+                        // With two dialogs open the box may still be bound to
+                        // A while the user pressed Ctrl+G in B. Move it first,
+                        // or the jump below would navigate A.
+                        let fg = window::foreground();
+                        if fg != 0
+                            && Some(fg) != bound
+                            && window::is_manual_quick_switch_target(fg)
+                        {
+                            crate::ui::retarget_quick_switch(&app, &state, fg);
+                        }
                         let _ = app.emit("quickswitch://jump", ());
                     } else {
                         let fg = window::foreground();
-                        if window::is_quick_switch_target(fg) {
+                        // An explicit Ctrl+G deserves the wider rule: the
+                        // automatic attach is strict on purpose, but a dialog
+                        // it did not recognise should still be usable on
+                        // request.
+                        if window::is_manual_quick_switch_target(fg) {
                             *state.dialog.lock() = Some(fg);
                             if let Some(dir) = window::dialog_current_folder(fg) {
                                 state.push_qs_dir(dir);

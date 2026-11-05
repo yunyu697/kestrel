@@ -195,7 +195,7 @@ pub fn has_dialog_target(state: State<'_, Arc<AppState>>) -> bool {
     state
         .dialog
         .lock()
-        .map(|h| window::is_quick_switch_target(h))
+        .map(|h| window::is_manual_quick_switch_target(h))
         .unwrap_or(false)
 }
 

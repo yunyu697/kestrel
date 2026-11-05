@@ -226,6 +226,7 @@ extern "system" {
     pub fn GetClassNameW(hwnd: HWND, buf: *mut u16, max: i32) -> i32;
     pub fn GetWindowThreadProcessId(hwnd: HWND, pid: *mut u32) -> u32;
     pub fn IsWindowVisible(hwnd: HWND) -> BOOL;
+    pub fn IsWindowEnabled(hwnd: HWND) -> BOOL;
     pub fn IsIconic(hwnd: HWND) -> BOOL;
     pub fn IsWindow(hwnd: HWND) -> BOOL;
     pub fn ShowWindow(hwnd: HWND, cmd: i32) -> BOOL;
