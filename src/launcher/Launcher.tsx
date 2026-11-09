@@ -4,7 +4,7 @@ import "./launcher.css";
 import { Icon } from "../shared/icons";
 import { api } from "../shared/api";
 import { setLang, t, useLang } from "../shared/i18n";
-import { accentMix, formatBytes, formatDate, formatRelative, resolveTheme, shortPath } from "../shared/format";
+import { formatBytes, formatDate, formatRelative, resolveTheme, shortPath } from "../shared/format";
 import {
   baseName,
   isPathLike,
@@ -258,10 +258,6 @@ export default function Launcher() {
     document.documentElement.setAttribute("data-anim", s.animations ? "on" : "off");
     // Per-element colour overrides (empty value = theme default).
     applyColors(s, themeName);
-    document.documentElement.style.setProperty(
-      "--accent-soft",
-      accentMix(s.accent, 0.16),
-    );
     document.documentElement.style.setProperty("--font-scale", String(s.fontScale));
   }
 

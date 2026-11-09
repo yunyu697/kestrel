@@ -32,6 +32,9 @@ jobs:
       - name: i18n completeness
         run: node scripts/check-i18n.mjs
 
+      - name: Palette contrast
+        run: npm run test:palettes
+
       - name: Rust check
         working-directory: src-tauri
         run: cargo check --all-targets

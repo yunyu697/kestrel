@@ -3,8 +3,10 @@
    ------------------------------------------------------------------ */
 
 :root {
-  --accent: #4c7dff;
+  /* Deep enough for white labels to clear 4.5:1 on the accent. */
+  --accent: #3b6be8;
   --accent-ink: #ffffff;
+  --accent-soft: rgba(59, 107, 232, 0.16);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-fast: 120ms;
@@ -31,7 +33,7 @@
   --border-strong: rgba(15, 23, 42, 0.14);
   --text: #14161b;
   --text-2: #59616e;
-  --text-3: #8b93a1;
+  --text-3: #6b7280;
   --hover: rgba(15, 23, 42, 0.045);
   --active: rgba(15, 23, 42, 0.075);
   --shadow: 0 12px 32px -10px rgba(15, 23, 42, 0.3), 0 4px 14px -6px rgba(15, 23, 42, 0.16);
@@ -54,7 +56,7 @@
   --border-strong: rgba(255, 255, 255, 0.16);
   --text: #eceef3;
   --text-2: #a4acba;
-  --text-3: #767e8c;
+  --text-3: #949caa;
   --hover: rgba(255, 255, 255, 0.055);
   --active: rgba(255, 255, 255, 0.09);
   --shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.68), 0 4px 14px -6px rgba(0, 0, 0, 0.45);

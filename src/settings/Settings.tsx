@@ -5,8 +5,19 @@ import { Icon } from "../shared/icons";
 import { api } from "../shared/api";
 import { LANGS, setLang, systemLang, t, useLang } from "../shared/i18n";
 import { resolveTheme } from "../shared/format";
-import { applyColors, COLOR_SLOTS, slotColor, THEME_SWATCHES } from "../shared/theme";
-import { SCHEMES, schemeById, schemePalette } from "../shared/palettes";
+import { applyColors, currentPalette, schemeFor } from "../shared/theme";
+import {
+  MONO_SCHEME_LIST,
+  MULTI_SCHEME_LIST,
+  NEUTRAL_SCHEME,
+  SCHEMES,
+  paletteReport,
+  schemePalette,
+  schemeSwatches,
+  type ContrastCheck,
+  type Palette,
+  type SchemeDef,
+} from "../shared/palettes";
 import { pick, RELEASES, type ReleaseKind } from "../shared/releases";
 import {
   checkForUpdate,
@@ -28,17 +39,6 @@ import type {
   Settings,
   WebEngine,
 } from "../shared/types";
-
-const ACCENTS = [
-  "#4C7DFF",
-  "#2ECC71",
-  "#9B59F6",
-  "#FF6B6B",
-  "#FF9F0A",
-  "#00BCD4",
-  "#E91E8C",
-  "#607D8B",
-];
 
 /** Ready-made combinations for the main shortcut. */
 const HOTKEY_PRESETS = [
@@ -529,87 +529,167 @@ function GeneralPane({
   );
 }
 
-function ColorRow({
-  s,
-  update,
-  slot,
-  theme,
-}: {
-  s: Settings;
-  update: Updater;
-  slot: (typeof COLOR_SLOTS)[number];
-  theme: "light" | "dark";
-}) {
-  const raw = String(s[slot.key] ?? "").trim();
-  const shown = slotColor(s, slot, theme);
-  // Every colour slot is a plain string on `Settings`; the cast keeps the
-  // generic `update` signature happy without widening it to `any`.
-  const setColor = (v: string) => update(slot.key as "colorBg", v);
-  return (
-    <Row label={t(slot.label)} desc={t(slot.desc)}>
-      <div className="color-ctl">
-        <label className="color-chip" style={{ background: shown }} title={shown}>
-          <input
-            type="color"
-            value={shown}
-            onChange={(e) => setColor(e.target.value.toUpperCase())}
-          />
-        </label>
-        <span className="color-hex" data-default={!raw}>
-          {raw ? raw.toUpperCase() : t("默认")}
-        </span>
-        <button
-          className="btn"
-          data-size="sm"
-          data-variant="ghost"
-          disabled={!raw}
-          onClick={() => setColor("")}
-          title={t("恢复默认")}
-        >
-          <Icon name="refresh" size={13} />
-        </button>
-      </div>
-    </Row>
-  );
-}
-
+/** A preset card. The miniature window is painted entirely with that scheme's
+ *  real tokens, so a multi-hue scheme looks different from a single-hue one
+ *  at a glance — and the colour strip spells out the hues involved. */
 function SchemeCard({
-  label,
-  pal,
-  accent,
+  def,
+  theme,
   active,
   onPick,
 }: {
-  label: string;
-  pal: Record<string, string>;
-  accent: string;
+  def: SchemeDef;
+  theme: "light" | "dark";
   active: boolean;
   onPick: () => void;
 }) {
+  const pal = schemePalette(def, theme);
   return (
-    <button className="scheme" data-active={active} onClick={onPick} title={label}>
+    <button
+      className="scheme"
+      type="button"
+      data-active={active}
+      data-family={def.family}
+      onClick={onPick}
+      title={t(def.desc)}
+    >
       <span
         className="scheme-preview"
         style={{ background: pal["--bg"], borderColor: pal["--border"] }}
       >
-        <span className="scheme-strip" style={{ background: pal["--surface-2"] }} />
-        <span className="scheme-body">
-          <span className="scheme-line" style={{ background: pal["--text"] }} />
-          <span
-            className="scheme-line"
-            data-dim="true"
-            style={{ background: pal["--text-3"] }}
-          />
+        <span className="scheme-side" style={{ background: pal["--bg-sunken"] }}>
+          <span className="scheme-side-dot" style={{ background: pal["--accent"] }} />
+          <span className="scheme-side-bar" style={{ background: pal["--text-3"] }} />
+          <span className="scheme-side-bar short" style={{ background: pal["--text-3"] }} />
         </span>
-        <span className="scheme-dot" style={{ background: accent }} />
+        <span className="scheme-body">
+          <span
+            className="scheme-card"
+            style={{ background: pal["--surface"], borderColor: pal["--border"] }}
+          >
+            <span className="scheme-line" style={{ background: pal["--text"] }} />
+            <span className="scheme-line dim" style={{ background: pal["--text-2"] }} />
+          </span>
+          <span className="scheme-row" style={{ background: pal["--surface-2"] }}>
+            <span className="scheme-line faint" style={{ background: pal["--text-3"] }} />
+            <span className="scheme-btn" style={{ background: pal["--accent"] }} />
+          </span>
+        </span>
         {active && (
           <span className="scheme-tick">
             <Icon name="check" size={10} />
           </span>
         )}
       </span>
-      <span className="scheme-name">{label}</span>
+      <span className="scheme-name">{t(def.label)}</span>
+      <span className="scheme-swatches" aria-hidden="true">
+        {schemeSwatches(pal).map((c, i) => (
+          <i key={i} style={{ background: c }} />
+        ))}
+      </span>
     </button>
+  );
+}
+
+function SchemeGroup({
+  title,
+  desc,
+  tag,
+  schemes,
+  theme,
+  activeId,
+  onPick,
+}: {
+  title: string;
+  desc: string;
+  tag: string;
+  schemes: SchemeDef[];
+  theme: "light" | "dark";
+  activeId: string;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <div className="scheme-group" data-single={schemes.length === 1}>
+      <div className="scheme-group-head">
+        <span className="scheme-group-title">{t(title)}</span>
+        <span className="scheme-group-tag">{t(tag)}</span>
+        <span className="scheme-group-desc">{t(desc)}</span>
+      </div>
+      <div className="schemes">
+        {schemes.map((def) => (
+          <SchemeCard
+            key={def.id}
+            def={def}
+            theme={theme}
+            active={activeId === def.id}
+            onPick={() => onPick(def.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A miniature window drawn with the generated palette, plus the measured
+ *  contrast ratios. Seeing the whole scheme (and its numbers) before applying
+ *  it is the whole point: a preset should never be a readability surprise. */
+function PalettePreview({
+  name,
+  mode,
+  pal,
+  report,
+  allOk,
+}: {
+  name: string;
+  mode: string;
+  pal: Palette;
+  report: ContrastCheck[];
+  allOk: boolean;
+}) {
+  return (
+    <div className="palette-preview">
+      <div className="pp-head">
+        <span className="pp-title">{t("当前方案")}</span>
+        <span className="pp-name">{name}</span>
+        <span className="pp-mode">{mode}</span>
+      </div>
+      <div
+        className="pp-window"
+        style={{ background: pal["--bg"], borderColor: pal["--border"] }}
+      >
+        <div className="pp-side" style={{ background: pal["--bg-sunken"] }}>
+          <span className="pp-dot" style={{ background: pal["--accent"] }} />
+          <span className="pp-bar" style={{ background: pal["--text-3"] }} />
+          <span className="pp-bar" data-dim="true" style={{ background: pal["--text-3"] }} />
+        </div>
+        <div className="pp-main">
+          <div
+            className="pp-card"
+            style={{ background: pal["--surface"], borderColor: pal["--border"] }}
+          >
+            <span className="pp-bar" style={{ background: pal["--text"] }} />
+            <span className="pp-bar" data-dim="true" style={{ background: pal["--text-2"] }} />
+            <span className="pp-bar" data-faint="true" style={{ background: pal["--text-3"] }} />
+          </div>
+          <div className="pp-row" style={{ background: pal["--surface-2"] }}>
+            <span className="pp-bar" style={{ background: pal["--text"] }} />
+            <span className="pp-btn" style={{ background: pal["--accent"] }} />
+          </div>
+        </div>
+      </div>
+      <div className="pp-report">
+        {report.map((c) => (
+          <span className="pp-chip" key={c.label} data-ok={c.ok}>
+            {t(c.label)} <b>{c.ratio.toFixed(1)}:1</b>
+          </span>
+        ))}
+        <span className="pp-verdict" data-ok={allOk}>
+          {allOk
+            ? t("对比度全部达标")
+            : t("有 {n} 项对比度不足", { n: report.filter((c) => !c.ok).length })}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -623,37 +703,17 @@ function AppearancePane({
   updateMany: (patch: Partial<Settings>) => void;
 }) {
   const theme = resolveTheme(s.theme);
-  const overrides = COLOR_SLOTS.filter((slot) => String(s[slot.key] ?? "").trim());
-  const scheme = schemeById(s.colorScheme);
-  const custom = s.colorScheme === "custom";
-  // Palette shown on a card: the scheme's ramp, the per-slot values for
-  // 自定义, or the theme's own tokens when nothing is chosen.
-  const paletteOf = (id: string): Record<string, string> => {
-    const def = schemeById(id);
-    if (def) return schemePalette(def, theme);
-    if (id === "custom") {
-      const out: Record<string, string> = {};
-      for (const slot of COLOR_SLOTS) out[slot.cssVar] = slotColor(s, slot, theme);
-      return out;
-    }
-    return THEME_SWATCHES[theme];
-  };
-  const resetAll = () => {
-    const patch: Record<string, string> = { colorScheme: "" };
-    for (const slot of COLOR_SLOTS) patch[String(slot.key)] = "";
-    updateMany(patch as Partial<Settings>);
-  };
-  const hint = scheme
-    ? t("当前方案：{name}，浅色与深色各一套", { name: t(scheme.id) })
-    : custom
-      ? overrides.length
-        ? t("已自定义 {n} 项颜色，其余沿用主题默认", { n: overrides.length })
-        : t("全部沿用当前主题的默认配色")
-      : t("全部沿用当前主题的默认配色");
+  const active = schemeFor(s);
+  const pal = currentPalette(s, theme);
+  const report = paletteReport(pal);
+  const allOk = report.every((c) => c.ok);
+  // "neutral" is stored as an empty string so an untouched config stays empty.
+  const pick = (id: string) => update("colorScheme", id === "neutral" ? "" : id);
+  const reset = () => updateMany({ colorScheme: "" });
   return (
     <>
       <h1>{t("外观")}</h1>
-      <p className="pane-sub">{t("主题、强调色与窗口观感。")}</p>
+      <p className="pane-sub">{t("主题、配色与窗口观感。")}</p>
 
       <Section title={t("主题")}>
         <div className="card">
@@ -668,78 +728,59 @@ function AppearancePane({
               onChange={(v) => update("theme", v)}
             />
           </Row>
-          <Row label={t("强调色")} desc={t("用于高亮、开关与主按钮")}>
-            <div className="swatches">
-              {ACCENTS.map((c) => (
-                <button
-                  key={c}
-                  className="swatch"
-                  data-active={s.accent.toUpperCase() === c.toUpperCase()}
-                  style={{ background: c }}
-                  onClick={() => update("accent", c)}
-                  title={c}
-                />
-              ))}
-              <label className="swatch-custom" title={t("自定义颜色")} style={{ background: s.accent }}>
-                <input
-                  type="color"
-                  value={s.accent}
-                  onChange={(e) => update("accent", e.target.value.toUpperCase())}
-                />
-              </label>
-            </div>
-          </Row>
         </div>
       </Section>
 
       <Section title={t("配色方案")}>
-        <p className="scheme-note">{t("整套同色系配色，一键切换；浅色与深色各有一套。")}</p>
-        <div className="schemes">
-          <SchemeCard
-            label={t("跟随主题")}
-            pal={paletteOf("")}
-            accent={s.accent}
-            active={s.colorScheme === ""}
-            onPick={() => update("colorScheme", "")}
-          />
-          {SCHEMES.map((def) => (
-            <SchemeCard
-              key={def.id}
-              label={t(def.id)}
-              pal={schemePalette(def, theme)}
-              accent={def.accent}
-              active={s.colorScheme === def.id}
-              onPick={() => updateMany({ colorScheme: def.id, accent: def.accent })}
-            />
-          ))}
-          <SchemeCard
-            label={t("自定义")}
-            pal={paletteOf("custom")}
-            accent={s.accent}
-            active={custom}
-            onPick={() => update("colorScheme", "custom")}
-          />
-        </div>
-        {custom && (
-          <div className="card">
-            {COLOR_SLOTS.map((slot) => (
-              <ColorRow
-                key={String(slot.key)}
-                s={s}
-                update={update}
-                slot={slot}
-                theme={theme}
-              />
-            ))}
-          </div>
-        )}
+        <p className="scheme-note">
+          {t("每套方案都包含背景、文字、描边与强调色，浅色与深色各有对应版本；文字对比度已逐项校验，点选后设置窗口会立即变色。")}
+        </p>
+
+        <SchemeGroup
+          title={t("基础")}
+          tag={t("系统默认")}
+          desc={t("完全沿用当前明暗主题的默认颜色")}
+          schemes={[NEUTRAL_SCHEME]}
+          theme={theme}
+          activeId={active.id}
+          onPick={pick}
+        />
+        <SchemeGroup
+          title={t("同色系")}
+          tag={t("单色相")}
+          desc={t("背景、文字与强调色共用一个色相，整体统一")}
+          schemes={MONO_SCHEME_LIST}
+          theme={theme}
+          activeId={active.id}
+          onPick={pick}
+        />
+        <SchemeGroup
+          title={t("不同色系")}
+          tag={t("多色相")}
+          desc={t("底色、卡片与强调色分属不同色相，层次更分明")}
+          schemes={MULTI_SCHEME_LIST}
+          theme={theme}
+          activeId={active.id}
+          onPick={pick}
+        />
+
+        <PalettePreview
+          name={t(active.label)}
+          mode={theme === "dark" ? t("深色预览") : t("浅色预览")}
+          pal={pal}
+          report={report}
+          allOk={allOk}
+        />
+
         <div className="color-actions">
-          <span className="color-hint">{hint}</span>
+          <span className="color-hint">
+            {t("共 {n} 套方案，均为整套配色", { n: SCHEMES.length })}
+          </span>
           <button
             className="btn"
             data-size="sm"
-            disabled={!scheme && !overrides.length}
-            onClick={resetAll}
+            disabled={active.id === "neutral"}
+            onClick={reset}
           >
             <Icon name="refresh" size={13} />
             {t("恢复默认配色")}

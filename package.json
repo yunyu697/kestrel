@@ -1,13 +1,14 @@
 {
   "name": "kestrel",
   "private": true,
-  "version": "1.2.15",
+  "version": "1.2.16",
   "type": "module",
   "description": "Kestrel - instant file search and launcher for Windows",
   "scripts": {
     "build:info": "node scripts/build-info.mjs",
     "dev": "npm run build:info && vite",
     "build": "npm run build:info && tsc --noEmit && vite build",
+    "test:palettes": "esbuild scripts/test-palettes.mjs --bundle --platform=node --format=esm --outfile=.tmp/palettes-test.mjs && node .tmp/palettes-test.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "app:dev": "npm run build:info && tauri dev",

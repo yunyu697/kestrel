@@ -77,21 +77,10 @@ export interface Settings {
   updateMirror: string;
 
   theme: "light" | "dark" | "system";
+  /** Legacy accent colour; only used to migrate old free-form schemes. */
   accent: string;
-  /** "" = theme default, a scheme id, or "custom" for the per-slot values. */
+  /** A scheme id from palettes.ts; "" = follow the theme (see theme.ts). */
   colorScheme: string;
-  colorBg: string;
-  colorSurface: string;
-  colorSurface2: string;
-  colorText: string;
-  colorMuted: string;
-  colorFaint: string;
-  colorBorder: string;
-  colorHover: string;
-  colorSunken: string;
-  colorSurface3: string;
-  colorActive: string;
-  colorKbd: string;
   opacity: number;
   blur: boolean;
   cornerRadius: number;

@@ -225,22 +225,9 @@ pub struct Settings {
     // ---- appearance ----
     pub theme: String,
     pub accent: String,
-    /// Colour scheme id: empty = theme default, "custom" = the per-slot
-    /// overrides below, anything else = a generated hue-based palette.
+    /// Colour scheme id from palettes.ts; empty = follow the theme. Legacy
+    /// values ("auto", "custom", unknown ids) are migrated on the frontend.
     pub color_scheme: String,
-    /// Per-element colour overrides; empty string = use the theme default.
-    pub color_bg: String,
-    pub color_surface: String,
-    pub color_surface2: String,
-    pub color_text: String,
-    pub color_muted: String,
-    pub color_faint: String,
-    pub color_border: String,
-    pub color_hover: String,
-    pub color_sunken: String,
-    pub color_surface3: String,
-    pub color_active: String,
-    pub color_kbd: String,
     pub opacity: f64,
     pub blur: bool,
     pub corner_radius: f64,
@@ -318,18 +305,6 @@ impl Default for Settings {
             theme: "system".into(),
             accent: "#4C7DFF".into(),
             color_scheme: String::new(),
-            color_bg: String::new(),
-            color_surface: String::new(),
-            color_surface2: String::new(),
-            color_text: String::new(),
-            color_muted: String::new(),
-            color_faint: String::new(),
-            color_border: String::new(),
-            color_hover: String::new(),
-            color_sunken: String::new(),
-            color_surface3: String::new(),
-            color_active: String::new(),
-            color_kbd: String::new(),
             opacity: 0.98,
             blur: true,
             corner_radius: 18.0,

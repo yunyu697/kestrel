@@ -27,6 +27,54 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.16",
+    date: "2026-11-10",
+    title: {
+      zh: "配色方案重做：11 套预设，可读性全部达标",
+      en: "Colour schemes rebuilt: 11 presets, all readability-checked",
+      ja: "配色スキームを作り直し：11 種類のプリセット、すべて読みやすさを検証",
+      es: "Esquemas de color rehechos: 11 presets, todos con legibilidad verificada",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "外观不再只改几个按钮颜色：现在提供 11 套完整配色方案，分「跟随主题」「同色系」与「不同色系」三组。同色系 7 套（雾蓝、青瓷、薄荷、暖砂、玫瑰、藤紫、石墨）让背景、文字、描边与强调色共用同一色相；不同色系 3 套（港湾、极光、林间）把窗口底、卡片、交互控件、点缀分别映射到不同色相的界面层。每套都有浅色与深色两版",
+          en: "Appearance is no longer just a few recoloured buttons: there are now 11 complete colour schemes in three groups — Follow theme, Monochrome and Multi-hue. The seven monochrome presets (Mist, Celadon, Mint, Sand, Rose, Violet, Graphite) share one hue across backgrounds, text, borders and accents; the three multi-hue presets (Harbour, Aurora, Woodland) map distinct hues onto the window, cards, interactive controls and spot details. Every scheme ships in both light and dark",
+          ja: "外観はボタンの色を少し変えるだけではなくなりました。「テーマに従う」「同色系」「異色系」の 3 グループに、計 11 種類の完全な配色スキームを用意しています。同色系 7 種類（ミスト、青磁、ミント、暖砂、ローズ、藤紫、石墨）は背景・文字・枠線・強調色が同じ色相を共有し、異色系 3 種類（港、オーロラ、林間）はウィンドウ背景・カード・操作要素・アクセントにそれぞれ異なる色相を割り当てます。すべてにライト／ダークの 2 版があります",
+          es: "La apariencia ya no se limita a cambiar el color de unos botones: ahora hay 11 esquemas completos en tres grupos — Seguir tema, Monocromo y Multitono. Los siete monocromos (Niebla, Celadón, Menta, Arena, Rosa, Violeta, Grafito) comparten un único tono en fondos, texto, bordes y acentos; los tres multitono (Puerto, Aurora, Bosque) asignan tonos distintos a la ventana, las tarjetas, los controles y los detalles. Cada esquema tiene versión clara y oscura",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "旧预设用固定 HSL 明度阶梯把界面全染成同一色相，辅助文字最低只有 2.78:1、白字压在薄荷绿按钮上只有 2.69:1。新版改用感知均匀的 OKLCH 派生整套颜色，并对窗口底、卡片、面板三个背景逐一校验文字对比度后自动钳制；强调色上的文字也按对比度自动选黑或白。「跟随主题」默认态同样拉到这条下限：强调色改为更深的蓝，浅色/深色辅助文字分别调深/调亮",
+          en: "The old presets dyed the whole UI with a fixed HSL lightness ramp: faint text fell as low as 2.78:1 and white on the mint accent only 2.69:1. Schemes are now derived in perceptually uniform OKLCH, and text contrast is checked and clamped against the window, card and panel backgrounds; the ink on the accent colour is chosen automatically by contrast. The default Follow-theme palette was raised to the same floor with a deeper accent blue and adjusted faint-text greys in both light and dark",
+          ja: "旧プリセットは固定の HSL 明度階調で画面全体を染色していたため、補助文字は最低 2.78:1、ミントの強調色上の白文字は 2.69:1 まで低下していました。新版は知覚的に均一な OKLCH で配色を生成し、ウィンドウ背景・カード・パネルの 3 種を対象に文字コントラストを検証して自動補正します。強調色上の文字色もコントラストで自動選択されます。既定の「テーマに従う」も同じ下限まで引き上げ、強調色を濃い青に、補助文字のグレーを明暗それぞれ調整しました",
+          es: "Los presets anteriores teñían toda la interfaz con una escala HSL fija: el texto tenue bajaba a 2,78:1 y el blanco sobre el acento menta a solo 2,69:1. Ahora los esquemas se derivan en OKLCH perceptualmente uniforme, y el contraste del texto se comprueba y ajusta frente a los fondos de ventana, tarjeta y panel; el color del texto sobre el acento se elige automáticamente. El esquema predeterminado también se elevó al mismo mínimo, con un azul más profundo y grises ajustados en claro y oscuro",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "按反馈移除了全部自定义颜色功能：主色色板、染色强度滑块、12 项逐槽调色与「自动修正对比度」按钮都不再出现，设置里只挑方案，不会出现难读的组合。旧的 auto / custom / 未知值会按原强调色的色相自动落到最接近的同色系预设，已有配置不会丢失",
+          en: "All custom-colour controls were removed as requested: the seed swatches, tint-strength slider, twelve per-slot colour pickers and the auto-fix button are gone. Picking a scheme is the only colour decision, so an unreadable combination cannot be built. Legacy auto / custom / unknown values are migrated to the nearest monochrome preset by the hue of the previous accent, keeping existing settings intact",
+          ja: "ご要望に合わせてカスタムカラー機能をすべて削除しました。原色スウォッチ、染色強度スライダー、12 項目の個別カラーピッカー、「コントラスト自動修正」ボタンは表示されません。スキームを選ぶだけなので読みにくい組み合わせは作れません。旧 auto / custom / 未知の値は元の強調色の色相から最も近い同色系プリセットへ自動移行し、既存設定は失われません",
+          es: "Se eliminaron todas las opciones de color personalizado: las muestras de color, el deslizador de intensidad, los doce selectores por elemento y el botón de corrección automática. Solo se elige un esquema, así que no se puede crear una combinación ilegible. Los valores antiguos auto / custom / desconocidos se migran al preset monocromo más cercano según el tono del acento anterior, sin perder la configuración",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "设置里的配色方案改成分组缩略图卡片：每张卡用该方案的真实颜色画出迷你窗口（侧栏、卡片、文字层级、按钮）和关键色色带，选中态有描边与勾选；下方是当前方案的大预览和 5 项实测对比度。点选后设置窗口本身立刻变色。另外新增配色对比度自动化测试（642 条断言 / 22 个方案变体）并接入 CI，词典校验器现在也会检查动态传入的方案名",
+          en: "The settings page now shows grouped preview cards: each card draws a miniature window (sidebar, card, text levels, button) and a swatch strip using that scheme's real tokens, with a bordered selected state, plus a large preview of the current scheme and five measured contrast ratios. The settings window recolours itself instantly on selection. A new automated contrast test (642 assertions across 22 scheme variants) is wired into CI, and the dictionary checker now covers dynamically supplied scheme names",
+          ja: "設定画面の配色スキームはグループ別のプレビューカードになりました。各カードはそのスキームの実際の色でミニウィンドウ（サイドバー、カード、文字階層、ボタン）とキーカラーの帯を描き、選択中は枠とチェックが付きます。下には現在のスキームの大きなプレビューと 5 項目の実測コントラストを表示します。選択すると設定ウィンドウ自身が即座に配色を変えます。さらにコントラスト自動テスト（22 バリエーション・642 アサーション）を CI に追加し、辞書チェッカーは動的に渡されるスキーム名も検証するようになりました",
+          es: "En ajustes, los esquemas se muestran como tarjetas agrupadas: cada una dibuja una ventana en miniatura (barra lateral, tarjeta, niveles de texto, botón) y una franja de colores con los tokens reales, con borde y marca de selección; debajo aparecen una vista amplia del esquema activo y cinco ratios de contraste medidos. La ventana de ajustes se recolorea al instante. Se añadió a CI un test automático de contraste (642 aserciones en 22 variantes) y el verificador de diccionario ahora cubre los nombres de esquema pasados dinámicamente",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.15",
     date: "2026-11-09",
     title: {

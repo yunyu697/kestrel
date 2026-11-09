@@ -23,6 +23,20 @@ for (const f of files) {
   for (const m of c.matchAll(/\bt\(\s*"((?:[^"\\]|\\.)*)"/g)) used.add(m[1]);
 }
 
+// Preset names/descriptions and contrast labels reach t() through a variable,
+// so the literal scan above cannot see them. Collect them from palettes.ts.
+const palettes = fs.readFileSync("src/shared/palettes.ts", "utf8");
+for (const m of palettes.matchAll(/\b(?:label|desc|MONO_DESC)\s*[:=]\s*"((?:[^"\\]|\\.)*)"/g)) {
+  used.add(m[1]);
+}
+const dynStart = palettes.indexOf("DYNAMIC_I18N_KEYS");
+const dynEnd = palettes.indexOf("];", dynStart);
+if (dynStart >= 0 && dynEnd > dynStart) {
+  for (const m of palettes.slice(dynStart, dynEnd).matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
+    used.add(m[1]);
+  }
+}
+
 // parse dict blocks
 function block(name) {
   const i = src.indexOf(`const ${name}: Dict = {`);
@@ -57,7 +71,7 @@ for (const d of ["en", "ja", "es", "zhTW"]) {
   const status = missing.length ? "FAIL" : "ok";
   console.log(
     `${d}: ${keys.size} keys, missing ${missing.length} [${status}]`,
-    missing.slice(0, 12),
+    missing,
   );
   if (missing.length) failures++;
 }
