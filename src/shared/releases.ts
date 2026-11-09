@@ -27,6 +27,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.15",
+    date: "2026-11-09",
+    title: {
+      zh: "全新品牌图标，明暗主题各一版",
+      en: "A new brand icon, with light and dark variants",
+      ja: "新しいブランドアイコン、ライト／ダークの 2 種類",
+      es: "Nuevo icono de marca, con variantes clara y oscura",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "换上了新的品牌图标：圆角方块里是靛紫渐变的放大镜和青色准星。可执行文件、窗口、托盘、安装程序与快捷方式固定使用浅色版；两版 SVG 现作为唯一图标源，全套尺寸（含 ico、icns、Windows 磁贴和各平台图标）都由浅色版一键生成",
+          en: "A new brand icon: an indigo magnifier with a cyan crosshair on a rounded square. The executable, windows, tray, installers and shortcuts always use the light artwork. Both SVGs are now the single source of truth, and every size (ico, icns, Windows tiles and mobile icons) is generated from the light one in a single step",
+          ja: "新しいブランドアイコンになりました。角丸の正方形に藍紫のグラデーションの虫眼鏡とシアンの照準を配置しています。実行ファイル、ウィンドウ、トレイ、インストーラー、ショートカットは常にライト版を使用します。2 つの SVG が唯一のソースとなり、すべてのサイズ（ico、icns、Windows タイル、モバイル用アイコン）はライト版から一括生成されます",
+          es: "Nuevo icono de marca: una lupa índigo con una mira cian sobre un cuadrado redondeado. El ejecutable, las ventanas, la bandeja, los instaladores y los accesos directos usan siempre la versión clara. Los dos SVG son ahora la única fuente y todos los tamaños (ico, icns, iconos de Windows y móviles) se generan a la vez desde la versión clara",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "设置窗口标题栏和「关于」页不再是渐变方块加放大镜字形，而是随当前明暗主题自动选用浅色或深色图标；切换主题时立刻跟随，深色界面上不会再出现一块发亮的白底",
+          en: "The settings title bar and the About page no longer show a gradient badge with a magnifier glyph. They now pick the light or dark artwork to match the current theme, switching instantly with it — no bright white square on a dark surface",
+          ja: "設定画面のタイトルバーと「バージョン情報」は、グラデーションの四角に虫眼鏡の字形を重ねたものではなくなりました。現在のテーマに合わせてライト／ダークのアイコンを自動で切り替え、深色テーマで白い四角が浮かぶこともありません",
+          es: "La barra de título de ajustes y la página Acerca de ya no muestran una insignia degradada con una lupa. Ahora eligen la versión clara u oscura según el tema activo y cambian al instante con él, sin un cuadrado blanco brillando sobre una superficie oscura",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.14",
     date: "2026-11-05",
     title: {

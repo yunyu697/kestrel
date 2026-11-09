@@ -39,6 +39,9 @@
   --kbd-bg: #f1f3f8;
   --kbd-border: rgba(15, 23, 42, 0.1);
   --scroll: rgba(15, 23, 42, 0.16);
+  /* Brand mark: the light artwork is the app/exe icon, the UI picks one to
+     match the surface it sits on. See src/assets/. */
+  --app-logo: url("../assets/kestrel-light.svg");
 }
 
 :root[data-theme="dark"] {
@@ -59,6 +62,7 @@
   --kbd-bg: rgba(255, 255, 255, 0.08);
   --kbd-border: rgba(255, 255, 255, 0.12);
   --scroll: rgba(255, 255, 255, 0.18);
+  --app-logo: url("../assets/kestrel-dark.svg");
 }
 
 * {

@@ -44,12 +44,14 @@ body.win-settings {
 .sb-title .brand .logo {
   width: 22px;
   height: 22px;
-  border-radius: 7px;
-  background: linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #1b3df0));
-  display: grid;
-  place-items: center;
-  color: #fff;
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+  flex: none;
+  /* The SVG artwork has a small transparent margin; 108% keeps the rounded
+     square the same visual size as the old solid badge. */
+  background-image: var(--app-logo);
+  background-size: 108%;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 1px 3px rgba(15, 23, 42, 0.14));
 }
 .sb-title .brand small {
   font-weight: 500;
@@ -592,13 +594,12 @@ textarea.input {
 .about-hero .big-logo {
   width: 56px;
   height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #1b3df0));
-  display: grid;
-  place-items: center;
-  color: #fff;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent);
   flex: none;
+  background-image: var(--app-logo);
+  background-size: 108%;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 4px 12px rgba(15, 23, 42, 0.18));
 }
 .about-hero .ah-name {
   font-size: 20px;

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Kestrel 02-focus indigo dark">
+ <defs>
+  <linearGradient id="bg" x1="40" y1="40" x2="984" y2="984" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#262B38"/>
+   <stop offset="1" stop-color="#11141C"/>
+  </linearGradient>
+  <linearGradient id="fg" x1="280" y1="270" x2="760" y2="770" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#93A7FF"/>
+   <stop offset="1" stop-color="#B78BFA"/>
+  </linearGradient>
+  <linearGradient id="sheen" x1="40" y1="40" x2="760" y2="860" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.075"/>
+   <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+  </linearGradient>
+  <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+   <feGaussianBlur stdDeviation="70"/>
+  </filter>
+  <filter id="lift" x="-30%" y="-30%" width="160%" height="160%">
+   <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0F172A" flood-opacity="0.13"/>
+  </filter>
+ </defs>
+
+ <rect x="40" y="40" width="944" height="944" rx="228" fill="url(#bg)"/>
+ <rect x="40" y="40" width="944" height="944" rx="228" fill="url(#sheen)"/>
+ <rect x="40" y="40" width="944" height="944" rx="228" fill="none"
+       stroke="#FFFFFF" stroke-opacity="0.11" stroke-width="3"/>
+
+ <g fill="none" stroke="#FFFFFF" stroke-opacity="0.055" stroke-width="3">
+  <circle cx="512" cy="512" r="318"/>
+  <circle cx="512" cy="512" r="404"/>
+ </g>
+ <circle cx="512" cy="486" r="246" fill="#6366F1" opacity="0.3" filter="url(#soft)"/>
+
+ <g>
+  <circle cx="512" cy="500" r="190" fill="none" stroke="url(#fg)" stroke-width="76"
+          stroke-linecap="round" stroke-dasharray="1028 1194"
+          transform="rotate(70 512 500)"/>
+  <path d="M646 634 L706 694" fill="none" stroke="url(#fg)" stroke-width="76" stroke-linecap="round"/>
+  <g stroke="#7CE7F5" stroke-width="18" stroke-linecap="round" opacity="0.9">
+    <path d="M512 372 L512 404"/>
+    <path d="M512 596 L512 628"/>
+    <path d="M384 500 L416 500"/>
+    <path d="M608 500 L640 500"/>
+  </g>
+  <circle cx="512" cy="500" r="42" fill="url(#fg)"/>
+ </g>
+</svg>

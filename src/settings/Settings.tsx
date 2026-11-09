@@ -189,9 +189,7 @@ export default function Settings() {
     <div className="settings-root">
       <div className="sb-title" data-tauri-drag-region>
         <div className="brand">
-          <div className="logo">
-            <Icon name="search" size={14} strokeWidth={2.2} />
-          </div>
+          <div className="logo" role="img" aria-label="Kestrel" />
           <span>{t("Kestrel 设置")}{(lang === "zh" || lang === "zh-TW") && <small>{t("隼")}</small>}
           </span>
         </div>
@@ -1846,9 +1844,7 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
       <h1>{t("关于")}</h1>
       <p className="pane-sub">{t("Kestrel（隼）— 极速文件定位与命令启动器。")}</p>
       <div className="about-hero">
-        <div className="big-logo">
-          <Icon name="search" size={28} strokeWidth={2.2} />
-        </div>
+        <div className="big-logo" role="img" aria-label="Kestrel" />
         <div>
           <div className="ah-name">{t("Kestrel 隼")}</div>
           <div className="ah-tag">{t("瞬达万千文件，一击即至。")}</div>
