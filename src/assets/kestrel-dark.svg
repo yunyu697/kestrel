@@ -23,7 +23,7 @@
  <rect x="40" y="40" width="944" height="944" rx="228" fill="url(#bg)"/>
  <rect x="40" y="40" width="944" height="944" rx="228" fill="url(#sheen)"/>
  <rect x="40" y="40" width="944" height="944" rx="228" fill="none"
-       stroke="#FFFFFF" stroke-opacity="0.11" stroke-width="3"/>
+       stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="4"/>
 
  <g fill="none" stroke="#FFFFFF" stroke-opacity="0.055" stroke-width="3">
   <circle cx="512" cy="512" r="318"/>
@@ -31,7 +31,7 @@
  </g>
  <circle cx="512" cy="486" r="246" fill="#6366F1" opacity="0.3" filter="url(#soft)"/>
 
- <g>
+ <g transform="translate(512 500) scale(1.35) translate(-512 -500)">
   <circle cx="512" cy="500" r="190" fill="none" stroke="url(#fg)" stroke-width="76"
           stroke-linecap="round" stroke-dasharray="1028 1194"
           transform="rotate(70 512 500)"/>

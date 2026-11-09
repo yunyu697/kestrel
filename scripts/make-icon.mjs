@@ -1,8 +1,8 @@
 // Regenerate every app icon from the SVG sources.
 //
-//   src/assets/kestrel-light.svg — the executable / window / tray / installer
-//     icon (always the light artwork) and the README preview PNG.
-//   src/assets/kestrel-dark.svg  — the in-app logo on dark surfaces. It is
+//   src/assets/kestrel-dark.svg  — the executable / window / tray / installer
+//     icon (always the dark artwork) and the README preview PNG.
+//   src/assets/kestrel-light.svg — the in-app logo on light surfaces. It is
 //     picked by CSS via --app-logo (src/shared/theme.css), so this script does
 //     not touch it.
 //
@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "node_modules", "@tauri-apps", "cli", "tauri.js");
-const source = join(root, "src", "assets", "kestrel-light.svg");
+const source = join(root, "src", "assets", "kestrel-dark.svg");
 
 if (!existsSync(cli)) throw new Error("Tauri CLI missing — run npm install first");
 if (!existsSync(source)) throw new Error(`missing icon source: ${source}`);

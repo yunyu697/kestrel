@@ -27,6 +27,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.17",
+    date: "2026-11-10",
+    title: {
+      zh: "暗色程序图标，图案更饱满",
+      en: "A dark app icon with a bolder artwork",
+      ja: "ダークなアプリアイコン、図柄を大きく",
+      es: "Icono oscuro con el dibujo más grande",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "程序图标改用暗色版：可执行文件、窗口、托盘、安装包与快捷方式统一使用深蓝底配亮紫与青色的那一版。全套尺寸（ico 六帧、icns、Windows 磁贴、Android / iOS 图标）都从暗色 SVG 重新生成，README 预览图与图标生成脚本也一并指向暗色源。界面里的品牌图标仍然随明暗主题切换，不跟着固定成暗色",
+          en: "The app icon now uses the dark artwork: the executable, windows, tray, installers and shortcuts all show the deep-blue square with the bright violet magnifier and cyan crosshair. Every size (six ico frames, icns, Windows tiles, Android / iOS icons) was regenerated from the dark SVG, and the README preview plus the icon script now point at that source. The in-app logo still follows the light / dark theme rather than being locked to dark",
+          ja: "アプリアイコンをダーク版に変更しました。実行ファイル、ウィンドウ、トレイ、インストーラー、ショートカットは、深い青の背景に明るい紫の虫眼鏡とシアンの照準を配した版で統一されます。すべてのサイズ（ico 6 フレーム、icns、Windows タイル、Android / iOS アイコン）をダーク SVG から再生成し、README のプレビューとアイコン生成スクリプトもこのソースを参照します。アプリ内のロゴは従来どおりテーマに追従します",
+          es: "El icono de la aplicación pasa a la versión oscura: el ejecutable, las ventanas, la bandeja, los instaladores y los accesos directos muestran el cuadrado azul profundo con la lupa violeta y la mira cian. Todos los tamaños (seis fotogramas ico, icns, mosaicos de Windows, iconos de Android / iOS) se regeneraron desde el SVG oscuro, y la vista previa del README y el script de iconos apuntan a esa fuente. El logotipo interno sigue el tema claro / oscuro en lugar de fijarse en oscuro",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "放大镜图案整体放大到画布的 1.35 倍：圆环、手柄、准星与中心点围绕圆心等比缩放，描边随比例加粗，图案在圆角底板里的占比从约一半提升到约三分之二，小尺寸下更容易认出来。暗色版还把外描边从 3px / 11% 提到 4px / 20%，放在深色任务栏上轮廓不再糊掉。两版 SVG 同步调整，界面品牌图标也使用新比例",
+          en: "The magnifier artwork is scaled up 1.35× on the canvas: the ring, handle, crosshair ticks and centre dot grow around the artwork's centre with the stroke widening in proportion, so the drawing fills about two-thirds of the rounded square instead of roughly half and reads more clearly at small sizes. The dark variant also lifts its outer rim from 3px / 11% to 4px / 20%, so it no longer melts into a dark taskbar. Both SVGs changed together, so the in-app logo uses the new proportions too",
+          ja: "虫眼鏡の図柄をキャンバス上で 1.35 倍に拡大しました。リング、持ち手、照準の刻み、中心点が図柄の中心を基準に拡大し、線幅も比例して太くなります。角丸の正方形に対して図柄の占有率は約半分から約三分の二に上がり、小さいサイズでも判別しやすくなりました。ダーク版は外周の縁取りも 3px / 11% から 4px / 20% に強め、暗いタスクバー上でも輪郭が残ります。2 つの SVG を同時に調整したため、アプリ内ロゴも新しい比率になります",
+          es: "El dibujo de la lupa se amplía 1,35× en el lienzo: el anillo, el mango, las marcas de la mira y el punto central crecen alrededor del centro del dibujo y el trazo se engrosa en proporción, de modo que ocupa unos dos tercios del cuadrado redondeado en lugar de la mitad y se reconoce mejor en tamaños pequeños. La variante oscura sube además el borde exterior de 3px / 11% a 4px / 20%, así que ya no se funde con una barra de tareas oscura. Ambos SVG cambian a la vez, por lo que el logotipo interno también usa las nuevas proporciones",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.16",
     date: "2026-11-10",
     title: {
