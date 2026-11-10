@@ -490,6 +490,37 @@ function GeneralPane({
                 the de-elevating restart. */}
             <Toggle on={s.runAsAdmin || elevated === true} onChange={onToggleAdmin} />
           </Row>
+          <Row
+            label={t("搜索结果的打开权限")}
+            desc={
+              s.openPrivilege === "inherit"
+                ? t("跟随 Kestrel 当前权限：以管理员运行时，打开的程序也会提权（原有行为）")
+                : s.openPrivilege === "admin"
+                  ? t("每次打开可执行结果都会弹出 UAC 授权窗口")
+                  : t("即使 Kestrel 以管理员权限运行，从结果列表启动的程序仍使用普通权限；需要提权请用 Ctrl+Shift+Enter 或右键菜单")
+            }
+          >
+            <div className="seg seg-privilege">
+              <button
+                data-active={!s.openPrivilege || s.openPrivilege === "normal"}
+                onClick={() => update("openPrivilege", "normal")}
+              >
+                {t("普通权限")}
+              </button>
+              <button
+                data-active={s.openPrivilege === "inherit"}
+                onClick={() => update("openPrivilege", "inherit")}
+              >
+                {t("跟随应用")}
+              </button>
+              <button
+                data-active={s.openPrivilege === "admin"}
+                onClick={() => update("openPrivilege", "admin")}
+              >
+                {t("始终管理员")}
+              </button>
+            </div>
+          </Row>
         </div>
       </Section>
 

@@ -187,11 +187,41 @@ pub async fn icons_for(paths: Vec<String>, size: Option<u32>) -> Result<HashMap<
 #[tauri::command]
 pub async fn open_path(state: State<'_, Arc<AppState>>, path: String) -> Result<bool, String> {
     let st = state.inner().clone();
-    let ok = run_detached(path.clone(), shell::open_path).await;
+    let privilege = st.settings.read().open_privilege.clone();
+    let ok = run_detached(path.clone(), move |p| open_with_privilege(p, &privilege)).await;
     if ok {
         st.bump_usage(&path);
     }
     Ok(ok)
+}
+
+/// Choose how a result is launched (常规 › 权限 › 搜索结果的打开权限).
+///
+/// "normal" is the default: a launcher running as administrator must not make
+/// every app it starts an administrator too. "inherit" keeps the old behaviour
+/// and "admin" asks for elevation on every executable result.
+fn open_with_privilege(path: &str, privilege: &str) -> bool {
+    match privilege {
+        "inherit" => shell::open_path(path),
+        "admin" if can_elevate(path) => shell::run_as_admin(path),
+        _ => shell::open_path_unelevated(path),
+    }
+}
+
+/// `runas` only exists on executable-ish targets: using it on a .txt or a URL
+/// would raise a shell error dialog instead of opening anything.
+fn can_elevate(path: &str) -> bool {
+    if path.starts_with("shell:") || path.contains("://") {
+        return false;
+    }
+    let ext = Path::new(path)
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+    matches!(
+        ext.as_str(),
+        "exe" | "bat" | "cmd" | "msi" | "msix" | "ps1" | "vbs" | "lnk" | "com" | "scr" | "reg" | "cpl"
+    )
 }
 
 /// Run a shell hand-off away from the thread that drives the UI.
@@ -304,8 +334,9 @@ pub fn bump_usage(state: State<'_, Arc<AppState>>, path: String) {
 
 /// Open a folder in Explorer (used by the Quick Switch panel).
 #[tauri::command]
-pub async fn browse_folder(path: String) -> bool {
-    run_detached(path, shell::open_path).await
+pub async fn browse_folder(state: State<'_, Arc<AppState>>, path: String) -> Result<bool, String> {
+    let privilege = state.settings.read().open_privilege.clone();
+    Ok(run_detached(path, move |p| open_with_privilege(p, &privilege)).await)
 }
 
 #[tauri::command]
@@ -367,4 +398,32 @@ pub async fn file_hashes(path: String) -> Result<FileHashes, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn elevation_only_makes_sense_on_executables() {
+        assert!(can_elevate("C:\\Tools\\app.exe"));
+        assert!(can_elevate("D:\\setup.msi"));
+        assert!(can_elevate("C:\\links\\tool.LNK"));
+        assert!(!can_elevate("C:\\notes.txt"));
+        assert!(!can_elevate("https://example.com"));
+        assert!(!can_elevate("shell:AppsFolder\\Some.App"));
+        assert!(!can_elevate("C:\\Games"));
+    }
+
+    #[test]
+    fn old_settings_get_the_safe_privilege_default() {
+        // A settings.json written by an older build has no openPrivilege key:
+        // it must not silently keep inheriting the launcher's elevation.
+        let legacy: crate::model::Settings =
+            serde_json::from_str(r#"{"runAsAdmin":true}"#).unwrap();
+        assert_eq!(legacy.open_privilege, "normal");
+        let explicit: crate::model::Settings =
+            serde_json::from_str(r#"{"openPrivilege":"inherit"}"#).unwrap();
+        assert_eq!(explicit.open_privilege, "inherit");
+    }
 }

@@ -27,6 +27,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.18",
+    date: "2026-11-10",
+    title: {
+      zh: "搜索结果不再继承管理员权限",
+      en: "Results no longer inherit administrator rights",
+      ja: "検索結果が管理者権限を引き継がなくなりました",
+      es: "Los resultados ya no heredan los permisos de administrador",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "修复：以管理员身份运行 Kestrel 时，从搜索结果打开的程序会继承管理员权限，记事本、浏览器、编辑器全都莫名其妙地以管理员身份启动。默认档改为由一个短命的非提权副本执行打开动作，结果回到普通权限；副本创建失败时回退到原来的调用，最差也只是回到旧行为，不会出现点不开",
+          en: "Fixed: when Kestrel ran as administrator, every program opened from the result list inherited the admin token, so Notepad, browsers and editors all started elevated without being asked to. The default mode now hands the open action to a short-lived non-elevated copy, returning results to ordinary rights; if that copy cannot be created the call falls back to the previous path — at worst the old behaviour comes back, never a result that refuses to open",
+          ja: "修正：Kestrel を管理者として実行していると、検索結果から開いたプログラムが管理者トークンを引き継ぎ、メモ帳やブラウザ、エディターが意図せず管理者として起動していました。既定のモードでは、開く処理を短命の非昇格コピーに任せて通常権限に戻します。コピーを作成できない場合は従来の呼び出しに戻るため、最悪でも以前の動作に戻るだけで、開けない結果にはなりません",
+          es: "Corregido: al ejecutar Kestrel como administrador, todos los programas abiertos desde los resultados heredaban el token de administrador, así que el Bloc de notas, los navegadores y los editores se iniciaban elevados sin pedirlo. El modo predeterminado delega la apertura en una copia efímera sin privilegios y devuelve los resultados a los permisos normales; si esa copia no se puede crear, se vuelve a la llamada anterior: en el peor caso reaparece el comportamiento antiguo, nunca un resultado que no se abre",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "新增「常规 › 权限 › 搜索结果的打开权限」三档设置：「普通权限」不继承提权（默认）、「跟随应用」保留原有行为、「始终管理员」让可执行结果每次请求 UAC；文档、链接与商店应用在「始终管理员」下仍按常规方式打开。需要临时提权时，Ctrl+Shift+Enter 或右键菜单的「以管理员身份运行」随时可用",
+          en: "A three-way setting now lives in General › Privileges › Privilege for opened results: Normal never inherits elevation (default), Follow Kestrel keeps the previous behaviour, and Always elevated asks for UAC on every executable result — documents, links and Store apps still open normally under it. To elevate a single result, Ctrl+Shift+Enter or Run as administrator in the context menu are always there",
+          ja: "「一般 › 権限 › 検索結果を開くときの権限」に 3 段階の設定を追加しました。「通常権限」は昇格を引き継がず（既定）、「Kestrel に従う」は従来の動作を保ち、「常に管理者」は実行ファイルの結果ごとに UAC を要求します。「常に管理者」でもドキュメント、リンク、ストアアプリは通常どおり開きます。1 件だけ昇格したいときは Ctrl+Shift+Enter または右クリックメニューの「管理者として実行」を使えます",
+          es: "Nueva opción de tres niveles en General › Permisos › Permisos al abrir resultados: Normal no hereda la elevación (predeterminado), Seguir a Kestrel mantiene el comportamiento anterior y Siempre administrador pide UAC por cada resultado ejecutable; los documentos, enlaces y aplicaciones de la Store siguen abriéndose con normalidad. Para elevar algo puntualmente, Ctrl+Mayús+Intro o Ejecutar como administrador en el menú contextual siguen disponibles",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.17",
     date: "2026-11-10",
     title: {

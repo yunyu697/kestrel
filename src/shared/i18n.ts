@@ -22,6 +22,13 @@ export const LANGS: { id: Lang; label: string }[] = [
 type Dict = Record<string, string>;
 
 const en: Dict = {
+  "搜索结果的打开权限": "Privilege for opened results",
+  "普通权限": "Normal",
+  "跟随应用": "Follow Kestrel",
+  "始终管理员": "Always elevated",
+  "即使 Kestrel 以管理员权限运行，从结果列表启动的程序仍使用普通权限；需要提权请用 Ctrl+Shift+Enter 或右键菜单": "Programs launched from the result list stay unelevated even when Kestrel runs as administrator; use Ctrl+Shift+Enter or the context menu to elevate one",
+  "跟随 Kestrel 当前权限：以管理员运行时，打开的程序也会提权（原有行为）": "Follow Kestrel's own privilege: when it runs as administrator, everything it opens is elevated too (previous behaviour)",
+  "每次打开可执行结果都会弹出 UAC 授权窗口": "Every executable result asks for UAC confirmation before opening",
   "Kestrel 内置": "Built into Kestrel",
   "Kestrel 索引到的可搜索程序（来自开始菜单与桌面）。":
     "Searchable programs indexed by Kestrel (from the Start menu and desktop).",
@@ -490,6 +497,13 @@ const en: Dict = {
 };
 
 const ja: Dict = {
+  "搜索结果的打开权限": "検索結果を開くときの権限",
+  "普通权限": "通常権限",
+  "跟随应用": "Kestrel に従う",
+  "始终管理员": "常に管理者",
+  "即使 Kestrel 以管理员权限运行，从结果列表启动的程序仍使用普通权限；需要提权请用 Ctrl+Shift+Enter 或右键菜单": "Kestrel が管理者権限で実行されていても、検索結果から起動したプログラムは通常権限で開きます。1 つだけ昇格するには Ctrl+Shift+Enter または右クリックメニューを使ってください",
+  "跟随 Kestrel 当前权限：以管理员运行时，打开的程序也会提权（原有行为）": "Kestrel の権限に従います。管理者権限で実行している場合、開いたプログラムも昇格されます（従来の動作）",
+  "每次打开可执行结果都会弹出 UAC 授权窗口": "実行ファイルを開くたびに UAC の確認が表示されます",
   "Kestrel 内置": "Kestrel 内蔵",
   "Kestrel 索引到的可搜索程序（来自开始菜单与桌面）。":
     "Kestrel がインデックスした検索可能なプログラム（スタートメニューとデスクトップから）。",
@@ -958,6 +972,13 @@ const ja: Dict = {
 };
 
 const es: Dict = {
+  "搜索结果的打开权限": "Permisos al abrir resultados",
+  "普通权限": "Normal",
+  "跟随应用": "Seguir a Kestrel",
+  "始终管理员": "Siempre administrador",
+  "即使 Kestrel 以管理员权限运行，从结果列表启动的程序仍使用普通权限；需要提权请用 Ctrl+Shift+Enter 或右键菜单": "Los programas abiertos desde los resultados se mantienen sin privilegios aunque Kestrel se ejecute como administrador; usa Ctrl+Mayús+Intro o el menú contextual para elevar uno",
+  "跟随 Kestrel 当前权限：以管理员运行时，打开的程序也会提权（原有行为）": "Sigue el privilegio de Kestrel: si se ejecuta como administrador, todo lo que abra también se eleva (comportamiento anterior)",
+  "每次打开可执行结果都会弹出 UAC 授权窗口": "Cada resultado ejecutable solicitará confirmación UAC antes de abrirse",
   "Kestrel 内置": "Integrado en Kestrel",
   "Kestrel 索引到的可搜索程序（来自开始菜单与桌面）。":
     "Programas indexados por Kestrel (del menú Inicio y el escritorio).",
@@ -1443,6 +1464,13 @@ const es: Dict = {
 };
 
 const zhTW: Dict = {
+  "搜索结果的打开权限": "搜尋結果的開啟權限",
+  "普通权限": "一般權限",
+  "跟随应用": "跟隨 Kestrel",
+  "始终管理员": "永遠系統管理員",
+  "即使 Kestrel 以管理员权限运行，从结果列表启动的程序仍使用普通权限；需要提权请用 Ctrl+Shift+Enter 或右键菜单": "即使 Kestrel 以系統管理員身分執行，從結果清單啟動的程式仍使用一般權限；只要單獨提權，請用 Ctrl+Shift+Enter 或右鍵選單",
+  "跟随 Kestrel 当前权限：以管理员运行时，打开的程序也会提权（原有行为）": "跟隨 Kestrel 目前的權限：以系統管理員執行時，開啟的程式也會提權（原有行為）",
+  "每次打开可执行结果都会弹出 UAC 授权窗口": "每次開啟可執行結果都會跳出 UAC 授權視窗",
   "Kestrel 内置": "Kestrel 內建",
   "Kestrel 索引到的可搜索程序（来自开始菜单与桌面）。":
     "Kestrel 索引到的可搜尋程式（來自開始功能表與桌面）。",

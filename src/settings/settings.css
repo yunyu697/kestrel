@@ -285,12 +285,15 @@ textarea.input {
   padding: 0 14px;
 }
 
-/* Five languages need to stay on one line without squeezing the label. */
-.seg-lang {
+/* Five languages (or three privilege modes) need to stay on one line
+   without squeezing the row label. */
+.seg-lang,
+.seg-privilege {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-.seg-lang button {
+.seg-lang button,
+.seg-privilege button {
   padding: 0 9px;
   font-size: 12px;
   letter-spacing: -0.01em;

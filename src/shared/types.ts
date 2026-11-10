@@ -67,6 +67,8 @@ export interface Settings {
   rememberLastQuery: boolean;
   singleClickOpen: boolean;
   runAsAdmin: boolean;
+  /** "normal" | "inherit" | "admin" — privilege for programs opened from results. */
+  openPrivilege: string;
   language: string;
 
   /** Update check frequency: "off" | "daily" | "weekly". */

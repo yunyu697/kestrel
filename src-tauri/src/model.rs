@@ -149,6 +149,10 @@ fn daily() -> String {
     "daily".into()
 }
 
+fn open_privilege_default() -> String {
+    "normal".into()
+}
+
 /// Presets seeded into an empty custom-command list, in `lang`.
 pub fn preset_commands(lang: &str) -> Vec<CustomCommand> {
     let i = crate::i18n::index_of(lang);
@@ -209,6 +213,10 @@ pub struct Settings {
     pub single_click_open: bool,
     /// Relaunch elevated (UAC) so privileged actions work without a prompt.
     pub run_as_admin: bool,
+    /// Privilege used for programs opened from the result list:
+    /// "normal" (never inherit our elevation) | "inherit" | "admin" (always UAC).
+    #[serde(default = "open_privilege_default")]
+    pub open_privilege: String,
     pub language: String,
 
     // ---- updates ----
@@ -296,6 +304,7 @@ impl Default for Settings {
             remember_last_query: false,
             single_click_open: false,
             run_as_admin: false,
+            open_privilege: open_privilege_default(),
             language: crate::i18n::detect_system().into(),
 
             update_check: "daily".into(),

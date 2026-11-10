@@ -24,6 +24,22 @@ use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
 
 pub fn run() {
+    let args: Vec<String> = std::env::args().collect();
+
+    // De-elevation helper: a short-lived, non-elevated copy of Kestrel that
+    // performs one ShellExecute on behalf of an elevated parent (see
+    // `win::shell::open_path_unelevated`). It must be handled before DPI
+    // setup, the panic hook and the single-instance guard, so that it can
+    // never turn into a second launcher or flash a window.
+    if let Some(i) = args.iter().position(|a| a == "--open-helper") {
+        if let Some(token) = args.get(i + 1) {
+            if let Some(path) = win::shell::decode_open_target(token) {
+                win::shell::open_path(&path);
+            }
+        }
+        return;
+    }
+
     // FIRST, before any window exists: without this the process is DPI
     // unaware, every window coordinate is virtualised by the monitor scale and
     // the compositor bitmap-stretches the whole UI (blurry, oversized,
@@ -35,7 +51,6 @@ pub fn run() {
     debug_log::init_verbose_from_env();
     debug_log::qs_log(&format!("dpi awareness: {dpi_mode}"));
     // Watchdog mode: keep-the-app-alive loop without any UI.
-    let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--watchdog") {
         watchdog::run();
         return;

@@ -59,6 +59,51 @@ pub fn open_path(path: &str) -> bool {
     h as isize > 32
 }
 
+/// Encode a target for the de-elevating helper's command line.
+///
+/// Windows file names cannot contain `"`, but a quoted path ending in `\`
+/// (`C:\`) escapes its own closing quote during command-line parsing. Base64
+/// removes the quoting problem entirely and keeps the token ASCII-only.
+pub fn encode_open_target(path: &str) -> String {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    STANDARD.encode(path.as_bytes())
+}
+
+pub fn decode_open_target(token: &str) -> Option<String> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    STANDARD
+        .decode(token.as_bytes())
+        .ok()
+        .and_then(|b| String::from_utf8(b).ok())
+}
+
+/// Open a search result without handing it this process's administrator token.
+///
+/// A child of an elevated process inherits the elevated token, so every app
+/// launched from the result list would silently run as administrator. An
+/// elevated process cannot lower its own integrity level, but it can start a
+/// short-lived copy of itself with the desktop shell's (medium integrity)
+/// token and let *that* copy do the ShellExecute. The helper is handled before
+/// any window or single-instance setup, so it costs one process start and no
+/// UI. If that fails, fall back to the ordinary call: a result that opens
+/// (still elevated) is better than one that does not open at all.
+pub fn open_path_unelevated(path: &str) -> bool {
+    if !crate::win::is_elevated() {
+        return open_path(path);
+    }
+    // Only the process that received the click may pass on foreground rights;
+    // the helper is not that process, so grant them here before handing off.
+    grant_foreground();
+    let Ok(exe) = std::env::current_exe() else {
+        return open_path(path);
+    };
+    let args = format!("--open-helper {}", encode_open_target(path));
+    if spawn_unelevated(&exe, &args) {
+        return true;
+    }
+    open_path(path)
+}
+
 /// Hand a shell namespace path to the shell (used for Store apps).
 ///
 /// The namespace only resolves inside a shell-initialised apartment, and the
@@ -429,4 +474,38 @@ pub fn copy_files_to_clipboard(paths: &[String]) -> bool {
 
 pub fn clipboard_has_files() -> bool {
     unsafe { IsClipboardFormatAvailable(CF_HDROP) != 0 }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_target_roundtrip_survives_command_line_traps() {
+        // A trailing backslash would escape a closing quote; spaces, quotes,
+        // non-ASCII names and URL query strings all have to survive intact.
+        for path in [
+            "C:\\",
+            "C:\\Program Files\\Kestrel\\app.exe",
+            "D:\\中文 文件夹\\report & notes.txt",
+            "shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+            "https://example.com/a?b=1&c=2",
+        ] {
+            assert_eq!(
+                decode_open_target(&encode_open_target(path)).as_deref(),
+                Some(path),
+                "round trip failed for {path}"
+            );
+        }
+    }
+
+    #[test]
+    fn open_target_token_needs_no_quoting() {
+        let token = encode_open_target("C:\\Program Files\\a.exe");
+        assert!(!token.contains('"'));
+        assert!(!token.contains('\\'));
+        assert!(token
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'='));
+    }
 }
