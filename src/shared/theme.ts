@@ -68,6 +68,7 @@ const MANAGED = [
   "--active",
   "--kbd-bg",
   "--accent",
+  "--accent-text",
   "--accent-ink",
   "--accent-soft",
 ];

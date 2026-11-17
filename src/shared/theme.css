@@ -5,6 +5,9 @@
 :root {
   /* Deep enough for white labels to clear 4.5:1 on the accent. */
   --accent: #3b6be8;
+  /* Accent as text: same hue, pushed until it clears 4.5:1 on the window,
+     cards and its own 16% tint. Fill stays --accent for maximum colour. */
+  --accent-text: #305eda;
   --accent-ink: #ffffff;
   --accent-soft: rgba(59, 107, 232, 0.16);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -62,8 +65,8 @@
   --border: rgba(15, 23, 42, 0.075);
   --border-strong: rgba(15, 23, 42, 0.14);
   --text: #14161b;
-  --text-2: #59616e;
-  --text-3: #6b7280;
+  --text-2: #535b68;
+  --text-3: #616876;
   --hover: rgba(15, 23, 42, 0.045);
   --active: rgba(15, 23, 42, 0.075);
   --shadow: 0 12px 32px -10px rgba(15, 23, 42, 0.3), 0 4px 14px -6px rgba(15, 23, 42, 0.16);
@@ -79,12 +82,13 @@
 :root[data-theme="dark"] {
   --bg: #1b1d22;
   --bg-sunken: #15171b;
+  --accent-text: #5b8bff;
   --surface: #202329;
   --surface-2: #262a31;
   --surface-3: #2e333b;
   --border: rgba(255, 255, 255, 0.085);
   --border-strong: rgba(255, 255, 255, 0.16);
-  --text: #eceef3;
+  --text: #f7f9fe;
   --text-2: #a4acba;
   --text-3: #949caa;
   --hover: rgba(255, 255, 255, 0.055);

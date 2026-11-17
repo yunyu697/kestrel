@@ -63,7 +63,7 @@
   transition: color var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 .bar-icon[data-active="true"] {
-  color: var(--accent);
+  color: var(--accent-text);
   transform: scale(1.05);
 }
 
@@ -107,7 +107,7 @@
 }
 .icon-btn[data-active="true"] {
   background: var(--accent-soft, color-mix(in srgb, var(--accent) 14%, transparent));
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* quick-switch mode badge */
@@ -181,7 +181,7 @@
 }
 .qs-dir .qs-ic {
   display: inline-flex;
-  color: var(--accent);
+  color: var(--accent-text);
   flex: none;
 }
 .qs-dir .qs-txt {
@@ -398,7 +398,7 @@
 }
 .row .title mark {
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 
@@ -716,7 +716,7 @@
   font-size: var(--fs-calc);
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--accent);
+  color: var(--accent-text);
   word-break: break-all;
 }
 .calc-preview .exp {
@@ -1000,7 +1000,7 @@
   border: 1px solid var(--line);
 }
 .clip-item .pin {
-  color: var(--accent);
+  color: var(--accent-text);
   flex: none;
   margin-top: 2px;
 }
@@ -1286,7 +1286,7 @@
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .upd-bar-main b {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .upd-bar-x {
   display: inline-flex;

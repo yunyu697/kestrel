@@ -112,7 +112,7 @@
 }
 .upd-done-text {
   font-size: var(--fs-sm);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .upd-err {
   color: var(--danger, #e05252);

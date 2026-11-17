@@ -36,13 +36,23 @@ export interface SchemeDef {
 
 export type Palette = Record<string, string>;
 
-/** Minimum contrast ratios guaranteed by every scheme, in both modes. */
+/** Minimum contrast ratios guaranteed by every scheme, in both modes.
+ *
+ *  The text targets are WCAG 2.1 AA for *small* text (4.5:1), raised where a
+ *  token is used for running copy: --text is body, so 12:1 (well past AAA),
+ *  --text-2 is secondary body at 5.5:1 and --text-3 is 11-12px captions, which
+ *  is exactly the case AA's 4.5:1 exists for. The old 4:1 floor let captions
+ *  sit at 3.85:1 across all fifteen presets. */
 export const CONTRAST_TARGETS = {
   text: 12,
   text2: 5.5,
-  text3: 4,
+  text3: 4.5,
   label: 4.5,
   accent: 3,
+  /** Accent used as *text* (selected nav label, match highlight, badges). The
+   *  fill/indicator target above is 3:1, which is fine for a toggle knob but
+   *  leaves 11px accent labels at 3.05:1 in thirteen of the sixteen presets. */
+  accentText: 4.5,
   border: 1.25,
 } as const;
 
@@ -50,26 +60,31 @@ const MONO_TINT = 0.7;
 const MONO_DESC = "单一色相，整体统一";
 
 /** One hue for the entire interface. These ids are also the legacy preset ids,
- *  so an existing config keeps (and improves) its chosen colour on upgrade. */
+ *  so an existing config keeps (and improves) its chosen colour on upgrade.
+ *
+ *  The list is ordered by OKLCH hue, starting at the blue the app ships with
+ *  and walking the wheel clockwise through violet, magenta, red, orange,
+ *  yellow and green before returning to blue. The picker renders this array in
+ *  order, so the grid reads as a spectrum instead of the historical
+ *  "seven legacy ids, then eight generated ones" pile. Achromatic graphite sits
+ *  last, where hue is meaningless. `test:palettes` asserts the ordering. */
 const MONO_SCHEMES: SchemeDef[] = [
   { id: "mist", family: "mono", label: "雾蓝", desc: MONO_DESC, seed: "#4C7DFF", tint: MONO_TINT },
-  { id: "celadon", family: "mono", label: "青瓷", desc: MONO_DESC, seed: "#0E9F8E", tint: MONO_TINT },
-  { id: "mint", family: "mono", label: "薄荷", desc: MONO_DESC, seed: "#2FB45C", tint: MONO_TINT },
-  { id: "sand", family: "mono", label: "暖砂", desc: MONO_DESC, seed: "#C98A3C", tint: MONO_TINT },
-  { id: "rose", family: "mono", label: "玫瑰", desc: MONO_DESC, seed: "#E2596F", tint: MONO_TINT },
-  { id: "violet", family: "mono", label: "藤紫", desc: MONO_DESC, seed: "#8B5CF6", tint: MONO_TINT },
-  { id: "graphite", family: "mono", label: "石墨", desc: MONO_DESC, seed: "#6E7681", tint: 0.45 },
-  // Eight more single-hue schemes, spaced around the OKLCH wheel so no two
-  // presets (old or new) sit within ~14° of each other. Seeds were generated
-  // with OKLCH -> sRGB at moderate chroma and verified against hexToLch().
-  { id: "terracotta", family: "mono", label: "赤陶", desc: MONO_DESC, seed: "#D66132", tint: MONO_TINT },
-  { id: "amber", family: "mono", label: "秋香", desc: MONO_DESC, seed: "#AA9117", tint: MONO_TINT },
-  { id: "lime", family: "mono", label: "青柠", desc: MONO_DESC, seed: "#81A022", tint: MONO_TINT },
-  { id: "turquoise", family: "mono", label: "松石", desc: MONO_DESC, seed: "#249AA9", tint: MONO_TINT },
-  { id: "azure", family: "mono", label: "天青", desc: MONO_DESC, seed: "#248FCC", tint: MONO_TINT },
   { id: "indigo", family: "mono", label: "靛紫", desc: MONO_DESC, seed: "#6A6ECB", tint: MONO_TINT },
+  { id: "violet", family: "mono", label: "藤紫", desc: MONO_DESC, seed: "#8B5CF6", tint: MONO_TINT },
   { id: "magenta", family: "mono", label: "玫紫", desc: MONO_DESC, seed: "#BA5DB3", tint: MONO_TINT },
   { id: "blush", family: "mono", label: "樱粉", desc: MONO_DESC, seed: "#DA709D", tint: MONO_TINT },
+  { id: "rose", family: "mono", label: "玫瑰", desc: MONO_DESC, seed: "#E2596F", tint: MONO_TINT },
+  { id: "terracotta", family: "mono", label: "赤陶", desc: MONO_DESC, seed: "#D66132", tint: MONO_TINT },
+  { id: "sand", family: "mono", label: "暖砂", desc: MONO_DESC, seed: "#C98A3C", tint: MONO_TINT },
+  { id: "amber", family: "mono", label: "秋香", desc: MONO_DESC, seed: "#AA9117", tint: MONO_TINT },
+  { id: "lime", family: "mono", label: "青柠", desc: MONO_DESC, seed: "#81A022", tint: MONO_TINT },
+  { id: "mint", family: "mono", label: "薄荷", desc: MONO_DESC, seed: "#2FB45C", tint: MONO_TINT },
+  { id: "celadon", family: "mono", label: "青瓷", desc: MONO_DESC, seed: "#0E9F8E", tint: MONO_TINT },
+  { id: "turquoise", family: "mono", label: "松石", desc: MONO_DESC, seed: "#249AA9", tint: MONO_TINT },
+  { id: "azure", family: "mono", label: "天青", desc: MONO_DESC, seed: "#248FCC", tint: MONO_TINT },
+  // Achromatic: tint is halved so the surfaces stay grey rather than washed.
+  { id: "graphite", family: "mono", label: "石墨", desc: MONO_DESC, seed: "#6E7681", tint: 0.45 },
 ];
 
 export const NEUTRAL_SCHEME: SchemeDef = {
@@ -108,14 +123,15 @@ export const THEME_SWATCHES: Record<"light" | "dark", Palette> = {
     "--surface-2": "#F6F7FA",
     "--surface-3": "#EEF1F6",
     "--text": "#14161B",
-    "--text-2": "#59616E",
-    "--text-3": "#6B7280",
+    "--text-2": "#535B68",
+    "--text-3": "#616876",
     "--border": "#E4E7EE",
     "--border-strong": "#D2D7E1",
     "--hover": "#F2F4F8",
     "--active": "#ECEEF3",
     "--kbd-bg": "#F1F3F8",
     "--accent": "#3B6BE8",
+    "--accent-text": "#305EDA",
     "--accent-ink": "#FFFFFF",
     "--accent-soft": "rgba(59, 107, 232, 0.16)",
   },
@@ -125,7 +141,7 @@ export const THEME_SWATCHES: Record<"light" | "dark", Palette> = {
     "--surface": "#202329",
     "--surface-2": "#262A31",
     "--surface-3": "#2E333B",
-    "--text": "#ECEEF3",
+    "--text": "#F7F9FE",
     "--text-2": "#A4ACBA",
     "--text-3": "#949CAA",
     "--border": "#33373F",
@@ -134,6 +150,7 @@ export const THEME_SWATCHES: Record<"light" | "dark", Palette> = {
     "--active": "#2F323A",
     "--kbd-bg": "#2E3137",
     "--accent": "#3B6BE8",
+    "--accent-text": "#5B8BFF",
     "--accent-ink": "#FFFFFF",
     "--accent-soft": "rgba(59, 107, 232, 0.16)",
   },
@@ -320,20 +337,66 @@ function fitAccent(seed: string, bg: string, dark: boolean): string {
   return accent;
 }
 
-/** Final pass applied to every scheme: text must clear its target on the
- *  window background *and* on cards/panels, borders must separate, and the
- *  accent must remain visible with a legible label. */
-function enforceContrast(pal: Palette, dark: boolean): Palette {
-  const backgrounds = [pal["--bg"], pal["--surface"], pal["--surface-2"]];
-  pal["--text"] = readableOn(pal["--text"], backgrounds, CONTRAST_TARGETS.text, dark);
-  pal["--text-2"] = readableOn(pal["--text-2"], backgrounds, CONTRAST_TARGETS.text2, dark);
-  pal["--text-3"] = readableOn(pal["--text-3"], backgrounds, CONTRAST_TARGETS.text3, dark);
-  pal["--border"] = readableOn(pal["--border"], [pal["--bg"]], CONTRAST_TARGETS.border, dark);
-  pal["--border-strong"] = readableOn(pal["--border"], [pal["--bg"]], 1.6, dark);
+/** Composite an `rgba()` token over a solid backdrop. Alpha tokens cannot be
+ *  measured directly, and the composite is what the eye actually sees. */
+function flatten(color: string, backdrop: string): string {
+  if (typeof color !== "string") return backdrop;
+  const m = color.match(/^rgba\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\)$/);
+  if (!m) return color;
+  const [r, g, b, a] = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
+  const bg = parseHex(backdrop).map((v) => Math.round(v * 255));
+  const mix = [r, g, b].map((c, i) => Math.round(c * a + bg[i] * (1 - a)));
+  return (
+    "#" + mix.map((v) => clamp(v, 0, 255).toString(16).padStart(2, "0")).join("").toUpperCase()
+  );
+}
+
+/** Every surface a text token can legitimately sit on: the window, cards,
+ *  panels, the sunken sidebar, raised pills, hover/selection fills and keycaps.
+ *  Measuring only the first three let captions fall to 3.85:1 on a selected
+ *  row, which is where they are actually read. */
+export function textBackdrops(pal: Palette): string[] {
+  const bg = pal["--bg"];
+  return [
+    pal["--bg"],
+    pal["--surface"],
+    pal["--surface-2"],
+    pal["--surface-3"],
+    pal["--bg-sunken"],
+    flatten(pal["--hover"], bg),
+    flatten(pal["--active"], bg),
+    pal["--kbd-bg"],
+    // Selected rows and the launcher pill paint accent-soft on top of the
+    // window background, so text sits on the *blend*, not on the accent.
+    flatten(pal["--accent-soft"], bg),
+  ];
+}
+
+/** Final pass applied to every scheme: text must clear its target on every
+ *  surface it can sit on, borders must separate, and the accent must remain
+ *  visible with a legible label. */
+export function enforceContrast(pal: Palette, dark: boolean): Palette {
+  // Accent first: its soft variant is one of the backgrounds the text is
+  // measured against, so it has to exist before the text pass runs.
   const accent = fitAccent(pal["--accent"], pal["--bg"], dark);
   pal["--accent"] = accent;
   pal["--accent-ink"] = accentInk(accent);
   pal["--accent-soft"] = accentSoft(accent);
+
+  const backgrounds = textBackdrops(pal);
+  pal["--text"] = readableOn(pal["--text"], backgrounds, CONTRAST_TARGETS.text, dark);
+  pal["--text-2"] = readableOn(pal["--text-2"], backgrounds, CONTRAST_TARGETS.text2, dark);
+  pal["--text-3"] = readableOn(pal["--text-3"], backgrounds, CONTRAST_TARGETS.text3, dark);
+  // Accent on a fill only needs to be visible; accent *as text* has to be
+  // readable, including on its own 14-16% tint and on cards.
+  pal["--accent-text"] = readableOn(
+    accent,
+    [pal["--bg"], pal["--surface"], pal["--surface-2"], flatten(pal["--accent-soft"], pal["--bg"])],
+    CONTRAST_TARGETS.accentText,
+    dark,
+  );
+  pal["--border"] = readableOn(pal["--border"], [pal["--bg"]], CONTRAST_TARGETS.border, dark);
+  pal["--border-strong"] = readableOn(pal["--border"], [pal["--bg"]], 1.6, dark);
   return pal;
 }
 
@@ -369,7 +432,9 @@ export function schemeSwatches(pal: Palette): string[] {
   return [pal["--bg"], pal["--surface-2"], pal["--active"], pal["--accent"]];
 }
 
-/** Contrast read-out shown under the current scheme in Settings. */
+/** Contrast read-out shown under the current scheme in Settings. The numbers
+ *  are the worst case across every surface the token can sit on, so the panel
+ *  cannot show a healthy ratio for a colour that only fails on a selected row. */
 export interface ContrastCheck {
   label: string;
   ratio: number;
@@ -377,7 +442,7 @@ export interface ContrastCheck {
 }
 
 export function paletteReport(pal: Palette): ContrastCheck[] {
-  const backgrounds = [pal["--bg"] ?? WHITE, pal["--surface"] ?? WHITE, pal["--surface-2"] ?? WHITE];
+  const backgrounds = textBackdrops(pal);
   const worst = (fg: string) => Math.min(...backgrounds.map((bg) => contrastRatio(fg, bg)));
   const accent = pal["--accent"] ?? "#4C7DFF";
   const ink = pal["--accent-ink"] ?? WHITE;

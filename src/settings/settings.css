@@ -129,10 +129,10 @@ body.win-settings {
 }
 .sb-nav-item[data-active="true"] {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .sb-nav-item[data-active="true"] svg {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ---- content ---- */
@@ -321,7 +321,7 @@ textarea.input {
 .chip[data-on="true"] {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .chip .chip-x {
   width: 18px;
@@ -391,7 +391,7 @@ textarea.input {
   padding: 1px 6px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: var(--fs-caption);
   font-weight: 600;
   vertical-align: 1px;
@@ -643,8 +643,8 @@ textarea.input {
   background: var(--surface-3);
 }
 .hk[data-capturing="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--accent-text);
+  color: var(--accent-text);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
@@ -676,8 +676,8 @@ textarea.input {
 }
 .hk-preset[data-active="true"] {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--accent-text);
+  color: var(--accent-text);
 }
 
 /* responsive: narrower settings window */
@@ -742,7 +742,7 @@ textarea.input {
   padding: 1px 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .scheme-group-desc {
   flex: 1;
@@ -777,7 +777,7 @@ textarea.input {
   transform: translateY(-1px);
 }
 .scheme[data-active="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
   box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 .scheme-preview {
@@ -1080,7 +1080,7 @@ textarea.input {
   padding: 1px 6px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 .release-head .rtitle {
@@ -1130,7 +1130,7 @@ textarea.input {
 }
 .release-items li[data-kind="new"] .rk {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .release-items li[data-kind="fix"] .rk {
   background: color-mix(in srgb, #f59e0b 18%, transparent);
@@ -1154,7 +1154,7 @@ textarea.input {
   color: var(--text);
 }
 .upd-ver b {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .upd-notes {
   margin: 8px 0;
