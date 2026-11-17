@@ -27,6 +27,63 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.21",
+    date: "2026-11-17",
+    title: {
+      zh: "配色按色相重排，小字对比度全面达标",
+      en: "Colour schemes ordered by hue; small-text contrast brought up to spec",
+      ja: "配色を色相順に並べ替え、小さい文字のコントラストを全体的に改善",
+      es: "Paletas ordenadas por tono y contraste del texto pequeño corregido",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "设置页的配色方案改为按色相排列：从应用主色蓝（雾蓝）起，沿 OKLCH 色相角顺时针走一圈——雾蓝、靛紫、藤紫、玫紫、樱粉、玫瑰、赤陶、暖砂、秋香、青柠、薄荷、青瓷、松石、天青。历史上「先七个老方案、再八个新方案」的堆放顺序取消，选择器现在读起来是一条连续的光谱；「跟随主题」固定第一（默认值，不属于任何色相），无彩的石墨固定最后",
+          en: "The scheme picker is now ordered by hue: starting from the app's own blue (Mist) and walking the OKLCH wheel clockwise — Mist, Indigo, Violet, Magenta, Blush, Rose, Terracotta, Amber, Lime, Mint, Celadon, Turquoise, Azure. The historical pile-up of seven legacy presets followed by eight newer ones is gone, so the grid reads as one continuous spectrum. Theme-following stays first because it is the default and has no hue, and achromatic Graphite stays last",
+          ja: "設定画面の配色を色相順に並べ替えました。アプリの基調色である青（ミスト）から OKLCH 色相環を時計回りに一周します——ミスト、インディゴ、バイオレット、マゼンタ、ブラッシュ、ローズ、テラコッタ、アンバー、ライム、ミント、セラドン、ターコイズ、アジュール。従来の「旧 7 件套＋新 8 件套」という並びを廃止し、選択画面が連続したスペクトルとして読めるようになりました。「テーマに従う」は既定値で色相を持たないため先頭、無彩色のグラファイトは末尾です",
+          es: "El selector de paletas ahora se ordena por tono: desde el azul propio de la app (Niebla) recorriendo la rueda OKLCH en sentido horario — Niebla, Índigo, Violeta, Magenta, Rosado, Rosa, Terracota, Ámbar, Lima, Menta, Celadón, Turquesa, Azur. Se elimina el antiguo amontonamiento de siete presets heredados seguidos de ocho nuevos, de modo que la rejilla se lee como un espectro continuo. «Seguir el tema» queda primero por ser el valor por defecto y no tener tono, y el Grafito acromático queda al final",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复选中行、键帽、徽标等位置的辅助文字对比度不足：原先只按窗口底色、卡片、面板三个背景校验，而 11–12px 的辅助文字真正被读的地方往往是选中行（强调色淡底叠加窗口底色）、悬停行和键帽，实测在选中行上只有 3.85:1，低于小字所需的 4.5:1。现在校验覆盖全部八种背景加强调色淡底共九处，并逐 token 复核，16 套方案在明暗两态下的不达标项已全部修掉",
+          en: "Fixed insufficient contrast for secondary text on selected rows, keycaps and badges: contrast used to be checked only against the window background, cards and panels, but 11–12px captions are actually read on selected rows (accent tint over the window background), hover fills and keycaps — where they measured as low as 3.85:1, under the 4.5:1 small text requires. Every token is now verified against all eight surfaces plus the accent tint, and all sixteen presets pass in both light and dark mode",
+          ja: "選択行・キーキャップ・バッジ上の補助文字のコントラスト不足を修正しました。従来はウィンドウ背景・カード・パネルの 3 か所だけを検証していましたが、11〜12px の補助文字が実際に読まれるのは選択行（ウィンドウ背景に強調色の淡い塗りを重ねたもの）、ホバー行、キーキャップであり、実測では選択行で 3.85:1 と小さい文字に必要な 4.5:1 を下回っていました。検証対象を 8 種類の背景＋強調色の淡い塗りの計 9 か所に広げ、16 件套すべてが明暗両方で基準を満たすようになりました",
+          es: "Corregido el contraste insuficiente del texto secundario en filas seleccionadas, teclas y distintivos: antes solo se comprobaba contra el fondo de la ventana, las tarjetas y los paneles, pero los textos de 11–12 px se leen sobre todo en filas seleccionadas (tinte de acento sobre el fondo), filas con hover y teclas, donde medían 3,85:1, por debajo del 4,5:1 exigido al texto pequeño. Ahora cada token se verifica contra las ocho superficies más el tinte de acento, y las dieciséis paletas cumplen en modo claro y oscuro",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "强调色当文字时改用单独的色阶：原先选中标签、命中高亮、徽标这 21 处直接拿强调色当文字色，而强调色的下限是为填充和指示器定的 3:1，导致十六套方案里有十三套的 11px 强调色文字只有 3.05–4.49:1。现在填充仍用原色保留饱和度，文字改用新增的 --accent-text，同色相沿明度轴推到 4.5:1",
+          en: "Accent-coloured text now uses its own step: selected labels, match highlights and badges — 21 places — drew straight from the accent, whose floor is the 3:1 set for fills and indicators, leaving 11px accent text at 3.05–4.49:1 in thirteen of the sixteen presets. Fills keep the original colour for saturation, while text uses a new --accent-text token pushed along the lightness axis to 4.5:1 in the same hue",
+          ja: "強調色を文字として使う箇所には専用の色段を用意しました。選択中ラベル、一致ハイライト、バッジの 21 か所は強調色をそのまま文字色にしていましたが、強調色の下限は塗りとインジケーター用の 3:1 であるため、16 件套のうち 13 件套で 11px の強調色文字が 3.05〜4.49:1 にとどまっていました。塗りは彩度を保つため元の色のまま、文字は新しい --accent-text を使い、同じ色相のまま明度方向に 4.5:1 まで引き上げています",
+          es: "El texto en color de acento usa ahora su propio escalón: las etiquetas seleccionadas, los resaltados de coincidencia y los distintivos —21 sitios— tomaban el acento directamente, cuyo mínimo es el 3:1 fijado para rellenos e indicadores, dejando el texto de acento de 11 px en 3,05–4,49:1 en trece de las dieciséis paletas. Los rellenos conservan el color original por saturación y el texto usa el nuevo token --accent-text, desplazado en luminosidad hasta 4,5:1 dentro del mismo tono",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "「跟随主题」这一套的色值是手写的，不走配色生成管线，因此长期存在与设置页预览色卡不一致、且对比度偏低的风险（本次核出 6 处）。现在亮色的次要文字与辅助文字、暗色的正文，以及两态的强调色文字都重新取值，并加了逐 token 比对断言：改一处而忘另一处会让测试直接失败",
+          en: "Theme-following is hand-written rather than generated, so its values had drifted from the swatch shown in settings and sat below target in six places. Its light-mode secondary and caption text, dark-mode body text and both modes' accent text have been re-derived, and a token-by-token assertion now fails the build if one copy is edited without the other",
+          ja: "「テーマに従う」の色値は生成パイプラインを通らない手書きのため、設定画面の見本との不一致やコントラスト不足（今回は 6 か所）が起きやすい状態でした。明色の副次文字・補助文字、暗色の本文、両モードの強調色文字を取り直し、トークン単位の比較アサーションを追加しました。片方だけ直すとテストが失敗します",
+          es: "«Seguir el tema» está escrito a mano y no pasa por el generador, por lo que sus valores se habían desviado de la muestra de ajustes y quedaban por debajo del objetivo en seis puntos. Se recalcularon el texto secundario y las leyendas en modo claro, el cuerpo en modo oscuro y el texto de acento en ambos, y una comprobación token por token ahora falla si se edita una copia sin la otra",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "配色测试从 1020 条断言扩到 1276 条：逐 token 在所有背景上复核、断言强调色文字下限，并校验选择器的色相走位是单调的，方案顺序不会在后续改动中被无声打乱",
+          en: "The palette suite grows from 1020 to 1276 assertions: every token is re-checked on every surface, the accent-text floor is asserted, and the picker's hue walk is verified to be monotonic so the ordering cannot silently drift",
+          ja: "配色テストを 1020 件から 1276 件のアサーションに拡張しました。全トークンを全背景で再検証し、強調色文字の下限を断言し、選択画面の色相の並びが単調であることを検証するため、順序が黙って崩れることはありません",
+          es: "La batería de paletas pasa de 1020 a 1276 aserciones: cada token se revisa en cada superficie, se comprueba el mínimo del texto de acento y se verifica que el recorrido de tonos del selector sea monótono, de modo que el orden no pueda desviarse en silencio",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.20",
     date: "2026-11-17",
     title: {
