@@ -35,6 +35,20 @@ jobs:
       - name: Palette contrast
         run: npm run test:palettes
 
+      - name: Updater asset selection
+        run: npm run test:updater
+
+      - name: Rust format
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      # Warnings are errors here: the tree is clean today, and an allowance
+      # would quietly rot. `--all-targets` covers test code too, which is where
+      # the last few lints were hiding.
+      - name: Rust lints
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: Rust check
         working-directory: src-tauri
         run: cargo check --all-targets
