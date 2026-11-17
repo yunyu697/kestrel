@@ -20,26 +20,7 @@
  * into an unreadable state.
  */
 
-export type SchemeFamily = "neutral" | "mono" | "multi";
-
-export interface Layer {
-  /** Seed colour supplying the hue. */
-  seed: string;
-  /** How much of that hue the neutral surfaces carry, 0..1. */
-  tint: number;
-}
-
-/** A multi-hue scheme splits the UI into four independently coloured groups. */
-export interface SchemeLayers {
-  /** Window background, sunken areas, text and borders. */
-  shell: Layer;
-  /** Cards and panels. */
-  surface: Layer;
-  /** Hover / active states and the accent. */
-  action: Layer;
-  /** Control fills and keycaps — the small "third colour" accents. */
-  spot: Layer;
-}
+export type SchemeFamily = "neutral" | "mono";
 
 export interface SchemeDef {
   id: string;
@@ -48,11 +29,9 @@ export interface SchemeDef {
   label: string;
   /** Chinese source string, shown under the card. */
   desc: string;
-  /** Single-hue schemes: seed + chroma strength. */
+  /** Seed hue + chroma strength. */
   seed?: string;
   tint?: number;
-  /** Multi-hue schemes: one layer per semantic group. */
-  layers?: SchemeLayers;
 }
 
 export type Palette = Record<string, string>;
@@ -80,48 +59,17 @@ const MONO_SCHEMES: SchemeDef[] = [
   { id: "rose", family: "mono", label: "玫瑰", desc: MONO_DESC, seed: "#E2596F", tint: MONO_TINT },
   { id: "violet", family: "mono", label: "藤紫", desc: MONO_DESC, seed: "#8B5CF6", tint: MONO_TINT },
   { id: "graphite", family: "mono", label: "石墨", desc: MONO_DESC, seed: "#6E7681", tint: 0.45 },
-];
-
-/** Different hue families working together. The groups map onto real CSS
- *  tokens (see composeLayers), so the difference is visible in the app, not
- *  just in a preview swatch. */
-const MULTI_SCHEMES: SchemeDef[] = [
-  {
-    id: "harbor",
-    family: "multi",
-    label: "港湾",
-    desc: "中性底 · 靛蓝 · 琥珀点缀",
-    layers: {
-      shell: { seed: "#808080", tint: 0 },
-      surface: { seed: "#4C7DFF", tint: 0.8 },
-      action: { seed: "#4C7DFF", tint: 0.85 },
-      spot: { seed: "#F59E0B", tint: 0.8 },
-    },
-  },
-  {
-    id: "aurora",
-    family: "multi",
-    label: "极光",
-    desc: "冷蓝底 · 暖砂卡片 · 藤紫",
-    layers: {
-      shell: { seed: "#3B82F6", tint: 0.85 },
-      surface: { seed: "#F59E0B", tint: 0.9 },
-      action: { seed: "#8B5CF6", tint: 0.9 },
-      spot: { seed: "#0E9F8E", tint: 0.8 },
-    },
-  },
-  {
-    id: "grove",
-    family: "multi",
-    label: "林间",
-    desc: "青绿底 · 暖橙 · 玫瑰点缀",
-    layers: {
-      shell: { seed: "#0E9F8E", tint: 0.8 },
-      surface: { seed: "#C98A3C", tint: 0.9 },
-      action: { seed: "#2FB45C", tint: 0.9 },
-      spot: { seed: "#E2596F", tint: 0.8 },
-    },
-  },
+  // Eight more single-hue schemes, spaced around the OKLCH wheel so no two
+  // presets (old or new) sit within ~14° of each other. Seeds were generated
+  // with OKLCH -> sRGB at moderate chroma and verified against hexToLch().
+  { id: "terracotta", family: "mono", label: "赤陶", desc: MONO_DESC, seed: "#D66132", tint: MONO_TINT },
+  { id: "amber", family: "mono", label: "秋香", desc: MONO_DESC, seed: "#AA9117", tint: MONO_TINT },
+  { id: "lime", family: "mono", label: "青柠", desc: MONO_DESC, seed: "#81A022", tint: MONO_TINT },
+  { id: "turquoise", family: "mono", label: "松石", desc: MONO_DESC, seed: "#249AA9", tint: MONO_TINT },
+  { id: "azure", family: "mono", label: "天青", desc: MONO_DESC, seed: "#248FCC", tint: MONO_TINT },
+  { id: "indigo", family: "mono", label: "靛紫", desc: MONO_DESC, seed: "#6A6ECB", tint: MONO_TINT },
+  { id: "magenta", family: "mono", label: "玫紫", desc: MONO_DESC, seed: "#BA5DB3", tint: MONO_TINT },
+  { id: "blush", family: "mono", label: "樱粉", desc: MONO_DESC, seed: "#DA709D", tint: MONO_TINT },
 ];
 
 export const NEUTRAL_SCHEME: SchemeDef = {
@@ -131,9 +79,8 @@ export const NEUTRAL_SCHEME: SchemeDef = {
   desc: "沿用系统默认配色",
 };
 
-export const SCHEMES: SchemeDef[] = [NEUTRAL_SCHEME, ...MONO_SCHEMES, ...MULTI_SCHEMES];
+export const SCHEMES: SchemeDef[] = [NEUTRAL_SCHEME, ...MONO_SCHEMES];
 export const MONO_SCHEME_LIST = MONO_SCHEMES;
-export const MULTI_SCHEME_LIST = MULTI_SCHEMES;
 
 export function schemeById(id: string): SchemeDef | undefined {
   return SCHEMES.find((s) => s.id === id);
@@ -408,34 +355,12 @@ export function buildPalette(
   return enforceContrast(out, dark);
 }
 
-/** Compose a multi-hue scheme from four independently coloured groups. */
-function composeLayers(layers: SchemeLayers, theme: "light" | "dark"): Palette {
-  const shell = buildPalette(layers.shell.seed, layers.shell.tint, theme);
-  const surface = buildPalette(layers.surface.seed, layers.surface.tint, theme);
-  const action = buildPalette(layers.action.seed, layers.action.tint, theme);
-  const spot = buildPalette(layers.spot.seed, layers.spot.tint, theme);
-  const out: Palette = {
-    ...shell,
-    "--surface": surface["--surface"],
-    "--surface-2": surface["--surface-2"],
-    "--hover": action["--hover"],
-    "--active": action["--active"],
-    "--accent": action["--accent"],
-    "--surface-3": spot["--surface-3"],
-    "--kbd-bg": spot["--kbd-bg"],
-  };
-  // buildPalette already clamps each layer against its own background; run the
-  // pass once more because the composed surfaces now have different hues.
-  return enforceContrast(out, theme === "dark");
-}
-
 /** The complete palette for a scheme in one appearance mode. */
 export function schemePalette(
   def: SchemeDef,
   theme: "light" | "dark",
 ): Palette {
   if (def.family === "neutral") return { ...THEME_SWATCHES[theme] };
-  if (def.family === "multi" && def.layers) return composeLayers(def.layers, theme);
   return buildPalette(def.seed ?? "#4C7DFF", def.tint ?? MONO_TINT, theme);
 }
 

@@ -10,7 +10,6 @@ import assert from "node:assert/strict";
 import {
   CONTRAST_TARGETS,
   MONO_SCHEME_LIST,
-  MULTI_SCHEME_LIST,
   NEUTRAL_SCHEME,
   SCHEMES,
   THEME_SWATCHES,
@@ -41,11 +40,11 @@ const worstText = (pal, token) =>
   );
 
 // ---- scheme inventory -----------------------------------------------------
-ok(SCHEMES.length === 11, `expected 11 schemes, got ${SCHEMES.length}`);
+ok(SCHEMES.length === 16, `expected 16 schemes (1 neutral + 15 mono), got ${SCHEMES.length}`);
 ok(new Set(SCHEMES.map((s) => s.id)).size === SCHEMES.length, "scheme ids must be unique");
-ok(MONO_SCHEME_LIST.length === 7, "seven single-hue schemes");
-ok(MULTI_SCHEME_LIST.length === 3, "three multi-hue schemes");
+ok(MONO_SCHEME_LIST.length === 15, "fifteen single-hue schemes");
 ok(NEUTRAL_SCHEME.family === "neutral", "neutral scheme is the theme default");
+ok(SCHEMES.every((s) => s.family !== "multi"), "multi-hue schemes are gone");
 for (const def of SCHEMES) {
   ok(schemeById(def.id) === def, `lookup by id works for ${def.id}`);
   ok(typeof def.label === "string" && def.label.length > 0, `${def.id} has a label`);
@@ -112,10 +111,17 @@ for (const theme of ["light", "dark"]) {
     const d = hueDelta(hexToLch(pal["--surface-2"]).H, hexToLch(pal["--accent"]).H);
     ok(d < 15, `${def.id}/${theme}: single hue, got ${d.toFixed(1)}° apart`);
   }
-  for (const def of MULTI_SCHEME_LIST) {
-    const pal = schemePalette(def, theme);
-    const d = hueDelta(hexToLch(pal["--kbd-bg"]).H, hexToLch(pal["--accent"]).H);
-    ok(d > 25, `${def.id}/${theme}: spot colour is a different hue, got ${d.toFixed(1)}°`);
+}
+
+// No two single-hue presets may share a hue: users asked that new schemes not
+// duplicate existing ones. Compare the seed hues directly (the accent token is
+// the seed), keeping a small tolerance for OKLCH round-tripping.
+for (let i = 0; i < MONO_SCHEME_LIST.length; i++) {
+  for (let j = i + 1; j < MONO_SCHEME_LIST.length; j++) {
+    const a = MONO_SCHEME_LIST[i], b = MONO_SCHEME_LIST[j];
+    if (a.id === "graphite" || b.id === "graphite") continue; // near-grey, hue meaningless
+    const d = hueDelta(hexToLch(a.seed).H, hexToLch(b.seed).H);
+    ok(d >= 12, `hue collision: ${a.id} vs ${b.id} only ${d.toFixed(1)}° apart`);
   }
 }
 
@@ -134,14 +140,24 @@ for (const legacy of ["auto", "custom", "something-else"]) {
   const id = normalizeSchemeId(legacy, "#8B5CF6");
   ok(schemeById(id)?.family === "mono", `${legacy} migrates to a real mono preset (${id})`);
 }
+// Removed multi-hue schemes migrate by their stored accent, each landing on a
+// *different* mono preset so long-time users don't all collapse to one colour.
+const migrated = [
+  normalizeSchemeId("harbor", "#4C7DFF"),
+  normalizeSchemeId("aurora", "#8B5CF6"),
+  normalizeSchemeId("grove", "#2FB45C"),
+];
+ok(migrated[0] === "mist" && migrated[1] === "violet" && migrated[2] === "mint",
+  `old multi schemes migrate to mist/violet/mint, got ${migrated.join("/")}`);
+ok(new Set(migrated).size === 3, "the three old schemes migrate to three distinct presets");
 ok(schemeFor({ colorScheme: "", accent: "#4C7DFF" }).id === "neutral", "schemeFor default");
 ok(
   schemeFor({ colorScheme: "auto", accent: "#4C7DFF" }).family === "mono",
   "schemeFor migrates legacy free-form mode",
 );
 for (const theme of ["light", "dark"]) {
-  const viaCurrent = currentPalette({ colorScheme: "aurora", accent: "#4C7DFF" }, theme);
-  const viaScheme = schemePalette(schemeById("aurora"), theme);
+  const viaCurrent = currentPalette({ colorScheme: "terracotta", accent: "#4C7DFF" }, theme);
+  const viaScheme = schemePalette(schemeById("terracotta"), theme);
   ok(viaCurrent["--accent"] === viaScheme["--accent"], `currentPalette/${theme} matches preset`);
 }
 

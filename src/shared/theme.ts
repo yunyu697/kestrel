@@ -10,8 +10,10 @@
  * `colorScheme` values:
  *   "" / "neutral"   → theme.css defaults, nothing is overridden
  *   a preset id      → that scheme's full palette
- *   "auto"/"custom"  → legacy free-form modes: migrated to the closest preset
- *   unknown ids      → migrated to the closest preset by the stored accent
+ *   "auto"/"custom"  → legacy free-form modes: migrated to the closest mono
+ *   old multi ids    → "harbor"/"aurora"/"grove" removed; migrated to their
+ *                      nearest mono by accent (mist / violet / mint)
+ *   unknown ids      → migrated to the closest mono by the stored accent
  *
  * Legacy hue-preset ids (mist, celadon, …) are still valid preset ids, so an
  * existing config keeps its colour and simply gains the readability fixes.

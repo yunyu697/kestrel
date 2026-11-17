@@ -10,8 +10,15 @@ const ALIVE_MUTEX: &str = "Local\\KestrelAliveMutex";
 const STOP_FLAG: &str = "kestrel-watchdog-stop";
 const QUIT_FLAG: &str = "kestrel-quit";
 
+/// Flag files live under `%LOCALAPPDATA%\Kestrel`, never next to the exe.
+/// An installed copy sits in `C:\Program Files\Kestrel`, which a normal
+/// (unelevated) process cannot write — so quit/stop flags silently failed and
+/// the watchdog kept respawning the app after a deliberate quit. The log and
+/// restart handshake already use this same user-writable directory.
 pub fn flag_dir() -> Option<PathBuf> {
-    std::env::current_exe().ok()?.parent().map(|p| p.to_path_buf())
+    let dir = PathBuf::from(std::env::var("LOCALAPPDATA").ok()?).join("Kestrel");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir)
 }
 
 fn now() -> u64 {
@@ -21,10 +28,30 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
+/// Atomically write a flag file via a temp file + rename. A reader (the
+/// watchdog) only checks existence, so a half-written flag must never be
+/// visible. Windows `rename` fails when the target exists, so remove it first.
+/// Any failure is logged — silently swallowing it was how the original
+/// "flags next to the exe" bug stayed invisible for so long.
+fn write_flag(path: &std::path::Path, name: &str) {
+    let tmp = path.with_extension("tmp");
+    if let Err(e) = std::fs::write(&tmp, now().to_string()) {
+        crate::debug_log::qs_log(&format!("watchdog: write {name}.tmp failed: {e}"));
+        return;
+    }
+    if path.exists() {
+        let _ = std::fs::remove_file(path);
+    }
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        let _ = std::fs::remove_file(&tmp);
+        crate::debug_log::qs_log(&format!("watchdog: rename {name} failed: {e}"));
+    }
+}
+
 /// Written right before a deliberate exit so the watchdog won't respawn us.
 pub fn mark_graceful_quit() {
     if let Some(p) = flag_dir().map(|d| d.join(QUIT_FLAG)) {
-        let _ = std::fs::write(&p, now().to_string());
+        write_flag(&p, QUIT_FLAG);
     }
 }
 
@@ -37,7 +64,7 @@ pub fn clear_quit_flag() {
 
 pub fn mark_stop() {
     if let Some(p) = flag_dir().map(|d| d.join(STOP_FLAG)) {
-        let _ = std::fs::write(&p, now().to_string());
+        write_flag(&p, STOP_FLAG);
     }
 }
 

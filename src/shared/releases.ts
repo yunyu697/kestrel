@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.20",
+    date: "2026-11-17",
+    title: {
+      zh: "修复「安装为服务」关掉又自启，配色精简为 15 套同色系",
+      en: "Fix the watchdog respawning after quit; streamline to 15 single-hue schemes",
+      ja: "「サービスとしてインストール」の再起動ループを修正、配色を同色系 15 件套に整理",
+      es: "Corregido el reinicio tras salir; paletas reducidas a 15 esquemas monocromos",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "修复「安装为服务」正常退出后又被自动拉起的问题：守护进程的退出/停止标志原先写在程序目录，安装版位于 Program Files 时普通权限无法写入且失败被静默忽略，导致每次主动退出后又被重启。标志文件改到用户可写的 %LOCALAPPDATA%\\Kestrel 目录，并改为临时文件加原子重命名、写入失败会记入日志",
+          en: "Fixed the watchdog respawning the app after a deliberate quit: its quit/stop flag files used to live next to the executable, which an unelevated process cannot write when installed under Program Files — and the failure was silently ignored, so every clean exit was undone. Flags now live in the user-writable %LOCALAPPDATA%\\Kestrel directory, are written atomically via a temp file plus rename, and log any failure",
+          ja: "「サービスとしてインストール」で正常に終了しても自動再起動される問題を修正しました。終了／停止フラグは以前実行ファイルの隣に置かれており、Program Files にインストールすると通常権限では書き込めず、その失敗も黙って無視されていたため、終了するたびに再起動されていました。フラグは書き込み可能な %LOCALAPPDATA%\\Kestrel に移し、一時ファイル＋アトミックなリネームで書き込み、失敗時はログに記録するようになりました",
+          es: "Corregido el reinicio automático tras una salida normal en «Instalar como servicio». Los archivos de bandera de salida/parada se escribían junto al ejecutable; con una instalación en Program Files un proceso sin privilegios no puede escribir allí y el error se ignoraba en silencio, por lo que cada salida se deshacía. Ahora están en %LOCALAPPDATA%\\Kestrel, que sí es escribible, se escriben de forma atómica con un archivo temporal y se registra cualquier fallo",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "配色方案精简为 15 套同色系加 1 套跟随主题：移除「港湾／极光／林间」三套多色系方案，新增赤陶、秋香、青柠、松石、天青、靛紫、玫紫、樱粉八套，各方案色相互相错开、不与原有方案重复。已选用旧多色系方案的配置会按强调色自动迁移到最接近的同色系方案，且三个旧方案分别落到不同新方案，不会都变成同一个颜色",
+          en: "Colour schemes streamlined to 15 single-hue presets plus one theme-following default: the three multi-hue schemes (Harbour / Aurora / Grove) were removed and eight new single-hue ones added — Terracotta, Amber, Lime, Turquoise, Azure, Indigo, Magenta and Blush — each spaced so no two presets share a hue. Configs using a removed scheme migrate by accent colour to the nearest single-hue preset, and the three old schemes land on three different presets rather than collapsing into one",
+          ja: "配色を同色系 15 件套と「テーマに従う」1 件套に整理しました。多色系の「ハーバー／オーロラ／森」の 3 件套を削除し、テラコッタ、アンバー、ライム、ターコイズ、アジュール、インディゴ、マゼンタ、ブラッシュの 8 件套を追加。各色相は重ならないよう配置されています。削除された方案を使っていた設定は強調色から最も近い同色系へ自動移動し、3 つの旧方案は別々の新方案へ移動するため同じ色に集中しません",
+          es: "Las paletas se reducen a 15 esquemas monocromos más uno que sigue el tema: se eliminaron los tres esquemas multicolor (Puerto / Aurora / Bosque) y se añadieron ocho monocromos — Terracota, Ámbar, Lima, Turquesa, Azur, Índigo, Magenta y Rosado — con tonos separados para que ningún par comparta color. Las configuraciones que usaban un esquema eliminado migran por color de acento al monocromo más cercano, y los tres esquemas antiguos recaen en tres presets distintos en lugar de unificarse",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "「安装为服务」开启后的描述明确为「关闭开关即卸载服务」",
+          en: "Clarified the enabled-state hint to say turning the switch off uninstalls the service",
+          ja: "有効時の説明を「オフにするとサービスを削除します」に明確化",
+          es: "Aclarada la descripción al activar: «desactívalo para desinstalar el servicio»",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.19",
     date: "2026-11-17",
     title: {

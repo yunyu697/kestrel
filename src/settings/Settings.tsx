@@ -8,7 +8,6 @@ import { resolveTheme } from "../shared/format";
 import { applyColors, currentPalette, schemeFor } from "../shared/theme";
 import {
   MONO_SCHEME_LIST,
-  MULTI_SCHEME_LIST,
   NEUTRAL_SCHEME,
   SCHEMES,
   paletteReport,
@@ -421,7 +420,7 @@ function GeneralPane({
               svc === null
                 ? t("读取守护状态中…")
                 : svc
-                  ? t("已启用：Kestrel 被意外关闭时会自动重启；关闭开关即卸载")
+                  ? t("已启用：Kestrel 被意外关闭时会自动重启；关闭开关即卸载服务")
                   : t("在任务计划程序中注册登录任务，Kestrel 被意外关闭时自动重启（需要管理员权限）")
             }
           >
@@ -781,15 +780,6 @@ function AppearancePane({
           tag={t("单色相")}
           desc={t("背景、文字与强调色共用一个色相，整体统一")}
           schemes={MONO_SCHEME_LIST}
-          theme={theme}
-          activeId={active.id}
-          onPick={pick}
-        />
-        <SchemeGroup
-          title={t("不同色系")}
-          tag={t("多色相")}
-          desc={t("底色、卡片与强调色分属不同色相，层次更分明")}
-          schemes={MULTI_SCHEME_LIST}
           theme={theme}
           activeId={active.id}
           onPick={pick}
