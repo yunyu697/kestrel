@@ -7,6 +7,7 @@
 //   node .tmp/palettes-test.mjs
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   CONTRAST_TARGETS,
   MONO_SCHEME_LIST,
@@ -20,6 +21,7 @@ import {
   schemeById,
   schemePalette,
   schemeSwatches,
+  textBackdrops,
 } from "../src/shared/palettes.ts";
 import { currentPalette, normalizeSchemeId, schemeFor } from "../src/shared/theme.ts";
 
@@ -32,12 +34,12 @@ const hueDelta = (a, b) => {
   const d = Math.abs(a - b) % 360;
   return d > 180 ? 360 - d : d;
 };
+// Worst case across every surface the token can sit on: window, cards,
+// panels, sunken sidebar, raised pills, hover/selection fills, keycaps and the
+// accent-soft blend used by the selected row. Measuring only bg/surface/
+// surface-2 is what let 11px captions sit at 3.85:1 on a selected row.
 const worstText = (pal, token) =>
-  Math.min(
-    ...[pal["--bg"], pal["--surface"], pal["--surface-2"]].map((bg) =>
-      contrastRatio(pal[token], bg),
-    ),
-  );
+  Math.min(...textBackdrops(pal).map((bg) => contrastRatio(pal[token], bg)));
 
 // ---- scheme inventory -----------------------------------------------------
 ok(SCHEMES.length === 16, `expected 16 schemes (1 neutral + 15 mono), got ${SCHEMES.length}`);
@@ -68,6 +70,7 @@ const SOLID_TOKENS = [
   "--active",
   "--kbd-bg",
   "--accent",
+  "--accent-text",
   "--accent-ink",
 ];
 
@@ -101,6 +104,126 @@ for (const theme of ["light", "dark"]) {
       `${where}: accent ink is the better of black/white`,
     );
     ok(schemeSwatches(pal).length === 4, `${where}: four preview swatches`);
+  }
+}
+
+// ---- contrast floor on every backdrop, every scheme -----------------------
+// paletteReport already aggregates these, but an explicit per-token assertion
+// names the failing token instead of only printing a ratio.
+for (const theme of ["light", "dark"]) {
+  for (const def of SCHEMES) {
+    const pal = schemePalette(def, theme);
+    const where = `${def.id}/${theme}`;
+    const targets = [
+      ["--text", CONTRAST_TARGETS.text],
+      ["--text-2", CONTRAST_TARGETS.text2],
+      ["--text-3", CONTRAST_TARGETS.text3],
+    ];
+    for (const [token, target] of targets) {
+      const worst = worstText(pal, token);
+      ok(worst >= target - 0.01, `${where}: ${token} worst ${worst.toFixed(2)}:1, want ${target}:1`);
+    }
+  }
+}
+// Accent used as text (selected nav label, match highlight, badges) needs the
+// small-text floor, not the 3:1 that is enough for a fill or an indicator.
+for (const theme of ["light", "dark"]) {
+  for (const def of SCHEMES) {
+    const pal = schemePalette(def, theme);
+    const where = `${def.id}/${theme}`;
+    const worst = Math.min(
+      ...[pal["--bg"], pal["--surface"], pal["--surface-2"]].map((bg) =>
+        contrastRatio(pal["--accent-text"], bg),
+      ),
+    );
+    ok(
+      worst >= CONTRAST_TARGETS.accentText - 0.01,
+      `${where}: accent used as text is only ${worst.toFixed(2)}:1, want ${CONTRAST_TARGETS.accentText}:1`,
+    );
+    // The fill colour may stay as vivid as it likes, so the two must be
+    // allowed to differ; what must not happen is accent-text being *less*
+    // readable than the fill.
+    ok(
+      contrastRatio(pal["--accent-text"], pal["--bg"]) >=
+        contrastRatio(pal["--accent"], pal["--bg"]) - 0.01,
+      `${where}: accent-text must never be worse than accent`,
+    );
+  }
+}
+
+// Captions are 11-12px, so their floor is WCAG AA for small text, not 4:1.
+ok(CONTRAST_TARGETS.text3 >= 4.5, "caption target must be at least WCAG AA (4.5:1)");
+ok(CONTRAST_TARGETS.text2 >= 4.5, "secondary text target must be at least WCAG AA");
+
+// ---- the grid reads as a hue walk ----------------------------------------
+// Settings renders MONO_SCHEME_LIST in array order, so the array *is* the
+// picker. It must advance monotonically around the OKLCH wheel from the
+// shipped blue; achromatic graphite is pinned last because its hue means
+// nothing.
+const blueHue = hexToLch("#4C7DFF").H;
+const walk = MONO_SCHEME_LIST.filter((s) => s.id !== "graphite").map((s) => {
+  const rel = (hexToLch(s.seed).H - blueHue) % 360;
+  return rel < 0 ? rel + 360 : rel;
+});
+for (let i = 1; i < walk.length; i++) {
+  ok(
+    walk[i] > walk[i - 1],
+    `scheme order must follow the hue wheel: ${MONO_SCHEME_LIST[i].id} (${walk[i].toFixed(1)}°) after ${MONO_SCHEME_LIST[i - 1].id} (${walk[i - 1].toFixed(1)}°)`,
+  );
+}
+ok(MONO_SCHEME_LIST.at(-1).id === "graphite", "achromatic graphite stays last");
+ok(MONO_SCHEME_LIST[0].id === "mist", "the default blue leads the list");
+
+// ---- theme.css and THEME_SWATCHES must not drift -------------------------
+// The neutral scheme is hand-written in two places: the live CSS and the
+// preview built from THEME_SWATCHES. A fix applied to one and not the other is
+// how neutral kept 3.91:1 captions while every preset was corrected.
+const cssText = readFileSync(new URL("../src/shared/theme.css", import.meta.url), "utf8");
+function cssBlock(selector) {
+  const at = cssText.indexOf(selector);
+  ok(at >= 0, `theme.css contains ${selector}`);
+  const open = cssText.indexOf("{", at);
+  const close = cssText.indexOf("}", open);
+  const vars = {};
+  for (const line of cssText.slice(open + 1, close).split("\n")) {
+    const m = line.match(/^\s*(--[a-z0-9-]+):\s*([^;]+);/i);
+    if (m) vars[m[1]] = m[2].trim();
+  }
+  return vars;
+}
+const rootVars = cssBlock(":root {");
+const MIRRORED = [
+  "--bg", "--bg-sunken", "--surface", "--surface-2", "--surface-3",
+  "--text", "--text-2", "--text-3", "--kbd-bg", "--accent", "--accent-text",
+];
+const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+/** CSS declares some structure tokens as translucent white/black, which the
+ *  preview can only stand in for with a solid colour. Flatten over the window
+ *  background and allow a small delta for those; hex tokens must match. */
+function flattenCss(value, backdrop) {
+  if (/^#[0-9a-f]{6}$/i.test(value ?? "")) return { hex: value, exact: true };
+  const m = (value ?? "").match(/^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)$/i);
+  if (!m) return { hex: null, exact: false };
+  const a = m[4] === undefined ? 1 : Number(m[4]);
+  const base = rgbOf(backdrop);
+  const mix = [Number(m[1]), Number(m[2]), Number(m[3])].map((c, i) =>
+    Math.round(c * a + base[i] * (1 - a)),
+  );
+  return { hex: "#" + mix.map((v) => v.toString(16).padStart(2, "0")).join(""), exact: false };
+}
+for (const theme of ["light", "dark"]) {
+  const live = { ...rootVars, ...cssBlock(`:root[data-theme="${theme}"]`) };
+  for (const token of MIRRORED) {
+    const { hex, exact } = flattenCss(live[token], live["--bg"]);
+    ok(hex !== null, `theme defaults/${theme}: ${token} could not be read from theme.css`);
+    const swatch = THEME_SWATCHES[theme][token] ?? "";
+    const same = exact
+      ? hex.toLowerCase() === swatch.toLowerCase()
+      : rgbOf(hex).every((v, i) => Math.abs(v - rgbOf(swatch)[i]) <= 10);
+    ok(
+      same,
+      `theme defaults/${theme}: ${token} drifted — theme.css ${live[token]} (${hex}) vs THEME_SWATCHES ${swatch}`,
+    );
   }
 }
 
