@@ -20,7 +20,7 @@ thread_local! {
     /// The shell resolves `shell:AppsFolder\…` names only inside an
     /// initialised apartment, and extraction now runs across the pool, so
     /// every thread has to do it for itself rather than once for the caller.
-    static COM_READY: std::cell::Cell<bool> = std::cell::Cell::new(false);
+    static COM_READY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 fn ensure_com() {
@@ -129,7 +129,13 @@ fn render_icon(path: &str, size: u32) -> Option<Vec<u8>> {
     } else {
         FILE_ATTRIBUTE_NORMAL
     };
-    let flags = SHGFI_ICON | SHGFI_LARGEICON | if attrs != 0 { SHGFI_USEFILEATTRIBUTES } else { 0 };
+    let flags = SHGFI_ICON
+        | SHGFI_LARGEICON
+        | if attrs != 0 {
+            SHGFI_USEFILEATTRIBUTES
+        } else {
+            0
+        };
 
     let mut info = SHFILEINFOW {
         hIcon: 0,
@@ -211,7 +217,8 @@ fn render_shell_item_icon(path: &str, size: u32) -> Option<Vec<u8>> {
     png
 }
 
-unsafe fn hicon_to_png(hicon: HICON, size: i32) -> Option<Vec<u8>> {    let hdc_screen = GetDC(0);
+unsafe fn hicon_to_png(hicon: HICON, size: i32) -> Option<Vec<u8>> {
+    let hdc_screen = GetDC(0);
     if hdc_screen == 0 {
         return None;
     }
@@ -288,7 +295,11 @@ unsafe fn hicon_to_png(hicon: HICON, size: i32) -> Option<Vec<u8>> {    let hdc_
 /// Windows "type description" for a path, e.g. "文本文档" / "文件夹".
 pub fn type_name(path: &str, is_dir: bool) -> String {
     let wide_path = wide(path);
-    let attrs = if is_dir { FILE_ATTRIBUTE_DIRECTORY } else { FILE_ATTRIBUTE_NORMAL };
+    let attrs = if is_dir {
+        FILE_ATTRIBUTE_DIRECTORY
+    } else {
+        FILE_ATTRIBUTE_NORMAL
+    };
     let mut info = SHFILEINFOW {
         hIcon: 0,
         iIcon: 0,
@@ -325,7 +336,13 @@ mod batch_tests {
         let apps = crate::apps::scan_apps();
         let paths: Vec<String> = apps
             .iter()
-            .map(|a| if a.target.is_empty() { a.lnk.clone() } else { a.target.clone() })
+            .map(|a| {
+                if a.target.is_empty() {
+                    a.lnk.clone()
+                } else {
+                    a.target.clone()
+                }
+            })
             .filter(|p| !p.is_empty())
             .collect();
         assert!(!paths.is_empty(), "no apps found to test with");
@@ -349,7 +366,13 @@ mod batch_tests {
         for b in &blank {
             println!("  blank: {b}");
         }
-        assert!(blank.is_empty(), "{} icons could not be rendered", blank.len());
-        assert!(map.values().all(|u| u.starts_with("data:image/png;base64,")));
+        assert!(
+            blank.is_empty(),
+            "{} icons could not be rendered",
+            blank.len()
+        );
+        assert!(map
+            .values()
+            .all(|u| u.starts_with("data:image/png;base64,")));
     }
 }

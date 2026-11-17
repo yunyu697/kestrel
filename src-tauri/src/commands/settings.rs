@@ -30,7 +30,11 @@ pub fn apply_side_effects(app: &AppHandle, state: &Arc<AppState>) {
 }
 
 #[tauri::command]
-pub fn save_settings(app: AppHandle, state: State<'_, Arc<AppState>>, settings: Settings) -> Result<(), String> {
+pub fn save_settings(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    settings: Settings,
+) -> Result<(), String> {
     let old_roots = state.settings.read().indexed_drives.clone();
     let old_excludes = state.settings.read().exclude_dirs.clone();
     let old_lang = state.settings.read().language.clone();
@@ -71,11 +75,7 @@ pub fn save_settings(app: AppHandle, state: State<'_, Arc<AppState>>, settings: 
 /// already owns it) so the UI can tell the user instead of silently doing
 /// nothing.
 #[tauri::command]
-pub fn apply_hotkey(
-    app: AppHandle,
-    state: State<'_, Arc<AppState>>,
-    accelerator: String,
-) -> bool {
+pub fn apply_hotkey(app: AppHandle, state: State<'_, Arc<AppState>>, accelerator: String) -> bool {
     if accelerator.trim().is_empty() {
         return false;
     }
@@ -120,7 +120,10 @@ pub fn list_apps(state: State<'_, Arc<AppState>>) -> Vec<AppEntry> {
 }
 
 #[tauri::command]
-pub async fn refresh_apps(app: AppHandle, state: State<'_, Arc<AppState>>) -> Result<Vec<AppEntry>, String> {
+pub async fn refresh_apps(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<AppEntry>, String> {
     let list = tauri::async_runtime::spawn_blocking(crate::apps::scan_apps)
         .await
         .map_err(|e| e.to_string())?;
@@ -183,7 +186,11 @@ pub fn clipboard_push_text(state: State<'_, Arc<AppState>>, text: String) {
 // ---------------- favorites ----------------
 
 #[tauri::command]
-pub fn favorites_add(state: State<'_, Arc<AppState>>, path: String, name: Option<String>) -> Vec<crate::model::Favorite> {
+pub fn favorites_add(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+    name: Option<String>,
+) -> Vec<crate::model::Favorite> {
     let display = name.unwrap_or_else(|| {
         std::path::Path::new(&path)
             .file_name()
@@ -211,7 +218,10 @@ pub fn favorites_add(state: State<'_, Arc<AppState>>, path: String, name: Option
 /// Remove a favorite. Pinned (built-in) favorites are never removed — they can
 /// only be disabled or re-pointed.
 #[tauri::command]
-pub fn favorites_remove(state: State<'_, Arc<AppState>>, id: String) -> Vec<crate::model::Favorite> {
+pub fn favorites_remove(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Vec<crate::model::Favorite> {
     let mut s = state.settings.write();
     s.favorites.retain(|f| f.id != id || f.pinned);
     let list = s.favorites.clone();

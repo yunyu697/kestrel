@@ -47,7 +47,10 @@ fn parse_size(v: &str) -> Option<u64> {
     } else {
         (v.as_str(), 1)
     };
-    num.trim().parse::<f64>().ok().map(|n| (n * mult as f64) as u64)
+    num.trim()
+        .parse::<f64>()
+        .ok()
+        .map(|n| (n * mult as f64) as u64)
 }
 
 fn parse_date(v: &str) -> Option<i64> {
@@ -66,12 +69,19 @@ fn parse_date(v: &str) -> Option<i64> {
         return Some(t.timestamp());
     }
     if let Ok(d) = chrono::NaiveDate::parse_from_str(&v, "%Y-%m-%d") {
-        return d.and_hms_opt(0, 0, 0).map(|x| x.and_local_timezone(chrono::Local).unwrap().timestamp());
+        return d
+            .and_hms_opt(0, 0, 0)
+            .map(|x| x.and_local_timezone(chrono::Local).unwrap().timestamp());
     }
     if let Ok(y) = v.parse::<i32>() {
         if (1990..=2100).contains(&y) {
-            return chrono::NaiveDate::from_ymd_opt(y, 1, 1)
-                .map(|x| x.and_hms_opt(0, 0, 0).unwrap().and_local_timezone(chrono::Local).unwrap().timestamp());
+            return chrono::NaiveDate::from_ymd_opt(y, 1, 1).map(|x| {
+                x.and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(chrono::Local)
+                    .unwrap()
+                    .timestamp()
+            });
         }
     }
     None
@@ -110,7 +120,10 @@ pub fn parse(raw: &str) -> ParsedQuery {
             } else if let Some(t) = parse_date(v) {
                 q.after = Some(t);
             }
-        } else if let Some(v) = lower.strip_prefix("in:").or_else(|| lower.strip_prefix("path:")) {
+        } else if let Some(v) = lower
+            .strip_prefix("in:")
+            .or_else(|| lower.strip_prefix("path:"))
+        {
             q.in_path = Some(v.trim_matches('"').to_string());
         } else {
             q.terms.push(lower);
@@ -121,7 +134,10 @@ pub fn parse(raw: &str) -> ParsedQuery {
 }
 
 fn is_boundary(prev: u8) -> bool {
-    matches!(prev, b' ' | b'_' | b'-' | b'.' | b'(' | b'[' | b'+' | b',' | b'&' | b'\\' | b'/')
+    matches!(
+        prev,
+        b' ' | b'_' | b'-' | b'.' | b'(' | b'[' | b'+' | b',' | b'&' | b'\\' | b'/'
+    )
 }
 
 /// Keep the highest of the current best and a candidate score.
@@ -313,14 +329,23 @@ impl<'a> Scorer<'a> {
             if tmask == 0 || (e.mask & tmask) == tmask {
                 merge_best(&mut best, match_score_ex(e.lower(), term, self.fuzzy));
                 if best.is_none() && self.pinyin && !e.py.is_empty() {
-                    merge_best(&mut best, match_score_ex(&e.py, term, self.fuzzy).map(|s| s * 0.94));
+                    merge_best(
+                        &mut best,
+                        match_score_ex(&e.py, term, self.fuzzy).map(|s| s * 0.94),
+                    );
                 }
                 if best.is_none() && self.pinyin && !e.pyf.is_empty() {
-                    merge_best(&mut best, match_score_ex(&e.pyf, term, self.fuzzy).map(|s| s * 0.86));
+                    merge_best(
+                        &mut best,
+                        match_score_ex(&e.pyf, term, self.fuzzy).map(|s| s * 0.86),
+                    );
                 }
             }
             if best.is_none() && self.match_path {
-                merge_best(&mut best, match_score_ex(&e.path, term, self.fuzzy).map(|s| s * 0.62));
+                merge_best(
+                    &mut best,
+                    match_score_ex(&e.path, term, self.fuzzy).map(|s| s * 0.62),
+                );
             }
             total += best?;
         }
@@ -351,16 +376,16 @@ pub fn entry_to_hit(e: &Entry, score: f64) -> SearchHit {
         path: Some(e.path.to_string()),
         icon: None,
         score,
-        badge: if e.is_dir { None } else { Some(e.ext.to_string()) },
+        badge: if e.is_dir {
+            None
+        } else {
+            Some(e.ext.to_string())
+        },
         meta: None,
     }
 }
 
-pub fn search_entries(
-    entries: &[Entry],
-    scorer: &Scorer,
-    limit: usize,
-) -> (Vec<SearchHit>, usize) {
+pub fn search_entries(entries: &[Entry], scorer: &Scorer, limit: usize) -> (Vec<SearchHit>, usize) {
     let matched: Vec<(usize, f64)> = entries
         .par_iter()
         .enumerate()
@@ -370,7 +395,9 @@ pub fn search_entries(
 
     let mut best: Vec<(usize, f64)> = matched;
     if best.len() > limit * 4 {
-        best.par_sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        best.par_sort_unstable_by(|a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
         best.truncate(limit * 4);
     }
     best.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -430,7 +457,11 @@ mod tests {
     fn matches_a_mixed_case_name_case_insensitively() {
         let dir = tree("upper");
         let hits = run(&dir, "readme", true);
-        assert!(titles(&hits).contains(&"README.TXT"), "got {:?}", titles(&hits));
+        assert!(
+            titles(&hits).contains(&"README.TXT"),
+            "got {:?}",
+            titles(&hits)
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -440,7 +471,11 @@ mod tests {
     fn matches_a_name_that_is_already_lowercase() {
         let dir = tree("lower");
         let hits = run(&dir, "plain", true);
-        assert!(titles(&hits).contains(&"plain.md"), "got {:?}", titles(&hits));
+        assert!(
+            titles(&hits).contains(&"plain.md"),
+            "got {:?}",
+            titles(&hits)
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -448,7 +483,11 @@ mod tests {
     fn matches_a_cjk_name_by_its_pinyin_initials() {
         let dir = tree("pinyin");
         let hits = run(&dir, "hyjl", true);
-        assert!(titles(&hits).contains(&"会议记录.txt"), "got {:?}", titles(&hits));
+        assert!(
+            titles(&hits).contains(&"会议记录.txt"),
+            "got {:?}",
+            titles(&hits)
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -461,7 +500,10 @@ mod tests {
         let got = titles(&hits);
         assert!(got.contains(&"plain.md"), "got {got:?}");
         assert!(got.contains(&"会议记录.txt"), "got {got:?}");
-        assert!(!got.contains(&"README.TXT"), "README is not under docs: {got:?}");
+        assert!(
+            !got.contains(&"README.TXT"),
+            "README is not under docs: {got:?}"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -474,7 +516,11 @@ mod tests {
 
         // Extensions are stored lowercased, so an uppercase name still matches.
         let hits = run(&dir, "ext:txt", true);
-        assert!(titles(&hits).contains(&"README.TXT"), "got {:?}", titles(&hits));
+        assert!(
+            titles(&hits).contains(&"README.TXT"),
+            "got {:?}",
+            titles(&hits)
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -482,11 +528,18 @@ mod tests {
     fn a_hit_shows_its_parent_directory_as_the_subtitle() {
         let dir = tree("hit");
         let entries = entries(&dir);
-        let e = entries.iter().find(|e| &*e.name == "plain.md").expect("entry");
+        let e = entries
+            .iter()
+            .find(|e| &*e.name == "plain.md")
+            .expect("entry");
         let hit = entry_to_hit(e, 1.0);
         assert_eq!(hit.title, "plain.md");
         assert_eq!(hit.subtitle, e.dir());
-        assert!(hit.subtitle.ends_with("docs"), "subtitle was {:?}", hit.subtitle);
+        assert!(
+            hit.subtitle.ends_with("docs"),
+            "subtitle was {:?}",
+            hit.subtitle
+        );
         assert_eq!(hit.path.as_deref(), Some(&*e.path));
         assert_eq!(hit.badge.as_deref(), Some("md"));
     }
@@ -508,11 +561,22 @@ mod tests {
         };
         let index = crate::index::Index::new();
         let t0 = std::time::Instant::now();
-        assert!(crate::index::load(&index, Path::new(&path)).is_some(), "load failed");
+        assert!(
+            crate::index::load(&index, Path::new(&path)).is_some(),
+            "load failed"
+        );
         println!("loaded {} entries in {:?}", index.count(), t0.elapsed());
 
         let usage = HashMap::new();
-        for raw in ["a", "report", "会议", "hyjl", "in:downloads", "ext:rs log", "设置"] {
+        for raw in [
+            "a",
+            "report",
+            "会议",
+            "hyjl",
+            "in:downloads",
+            "ext:rs log",
+            "设置",
+        ] {
             let q = parse(raw);
             let scorer = Scorer {
                 query: &q,

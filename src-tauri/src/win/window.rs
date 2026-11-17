@@ -905,7 +905,7 @@ extern "system" fn scan_address_text(hwnd: HWND, lparam: LPARAM) -> BOOL {
     // The band's text is "地址: C:\Windows" — the path starts after the last
     // space that precedes the drive colon.
     if let Some(idx) = t.find(":\\") {
-        let start = t[..idx].rfind(|c| c == ' ').map(|i| i + 1).unwrap_or(0);
+        let start = t[..idx].rfind(' ').map(|i| i + 1).unwrap_or(0);
         let candidate = &t[start..];
         if std::path::Path::new(candidate).is_dir() {
             *out = Some(candidate.to_string());
@@ -1534,7 +1534,12 @@ mod tests {
     #[ignore = "opens a dialog on screen"]
     fn rejects_a_real_message_box() {
         std::thread::spawn(|| unsafe {
-            MessageBoxA(0, b"hello\0".as_ptr(), b"KestrelMsg\0".as_ptr(), 0);
+            MessageBoxA(
+                0,
+                c"hello".as_ptr().cast(),
+                c"KestrelMsg".as_ptr().cast(),
+                0,
+            );
         });
         let hwnd = find_visible_dialog("KestrelMsg", 8000).expect("no message box appeared");
         let detected = is_file_dialog(hwnd);
@@ -2262,13 +2267,21 @@ mod tests {
 
     #[test]
     fn ctrl_g_still_works_on_an_unrecognised_app_dialog() {
-        with_dialog("选项", &["确定", "取消"], &[(r"C://Windows", false)], |hwnd| {
-            assert!(!is_quick_switch_target(hwnd), "auto-attach must stay strict");
-            assert!(
-                is_manual_quick_switch_target(hwnd),
-                "Ctrl+G must still work when the user asks for it"
-            );
-        });
+        with_dialog(
+            "选项",
+            &["确定", "取消"],
+            &[(r"C://Windows", false)],
+            |hwnd| {
+                assert!(
+                    !is_quick_switch_target(hwnd),
+                    "auto-attach must stay strict"
+                );
+                assert!(
+                    is_manual_quick_switch_target(hwnd),
+                    "Ctrl+G must still work when the user asks for it"
+                );
+            },
+        );
     }
 
     #[test]

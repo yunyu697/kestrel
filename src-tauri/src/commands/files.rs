@@ -174,7 +174,10 @@ fn decode_capped(path: &Path) -> Option<image::DynamicImage> {
 /// The work is spread over the pool and the few icons a cold pass can miss
 /// are retried; see `icon::icon_batch`.
 #[tauri::command]
-pub async fn icons_for(paths: Vec<String>, size: Option<u32>) -> Result<HashMap<String, String>, String> {
+pub async fn icons_for(
+    paths: Vec<String>,
+    size: Option<u32>,
+) -> Result<HashMap<String, String>, String> {
     let px = size.unwrap_or(48).clamp(16, 256);
     tauri::async_runtime::spawn_blocking(move || winicon::icon_batch(paths, px))
         .await
@@ -220,7 +223,18 @@ fn can_elevate(path: &str) -> bool {
         .unwrap_or_default();
     matches!(
         ext.as_str(),
-        "exe" | "bat" | "cmd" | "msi" | "msix" | "ps1" | "vbs" | "lnk" | "com" | "scr" | "reg" | "cpl"
+        "exe"
+            | "bat"
+            | "cmd"
+            | "msi"
+            | "msix"
+            | "ps1"
+            | "vbs"
+            | "lnk"
+            | "com"
+            | "scr"
+            | "reg"
+            | "cpl"
     )
 }
 
@@ -284,7 +298,10 @@ pub fn copy_file_refs(paths: Vec<String>) -> bool {
 }
 
 #[tauri::command]
-pub fn delete_to_trash(state: State<'_, Arc<AppState>>, paths: Vec<String>) -> Result<usize, String> {
+pub fn delete_to_trash(
+    state: State<'_, Arc<AppState>>,
+    paths: Vec<String>,
+) -> Result<usize, String> {
     let mut n = 0;
     for p in &paths {
         if trash::delete(p).is_ok() {
@@ -296,7 +313,11 @@ pub fn delete_to_trash(state: State<'_, Arc<AppState>>, paths: Vec<String>) -> R
 }
 
 #[tauri::command]
-pub fn rename_path(state: State<'_, Arc<AppState>>, path: String, new_name: String) -> Result<String, String> {
+pub fn rename_path(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+    new_name: String,
+) -> Result<String, String> {
     let src = Path::new(&path);
     let parent = src.parent().ok_or("无法获取父目录")?;
     let clean = new_name.trim();
@@ -317,7 +338,11 @@ pub fn rename_path(state: State<'_, Arc<AppState>>, path: String, new_name: Stri
 }
 
 #[tauri::command]
-pub fn create_folder(state: State<'_, Arc<AppState>>, parent: String, name: String) -> Result<String, String> {
+pub fn create_folder(
+    state: State<'_, Arc<AppState>>,
+    parent: String,
+    name: String,
+) -> Result<String, String> {
     let p = Path::new(&parent).join(name.trim());
     std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
     let s = p.to_string_lossy().to_string();

@@ -27,9 +27,12 @@ fn tokenize(input: &str) -> Option<Vec<Tok>> {
             i += 1;
             continue;
         }
-        if c.is_ascii_digit() || (c == '.' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit()) {
+        if c.is_ascii_digit() || (c == '.' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit())
+        {
             let start = i;
-            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.' || chars[i] == '_') {
+            while i < chars.len()
+                && (chars[i].is_ascii_digit() || chars[i] == '.' || chars[i] == '_')
+            {
                 i += 1;
             }
             if i < chars.len() && (chars[i] == 'e' || chars[i] == 'E') {
@@ -55,7 +58,9 @@ fn tokenize(input: &str) -> Option<Vec<Tok>> {
             while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
                 i += 1;
             }
-            out.push(Tok::Ident(chars[start..i].iter().collect::<String>().to_lowercase()));
+            out.push(Tok::Ident(
+                chars[start..i].iter().collect::<String>().to_lowercase(),
+            ));
             continue;
         }
         match c {
@@ -251,7 +256,11 @@ fn apply_fn(name: &str, a: &[f64]) -> Option<f64> {
 
 pub fn format_number(v: f64) -> String {
     if !v.is_finite() {
-        return if v.is_nan() { "NaN".into() } else { "∞".into() };
+        return if v.is_nan() {
+            "NaN".into()
+        } else {
+            "∞".into()
+        };
     }
     let abs = v.abs();
     if abs != 0.0 && (abs >= 1e15 || abs < 1e-6) {
@@ -353,8 +362,8 @@ fn unit_table(u: &str) -> Option<(Dim, f64, f64)> {
         "m2" | "平方米" => (Dim::Area, 1.0, 0.0),
         "km2" | "平方公里" => (Dim::Area, 1e6, 0.0),
         "ha" | "公顷" => (Dim::Area, 10000.0, 0.0),
-        "acre" | "英亩" => (Dim::Area, 4046.856_422_4, 0.0),
-        "ft2" | "平方英尺" => (Dim::Area, 0.092_903_04, 0.0),
+        "acre" | "英亩" => (Dim::Area, 4046.8564224, 0.0),
+        "ft2" | "平方英尺" => (Dim::Area, 0.09290304, 0.0),
         // volume (base: liter)
         "ml" | "毫升" => (Dim::Volume, 0.001, 0.0),
         "l" | "升" => (Dim::Volume, 1.0, 0.0),
@@ -410,8 +419,9 @@ fn unit_name(u: &str) -> String {
 fn convert_units(input: &str) -> Option<CalcResult> {
     let lower = input.to_lowercase();
     let (num_part, rest) = {
-        let idx = lower
-            .find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-' || c == '+' || c == ' '))?;
+        let idx = lower.find(|c: char| {
+            !(c.is_ascii_digit() || c == '.' || c == '-' || c == '+' || c == ' ')
+        })?;
         (&lower[..idx], lower[idx..].trim())
     };
     let value: f64 = num_part.trim().parse().ok()?;

@@ -123,7 +123,7 @@ unsafe fn item_name(
     pidl: *const windows::Win32::UI::Shell::Common::ITEMIDLIST,
     flags: windows::Win32::UI::Shell::SHGDNF,
 ) -> Option<String> {
-    use windows::Win32::UI::Shell::{StrRetToBufW, Common::STRRET};
+    use windows::Win32::UI::Shell::{Common::STRRET, StrRetToBufW};
 
     let mut ret = STRRET::default();
     folder.GetDisplayNameOf(pidl, flags, &mut ret).ok()?;
@@ -149,9 +149,9 @@ fn uwp_apps() -> Vec<AppEntry> {
     use windows::Win32::Foundation::HWND;
     use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED};
     use windows::Win32::UI::Shell::{
-        Common::ITEMIDLIST, IEnumIDList, IShellFolder, SHGetDesktopFolder,
-        SHGetKnownFolderIDList, FOLDERID_AppsFolder, SHCONTF_FOLDERS, SHCONTF_NONFOLDERS,
-        SHGDN_FORPARSING, SHGDN_NORMAL,
+        Common::ITEMIDLIST, FOLDERID_AppsFolder, IEnumIDList, IShellFolder, SHGetDesktopFolder,
+        SHGetKnownFolderIDList, SHCONTF_FOLDERS, SHCONTF_NONFOLDERS, SHGDN_FORPARSING,
+        SHGDN_NORMAL,
     };
 
     let mut out = Vec::new();
@@ -239,8 +239,7 @@ fn millis_since_scan() -> u64 {
     EPOCH
         .elapsed()
         .as_millis()
-        .saturating_sub(LAST_SCAN.load(std::sync::atomic::Ordering::Relaxed) as u128)
-        as u64
+        .saturating_sub(LAST_SCAN.load(std::sync::atomic::Ordering::Relaxed) as u128) as u64
 }
 
 /// Belt and braces for the watcher: the launcher rescans on the way up when
@@ -273,7 +272,10 @@ fn publish(app: &AppHandle, state: &Arc<AppState>, list: Vec<AppEntry>) {
     }
     *state.apps.write() = list;
     state.save_apps();
-    crate::debug_log::qs_log(&format!("apps: refreshed count={}", state.apps.read().len()));
+    crate::debug_log::qs_log(&format!(
+        "apps: refreshed count={}",
+        state.apps.read().len()
+    ));
     let _ = app.emit("apps://refreshed", ());
 }
 
@@ -305,7 +307,9 @@ pub fn start(app: AppHandle, state: Arc<AppState>) {
 }
 
 fn watch(app: AppHandle, state: Arc<AppState>) {
-    watch_loop(start_menu_dirs(), move || publish(&app, &state, scan_apps()));
+    watch_loop(start_menu_dirs(), move || {
+        publish(&app, &state, scan_apps())
+    });
 }
 
 /// Block forever, calling `on_change` once the watched folders settle down.
@@ -372,7 +376,6 @@ fn watch_loop(dirs: Vec<PathBuf>, on_change: impl Fn() + Send + 'static) {
         }
     }
 }
-
 
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -459,7 +462,8 @@ mod tests {
             println!("  {:40} {}", a.name, a.target);
         }
         assert!(
-            apps.iter().all(|a| a.target.starts_with("shell:AppsFolder\\")),
+            apps.iter()
+                .all(|a| a.target.starts_with("shell:AppsFolder\\")),
             "every store app must be launchable through the shell namespace"
         );
     }
@@ -506,7 +510,8 @@ mod tests {
     /// A file that cannot possibly be a shortcut must not cause scans: the
     /// Desktop folder is watched too, and every saved document lives there.
     #[test]
-    fn unrelated_files_do_not_trigger_a_rescan() {        let dir = probe_dir("kestrel-watch-noise");
+    fn unrelated_files_do_not_trigger_a_rescan() {
+        let dir = probe_dir("kestrel-watch-noise");
         let hits = Arc::new(AtomicUsize::new(0));
 
         let counter = hits.clone();
@@ -526,7 +531,6 @@ mod tests {
         assert_eq!(seen, 0, "a .docx must not look like a new application");
     }
 }
-
 
 #[cfg(test)]
 mod icon_tests {

@@ -78,7 +78,7 @@ fn fixed_folder_paths() -> Vec<(String, &'static str)> {
 /// Runs on every load: installs created before the pinned flag existed still
 /// get it (recognised by their path), and a folder the user re-pointed stays
 /// pinned because it already carries a built-in id.
-pub fn normalize_favorites(favs: &mut Vec<Favorite>) {
+pub fn normalize_favorites(favs: &mut [Favorite]) {
     let fixed_paths = fixed_folder_paths();
     let mut taken: Vec<String> = favs
         .iter()

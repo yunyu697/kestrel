@@ -3,8 +3,8 @@
 use super::{make_entry_with, Entry};
 use jwalk::WalkDir;
 use parking_lot::Mutex;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 pub struct ScanOptions<'a> {
     pub roots: &'a [String],
@@ -209,15 +209,21 @@ mod tests {
 
         // A small stride keeps the test to a few dozen files while hitting the
         // exact same reporting branch production uses.
-        let entries = scan_with_stride(&opts, &cancel, &counter, |n, _root| {
-            if n > 0 {
-                reported.fetch_add(1, Ordering::Relaxed);
-            }
-            // The UI reads exactly this atomic, so it has to be current.
-            if counter.load(Ordering::Relaxed) != n {
-                stale.fetch_add(1, Ordering::Relaxed);
-            }
-        }, 8);
+        let entries = scan_with_stride(
+            &opts,
+            &cancel,
+            &counter,
+            |n, _root| {
+                if n > 0 {
+                    reported.fetch_add(1, Ordering::Relaxed);
+                }
+                // The UI reads exactly this atomic, so it has to be current.
+                if counter.load(Ordering::Relaxed) != n {
+                    stale.fetch_add(1, Ordering::Relaxed);
+                }
+            },
+            8,
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
         assert!(reported.load(Ordering::Relaxed) > 0, "no progress reported");

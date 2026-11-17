@@ -93,9 +93,7 @@ pub fn show_launcher(app: &AppHandle, state: &Arc<AppState>) {
     // (which is what this used to do) threw the session away, so after a
     // detour through the global search bar the box never came back.
     let bound = state.dialog.lock().is_some();
-    crate::debug_log::qs_log(&format!(
-        "show_launcher (suspends QS, bound={bound})"
-    ));
+    crate::debug_log::qs_log(&format!("show_launcher (suspends QS, bound={bound})"));
     state
         .qs_active
         .store(false, std::sync::atomic::Ordering::Relaxed);
@@ -103,7 +101,10 @@ pub fn show_launcher(app: &AppHandle, state: &Arc<AppState>) {
         .launcher_override
         .store(true, std::sync::atomic::Ordering::Relaxed);
     let Some(win) = launcher(app) else { return };
-    if !state.launcher_visible.load(std::sync::atomic::Ordering::Relaxed) {
+    if !state
+        .launcher_visible
+        .load(std::sync::atomic::Ordering::Relaxed)
+    {
         // Restore the normal launcher footprint (Quick Switch shrinks it).
         let _ = win.set_min_size(Some(tauri::LogicalSize::new(520.0, 320.0)));
         let _ = win.set_size(tauri::LogicalSize::new(780.0, 540.0));
@@ -160,7 +161,11 @@ fn show_quick_switch_at(app: &AppHandle, state: &Arc<AppState>, hwnd: isize, tak
     // Bail out instead of showing a stale/global launcher window.
     refresh_scale(app, state);
     let scale = launcher_scale(state);
-    let Some((x, y, w, h)) = crate::win::monitor::compute_qs_geometry(hwnd, state.settings.read().qs_visible_rows, scale) else {
+    let Some((x, y, w, h)) = crate::win::monitor::compute_qs_geometry(
+        hwnd,
+        state.settings.read().qs_visible_rows,
+        scale,
+    ) else {
         crate::debug_log::qs_log(&format!("show_qs hwnd={hwnd:#x} geometry FAILED"));
         // Nothing was shown, so the session is not running: leaving the flag
         // set would make every later foreground event think the box is up.
@@ -299,7 +304,8 @@ pub fn toggle_launcher(app: &AppHandle, state: &Arc<AppState>) {
     // Ctrl interval, otherwise hiding the launcher with a second double Ctrl
     // right after showing it would be swallowed.
     // parking_lot Mutex: cannot be poisoned by a panicked thread.
-    static LAST_TOGGLE: parking_lot::Mutex<Option<std::time::Instant>> = parking_lot::Mutex::new(None);
+    static LAST_TOGGLE: parking_lot::Mutex<Option<std::time::Instant>> =
+        parking_lot::Mutex::new(None);
     {
         let mut t = LAST_TOGGLE.lock();
         let now = std::time::Instant::now();
@@ -414,7 +420,9 @@ fn build_tray_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<tauri::Wry
 
 /// Re-label the tray icon after a language switch (no restart needed).
 pub fn refresh_tray_language(app: &AppHandle, lang: &str) {
-    let Some(tray) = app.tray_by_id("main") else { return };
+    let Some(tray) = app.tray_by_id("main") else {
+        return;
+    };
     if let Ok(menu) = build_tray_menu(app, lang) {
         let _ = tray.set_menu(Some(menu));
     }

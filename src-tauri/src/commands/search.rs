@@ -33,7 +33,11 @@ fn command_hits(query_lower: &str, limit: usize, lang: &str) -> Vec<SearchHit> {
             });
         }
     }
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     out.truncate(limit);
     out
 }
@@ -58,7 +62,11 @@ fn custom_command_hits(
         }
         let Some(s) = best else { continue };
         let id = format!("custom:{}", c.id);
-        let subtitle = if c.description.is_empty() { c.target.clone() } else { c.description.clone() };
+        let subtitle = if c.description.is_empty() {
+            c.target.clone()
+        } else {
+            c.description.clone()
+        };
         out.push(SearchHit {
             id: id.clone(),
             kind: "command".into(),
@@ -71,7 +79,11 @@ fn custom_command_hits(
             meta: Some(json!({ "glyph": "terminal", "commandId": id })),
         });
     }
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     out.truncate(limit);
     out
 }
@@ -104,7 +116,11 @@ fn app_hits(
             meta: Some(json!({ "target": app.target, "source": app.source })),
         });
     }
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     out.truncate(limit);
     out
 }
@@ -124,8 +140,8 @@ fn web_hit(engines: &[crate::model::WebEngine], raw: &str, lang: &str) -> Option
         id: format!("web:{}:{}", engine.id, rest),
         kind: "web".into(),
         title: crate::i18n::tr(lang, "web.search_title")
-                .replace("{engine}", &engine.name)
-                .replace("{q}", rest),
+            .replace("{engine}", &engine.name)
+            .replace("{q}", rest),
         subtitle: url.clone(),
         path: None,
         icon: None,
@@ -139,7 +155,9 @@ pub fn urlencode(s: &str) -> String {
     let mut out = String::with_capacity(s.len() * 3);
     for b in s.as_bytes() {
         match *b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(*b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(*b as char)
+            }
             b' ' => out.push('+'),
             other => out.push_str(&format!("%{other:02X}")),
         }
@@ -152,7 +170,7 @@ pub fn urlencode(s: &str) -> String {
 /// by score: a stable pass over the tier keeps the strongest match on top
 /// inside each group, so there is no second comparator to keep in sync.
 fn rank_hits(
-    hits: &mut Vec<SearchHit>,
+    hits: &mut [SearchHit],
     fav_paths: &std::collections::HashSet<String>,
     usage: &std::collections::HashMap<String, u32>,
 ) {
@@ -162,13 +180,13 @@ fn rank_hits(
         } else if h
             .path
             .as_deref()
-            .map_or(false, |p| fav_paths.contains(&p.to_lowercase()))
+            .is_some_and(|p| fav_paths.contains(&p.to_lowercase()))
         {
             1
         } else if h
             .path
             .as_deref()
-            .map_or(false, |p| usage.get(p).copied().unwrap_or(0) > 0)
+            .is_some_and(|p| usage.get(p).copied().unwrap_or(0) > 0)
         {
             2
         } else {
@@ -214,7 +232,11 @@ fn do_search(st: &Arc<AppState>, query: &str, limit: Option<usize>) -> SearchRes
                 let e = &store.entries[idx];
                 hits.push(SearchHit {
                     id: e.path.to_string(),
-                    kind: if e.is_dir { "folder".into() } else { "file".into() },
+                    kind: if e.is_dir {
+                        "folder".into()
+                    } else {
+                        "file".into()
+                    },
                     title: e.name.to_string(),
                     subtitle: e.dir().to_string(),
                     path: Some(e.path.to_string()),
@@ -298,7 +320,10 @@ fn do_search(st: &Arc<AppState>, query: &str, limit: Option<usize>) -> SearchRes
 
     // 5. Files and folders.
     let parsed = search::parse(raw);
-    if !parsed.terms.is_empty() || parsed.exts.len() > 0 || parsed.kind.is_some() || parsed.in_path.is_some()
+    if !parsed.terms.is_empty()
+        || !parsed.exts.is_empty()
+        || parsed.kind.is_some()
+        || parsed.in_path.is_some()
     {
         let usage = st.usage.read();
         let scorer = Scorer {
@@ -320,7 +345,11 @@ fn do_search(st: &Arc<AppState>, query: &str, limit: Option<usize>) -> SearchRes
     }
 
     // De-duplicate by id while keeping the highest score.
-    hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    hits.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let mut seen = std::collections::HashSet::new();
     hits.retain(|h| seen.insert(h.id.clone()));
 
@@ -382,7 +411,7 @@ pub fn record_query(state: State<'_, Arc<AppState>>, query: String) {
                 count: 1,
             });
         }
-        hist.sort_by(|a, b| b.at.cmp(&a.at));
+        hist.sort_by_key(|h| std::cmp::Reverse(h.at));
         hist.truncate(settings.history_limit as usize);
     }
     state.save_history();
@@ -422,7 +451,7 @@ mod tests {
         hits.iter().map(|h| h.id.as_str()).collect()
     }
 
-    fn by_score(hits: &mut Vec<SearchHit>) {
+    fn by_score(hits: &mut [SearchHit]) {
         hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
     }
 
@@ -457,7 +486,13 @@ mod tests {
         rank_hits(&mut hits, &favs, &usage);
         assert_eq!(
             ids(&hits),
-            vec!["fav-low", "used-high", "used-low", "plain-high", "plain-low"]
+            vec![
+                "fav-low",
+                "used-high",
+                "used-low",
+                "plain-high",
+                "plain-low"
+            ]
         );
     }
 
@@ -477,8 +512,7 @@ mod tests {
             hit("used", "file", Some(r"C:/d/used.txt"), 400.0),
         ];
         by_score(&mut hits);
-        let usage: HashMap<String, u32> =
-            [(r"C:/d/used.txt".to_string(), 1)].into_iter().collect();
+        let usage: HashMap<String, u32> = [(r"C:/d/used.txt".to_string(), 1)].into_iter().collect();
         rank_hits(&mut hits, &HashSet::new(), &usage);
         assert_eq!(ids(&hits), vec!["used", "cmd", "folder"]);
     }

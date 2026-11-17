@@ -34,6 +34,11 @@ const WINDOW_NAME: &str = "KestrelSingleInstance";
 /// Posted by a second launch: "you are the instance, show yourself".
 const WM_KESTREL_SHOW: u32 = WM_APP + 1;
 
+// WM_APP + 1 .. 0xBFFF is the range reserved for applications; below 0x8000
+// would collide with a real Windows message. Checked at compile time because
+// the value is a constant — a test for it could only ever pass.
+const _: () = assert!(WM_KESTREL_SHOW >= 0x8000 && WM_KESTREL_SHOW <= 0xBFFF);
+
 /// How long a second launch waits for the first one's message window. The
 /// owner creates it within microseconds of taking the mutex, but a cold start
 /// under a virus scanner can stretch that, and leaving without forwarding
@@ -216,12 +221,5 @@ mod tests {
             !take_pending_show(),
             "the flag must not survive the first read"
         );
-    }
-
-    #[test]
-    fn the_show_message_stays_out_of_the_system_range() {
-        // WM_APP + 1 .. 0xBFFF is the range reserved for applications; below
-        // 0x8000 would collide with a real Windows message.
-        assert!(WM_KESTREL_SHOW >= 0x8000 && WM_KESTREL_SHOW <= 0xBFFF);
     }
 }

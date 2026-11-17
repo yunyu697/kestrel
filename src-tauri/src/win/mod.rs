@@ -3,7 +3,12 @@
 //! We deliberately avoid the `windows` crate: its wrapper API changes between
 //! releases, while these flat C-style declarations are stable and predictable.
 
-#![allow(non_snake_case, non_camel_case_types, dead_code, clippy::upper_case_acronyms)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    dead_code,
+    clippy::upper_case_acronyms
+)]
 
 use std::ffi::c_void;
 
@@ -292,10 +297,25 @@ extern "system" {
         flags: u32,
     ) -> BOOL;
     pub fn DestroyIcon(icon: HICON) -> BOOL;
-    pub fn SetWindowPos(hwnd: HWND, after: HWND, x: i32, y: i32, cx: i32, cy: i32, flags: u32) -> BOOL;
+    pub fn SetWindowPos(
+        hwnd: HWND,
+        after: HWND,
+        x: i32,
+        y: i32,
+        cx: i32,
+        cy: i32,
+        flags: u32,
+    ) -> BOOL;
     pub fn GetAncestor(hwnd: HWND, flags: u32) -> HWND;
     pub fn GetSystemMetrics(index: i32) -> i32;
-    pub fn LoadImageW(hinst: HINSTANCE, name: *const u16, kind: u32, cx: i32, cy: i32, flags: u32) -> HANDLE;
+    pub fn LoadImageW(
+        hinst: HINSTANCE,
+        name: *const u16,
+        kind: u32,
+        cx: i32,
+        cy: i32,
+        flags: u32,
+    ) -> HANDLE;
     pub fn RegisterWindowMessageW(name: *const u16) -> u32;
     pub fn keybd_event(vk: u8, scan: u8, flags: u32, extra: usize);
     pub fn SystemParametersInfoW(action: u32, param: u32, data: *mut c_void, winini: u32) -> BOOL;
@@ -325,9 +345,20 @@ extern "system" {
     ) -> HINSTANCE;
     pub fn ShellExecuteExW(info: *mut SHELLEXECUTEINFOW) -> BOOL;
     pub fn ILCreateFromPathW(path: *const u16) -> *mut c_void;
-    pub fn SHOpenFolderAndSelectItems(pidl: *const c_void, count: u32, items: *const *const c_void, flags: u32) -> i32;
+    pub fn SHOpenFolderAndSelectItems(
+        pidl: *const c_void,
+        count: u32,
+        items: *const *const c_void,
+        flags: u32,
+    ) -> i32;
     pub fn ILFree(pidl: *mut c_void);
-    pub fn ExtractIconExW(file: *const u16, index: i32, large: *mut HICON, small: *mut HICON, count: u32) -> u32;
+    pub fn ExtractIconExW(
+        file: *const u16,
+        index: i32,
+        large: *mut HICON,
+        small: *mut HICON,
+        count: u32,
+    ) -> u32;
 }
 
 #[link(name = "gdi32")]
@@ -352,7 +383,8 @@ extern "system" {
     pub fn GetModuleHandleW(name: *const u16) -> HMODULE;
     pub fn GetCurrentProcess() -> HANDLE;
     pub fn OpenProcess(access: u32, inherit: BOOL, pid: u32) -> HANDLE;
-    pub fn QueryFullProcessImageNameW(h: HANDLE, flags: u32, buf: *mut u16, size: *mut u32) -> BOOL;
+    pub fn QueryFullProcessImageNameW(h: HANDLE, flags: u32, buf: *mut u16, size: *mut u32)
+        -> BOOL;
     pub fn CloseHandle(h: HANDLE) -> BOOL;
     pub fn GetLastError() -> u32;
     pub fn CreateMutexW(attrs: *mut c_void, initial_owner: BOOL, name: *const u16) -> HANDLE;
@@ -427,12 +459,7 @@ pub fn work_area_physical() -> (f64, f64) {
     const SPI_GETWORKAREA: u32 = 0x0030;
     unsafe {
         let mut r: RECT = std::mem::zeroed();
-        let ok = SystemParametersInfoW(
-            SPI_GETWORKAREA,
-            0,
-            &mut r as *mut RECT as *mut c_void,
-            0,
-        );
+        let ok = SystemParametersInfoW(SPI_GETWORKAREA, 0, &mut r as *mut RECT as *mut c_void, 0);
         if ok == 0 {
             return (1280.0, 800.0);
         }

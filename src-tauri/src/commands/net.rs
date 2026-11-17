@@ -136,10 +136,7 @@ fn parse_url(url: &str) -> Result<Parts, String> {
                 h.to_string(),
                 p.parse::<u16>().unwrap_or(if secure { 443 } else { 80 }),
             ),
-            _ => (
-                authority.to_string(),
-                if secure { 443 } else { 80 },
-            ),
+            _ => (authority.to_string(), if secure { 443 } else { 80 }),
         }
     };
     if host.is_empty() {
@@ -212,18 +209,35 @@ unsafe fn open_request(
             unsafe { windows::Win32::Foundation::GetLastError() }.0
         ));
     }
-    let _ = WinHttpSetTimeouts(session, timeout_ms as i32, timeout_ms as i32, timeout_ms as i32, timeout_ms as i32);
+    let _ = WinHttpSetTimeouts(
+        session,
+        timeout_ms as i32,
+        timeout_ms as i32,
+        timeout_ms as i32,
+        timeout_ms as i32,
+    );
 
-    let host_w: Vec<u16> = parts.host.encode_utf16().chain(std::iter::once(0)).collect();
+    let host_w: Vec<u16> = parts
+        .host
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     let connect = WinHttpConnect(session, PCWSTR(host_w.as_ptr()), parts.port, 0);
     if connect.is_null() {
         let _ = WinHttpCloseHandle(session);
         return Err("无法建立连接".into());
     }
 
-    let path_w: Vec<u16> = parts.path.encode_utf16().chain(std::iter::once(0)).collect();
+    let path_w: Vec<u16> = parts
+        .path
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     let verb_w: Vec<u16> = "GET".encode_utf16().chain(std::iter::once(0)).collect();
-    let version_w: Vec<u16> = "HTTP/1.1".encode_utf16().chain(std::iter::once(0)).collect();
+    let version_w: Vec<u16> = "HTTP/1.1"
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     let flags = if parts.secure {
         WINHTTP_FLAG_SECURE
     } else {
@@ -298,7 +312,9 @@ unsafe fn request(
         }
         let want = avail.min(buf.len() as u32);
         let mut read: u32 = 0;
-        if WinHttpReadData(req, buf.as_mut_ptr() as *mut c_void, want, &mut read).is_err() || read == 0 {
+        if WinHttpReadData(req, buf.as_mut_ptr() as *mut c_void, want, &mut read).is_err()
+            || read == 0
+        {
             break;
         }
         body.extend_from_slice(&buf[..read as usize]);
@@ -309,7 +325,7 @@ unsafe fn request(
 
     let text = String::from_utf8_lossy(&body).to_string();
     Ok(HttpProbe {
-        ok: status >= 200 && status < 400,
+        ok: (200..400).contains(&status),
         status: status as u16,
         body: Some(text),
         error: None,
@@ -333,9 +349,8 @@ pub(crate) fn download_to_file(
     // A cancelled transfer must not be retried through the proxy: the user
     // asked for it to stop, not for another route.
     let canceled = std::cell::Cell::new(false);
-    let direct = unsafe {
-        stream_to_file(&parts, None, timeout_ms, dest, &mut on_progress, &canceled)
-    };
+    let direct =
+        unsafe { stream_to_file(&parts, None, timeout_ms, dest, &mut on_progress, &canceled) };
     match direct {
         Ok(n) => Ok(n),
         Err(direct_err) => {
@@ -590,7 +605,11 @@ mod tests {
             .copied()
             .unwrap_or(urls[0]);
         println!("asset = {asset}");
-        for prefix in ["https://gh-proxy.com/", "https://ghproxy.net/", "https://gh-proxy.net/"] {
+        for prefix in [
+            "https://gh-proxy.com/",
+            "https://ghproxy.net/",
+            "https://gh-proxy.net/",
+        ] {
             let url = format!("{prefix}{asset}");
             let p = probe(&url, 20_000, Some(1024));
             println!("{prefix} -> status={} via={} ms={}", p.status, p.via, p.ms);
@@ -616,7 +635,9 @@ mod tests {
             .iter()
             .find(|a| a["name"].as_str().unwrap_or("").ends_with(".msi"))
             .expect("no msi asset");
-        let asset = msi["browser_download_url"].as_str().expect("no download url");
+        let asset = msi["browser_download_url"]
+            .as_str()
+            .expect("no download url");
         // The expected size comes from the release payload, so a truncated
         // download is caught even though the server answers 200.
         let expected = msi["size"].as_u64().expect("no size");

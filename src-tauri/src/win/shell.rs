@@ -55,7 +55,16 @@ pub fn open_path(path: &str) -> bool {
     let verb = wide("open");
     let file = wide(path);
     grant_foreground();
-    let h = unsafe { ShellExecuteW(0, verb.as_ptr(), file.as_ptr(), ptr::null(), ptr::null(), SW_SHOWNORMAL) };
+    let h = unsafe {
+        ShellExecuteW(
+            0,
+            verb.as_ptr(),
+            file.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
     h as isize > 32
 }
 
@@ -147,7 +156,16 @@ pub fn open_with(path: &str) -> bool {
     let verb = wide("openas");
     let file = wide(path);
     grant_foreground();
-    let h = unsafe { ShellExecuteW(0, verb.as_ptr(), file.as_ptr(), ptr::null(), ptr::null(), SW_SHOWNORMAL) };
+    let h = unsafe {
+        ShellExecuteW(
+            0,
+            verb.as_ptr(),
+            file.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
     h as isize > 32
 }
 
@@ -156,7 +174,16 @@ pub fn run_as_admin(path: &str) -> bool {
     let verb = wide("runas");
     let file = wide(path);
     grant_foreground();
-    let h = unsafe { ShellExecuteW(0, verb.as_ptr(), file.as_ptr(), ptr::null(), ptr::null(), SW_SHOWNORMAL) };
+    let h = unsafe {
+        ShellExecuteW(
+            0,
+            verb.as_ptr(),
+            file.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
     h as isize > 32
 }
 
@@ -366,7 +393,17 @@ pub fn reveal(path: &str) -> bool {
     } else {
         let params = wide(&format!("/select,\"{path}\""));
         let exe = wide("explorer.exe");
-        unsafe { ShellExecuteW(0, ptr::null(), exe.as_ptr(), params.as_ptr(), ptr::null(), SW_SHOWNORMAL) as isize > 32 }
+        unsafe {
+            ShellExecuteW(
+                0,
+                ptr::null(),
+                exe.as_ptr(),
+                params.as_ptr(),
+                ptr::null(),
+                SW_SHOWNORMAL,
+            ) as isize
+                > 32
+        }
     }
 }
 
@@ -388,13 +425,33 @@ pub fn open_terminal(dir: &str) -> bool {
     let params = wide(&format!("-d \"{dir}\""));
     let wt = wide("wt.exe");
     grant_foreground();
-    let ok = unsafe { ShellExecuteW(0, ptr::null(), wt.as_ptr(), params.as_ptr(), ptr::null(), SW_SHOWNORMAL) as isize > 32 };
+    let ok = unsafe {
+        ShellExecuteW(
+            0,
+            ptr::null(),
+            wt.as_ptr(),
+            params.as_ptr(),
+            ptr::null(),
+            SW_SHOWNORMAL,
+        ) as isize
+            > 32
+    };
     if ok {
         return true;
     }
     let cmd = wide("cmd.exe");
     let k = wide("/K");
-    unsafe { ShellExecuteW(0, ptr::null(), cmd.as_ptr(), k.as_ptr(), wide(dir).as_ptr(), SW_SHOWNORMAL) as isize > 32 }
+    unsafe {
+        ShellExecuteW(
+            0,
+            ptr::null(),
+            cmd.as_ptr(),
+            k.as_ptr(),
+            wide(dir).as_ptr(),
+            SW_SHOWNORMAL,
+        ) as isize
+            > 32
+    }
 }
 
 /// Run a command line through cmd.exe without showing a console flash.
@@ -404,7 +461,14 @@ pub fn run_shell(command: &str, cwd: Option<&str>) -> bool {
     let dir = cwd.map(wide);
     let dir_ptr = dir.as_ref().map(|d| d.as_ptr()).unwrap_or(ptr::null());
     unsafe {
-        let h = ShellExecuteW(0, ptr::null(), cmd.as_ptr(), args.as_ptr(), dir_ptr, SW_HIDE);
+        let h = ShellExecuteW(
+            0,
+            ptr::null(),
+            cmd.as_ptr(),
+            args.as_ptr(),
+            dir_ptr,
+            SW_HIDE,
+        );
         h as isize > 32
     }
 }
@@ -464,7 +528,11 @@ pub fn copy_files_to_clipboard(paths: &[String]) -> bool {
             f_wide: 1,
         };
         ptr::copy_nonoverlapping(&drop as *const DROPFILES as *const u8, dst, header);
-        ptr::copy_nonoverlapping(payload.as_ptr() as *const u8, dst.add(header), payload.len() * 2);
+        ptr::copy_nonoverlapping(
+            payload.as_ptr() as *const u8,
+            dst.add(header),
+            payload.len() * 2,
+        );
         GlobalUnlock(mem);
         let ok = SetClipboardData(CF_HDROP, mem as isize) != 0;
         CloseClipboard();

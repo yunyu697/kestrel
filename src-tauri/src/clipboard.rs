@@ -19,7 +19,10 @@ fn png_data_url(img: &arboard::ImageData) -> Option<String> {
     let buf = image::RgbaImage::from_raw(w, h, img.bytes.to_vec())?;
     let mut out = std::io::Cursor::new(Vec::new());
     buf.write_to(&mut out, image::ImageFormat::Png).ok()?;
-    Some(format!("data:image/png;base64,{}", STANDARD.encode(out.into_inner())))
+    Some(format!(
+        "data:image/png;base64,{}",
+        STANDARD.encode(out.into_inner())
+    ))
 }
 
 pub fn start(state: Arc<AppState>, app: AppHandle) {

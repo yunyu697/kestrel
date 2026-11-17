@@ -63,7 +63,11 @@ fn init() -> bool {
     STATE.store(if ok { 1 } else { 2 }, Ordering::Relaxed);
     if ok {
         let path = log_path().unwrap();
-        if let Ok(f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        if let Ok(f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
             *handle().lock() = Some(f);
         }
     }

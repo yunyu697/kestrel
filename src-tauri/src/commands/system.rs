@@ -195,7 +195,7 @@ pub fn has_dialog_target(state: State<'_, Arc<AppState>>) -> bool {
     state
         .dialog
         .lock()
-        .map(|h| window::is_manual_quick_switch_target(h))
+        .map(window::is_manual_quick_switch_target)
         .unwrap_or(false)
 }
 
@@ -254,10 +254,7 @@ pub fn qs_context(state: State<'_, Arc<AppState>>) -> QsContext {
     let home = dirs::home_dir()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|| std::env::var("USERPROFILE").unwrap_or_default());
-    let folder = state
-        .dialog
-        .lock()
-        .and_then(|h| window::dialog_current_folder(h));
+    let folder = state.dialog.lock().and_then(window::dialog_current_folder);
     let children = folder.as_deref().map(child_dirs).unwrap_or_default();
     QsContext {
         folder,

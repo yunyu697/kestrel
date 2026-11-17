@@ -109,7 +109,11 @@ impl AppState {
             settings.custom_commands = crate::model::preset_commands(&settings.language);
             settings_changed = true;
         }
-        if !settings.custom_commands.iter().any(|c| c.id == "preset-settings") {
+        if !settings
+            .custom_commands
+            .iter()
+            .any(|c| c.id == "preset-settings")
+        {
             // Migration: add the new "打开设置" preset.
             if let Some(p) = crate::model::preset_commands(&settings.language)
                 .into_iter()

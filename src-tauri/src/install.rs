@@ -89,7 +89,10 @@ fn launch(installer: &str) -> bool {
     match ext.as_str() {
         // Windows Installer: a quiet install of the new version over the old
         // one. A per-machine package still asks for elevation on its own.
-        "msi" => run_waited("msiexec.exe", &format!("/i \"{installer}\" /quiet /norestart")),
+        "msi" => run_waited(
+            "msiexec.exe",
+            &format!("/i \"{installer}\" /quiet /norestart"),
+        ),
         // Tauri's NSIS installer understands /S for a silent install.
         "exe" => run_waited(installer, "/S"),
         // A zip cannot be installed — show it in Explorer instead.
