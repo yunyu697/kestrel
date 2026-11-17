@@ -524,8 +524,21 @@ export default function Launcher() {
     return () => window.clearTimeout(id);
   }, [query, runSearch, quick]);
 
+  // Empty search: favorites get their own horizontal strip. Keeping them out
+  // of the keyboard list is what frees the vertical space for recents — eight
+  // favorite rows used to push history below the fold.
+  const showFavStrip = mode === "search" && !quick && query === "";
+  const favHits = useMemo(
+    () => (showFavStrip ? hits.filter((h) => h.kind === "favorite") : []),
+    [hits, showFavStrip],
+  );
+  const navHits = useMemo(
+    () => (showFavStrip ? hits.filter((h) => h.kind !== "favorite") : hits),
+    [hits, showFavStrip],
+  );
+
   // ---- preview ----
-  const selHit = hits[selected];
+  const selHit = navHits[selected];
   useEffect(() => {
     if (!selHit) {
       setPreview(null);
@@ -575,9 +588,22 @@ export default function Launcher() {
     [query, settings?.closeAfterOpen],
   );
 
+  /**
+   * Favorites are opened straight from the strip, so they never need to enter
+   * the keyboard list. Same launch path as a row, just without a selection.
+   */
+  const openFavorite = useCallback(
+    (hit: SearchHit) => {
+      const path = hit.path;
+      if (!path) return;
+      launch(() => api.openPath(path));
+    },
+    [launch],
+  );
+
   const openSelected = useCallback(
     async (shiftKey = false, ctrlKey = false, adminKey = false) => {
-      const hit = hits[selected];
+      const hit = navHits[selected];
       if (!hit) return;
       if (hit.kind === "calc" && hit.meta) {
         const v = String(hit.meta.display ?? hit.title);
@@ -618,7 +644,7 @@ export default function Launcher() {
         launch(() => api.openPath(path));
       }
     },
-    [hits, selected, settings, query, quick, showToast, qsJump, launch],
+    [navHits, selected, settings, query, quick, showToast, qsJump, launch],
   );
 
   const handleCommand = useCallback(
@@ -658,7 +684,7 @@ export default function Launcher() {
         if (quick && query === "") setDirSel((s) => Math.min(s + 1, Math.max(0, qsDirs.length - 1)));
         else if (plan && plan.candidates.length)
           setSelected((s) => Math.min(s + 1, plan.candidates.length - 1));
-        else setSelected((s) => Math.min(s + 1, Math.max(0, hits.length - 1)));
+        else setSelected((s) => Math.min(s + 1, Math.max(0, navHits.length - 1)));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         if (quick && query === "") setDirSel((s) => Math.max(s - 1, 0));
@@ -678,7 +704,7 @@ export default function Launcher() {
         void qsJump(upOne(qsFolder), true);
       } else if (e.key === "Tab" || (e.key === "k" && e.ctrlKey)) {
         e.preventDefault();
-        if (!quick && hits[selected]) setAction({ hit: hits[selected], items: buildActions(hits[selected]), idx: 0 });
+        if (!quick && navHits[selected]) setAction({ hit: navHits[selected], items: buildActions(navHits[selected]), idx: 0 });
       } else if (e.key === "Enter") {
         e.preventDefault();
         if (quick && query === "") {
@@ -702,7 +728,7 @@ export default function Launcher() {
     [
       action,
       mode,
-      hits,
+      navHits,
       selected,
       menuOpen,
       quick,
@@ -910,13 +936,40 @@ export default function Launcher() {
         <div className="body">
           {mode === "search" && (
             <div className="list-wrap">
-              <div className="list" ref={listRef} data-accent={selected >= 0 && hits[selected]?.kind === "command" ? "true" : "false"}>
+              {favHits.length > 0 && (
+                <div className="fav-block">
+                  <div className="fav-head">
+                    <span>{t("收藏夹")}</span>
+                    <span className="n">{favHits.length}</span>
+                  </div>
+                  <div className="fav-row">
+                    {favHits.map((h) => (
+                      <button
+                        key={h.id}
+                        className="fav-card"
+                        title={h.title}
+                        onClick={() => openFavorite(h)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setAction({ hit: h, items: buildActions(h), idx: 0 });
+                        }}
+                      >
+                        <span className="fav-ico">
+                          {h.path && icons[h.path] ? <img src={icons[h.path]} alt="" /> : <Icon name="star" size={15} />}
+                        </span>
+                        <span className="fav-name">{h.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="list" ref={listRef} data-accent={selected >= 0 && navHits[selected]?.kind === "command" ? "true" : "false"}>
                 <div
                   className="pill"
-                  data-hidden={hits.length === 0}
-                  style={{ transform: `translateY(${selected * rowH}px)`, height: rowH, opacity: hits.length ? 1 : 0 }}
+                  data-hidden={navHits.length === 0}
+                  style={{ transform: `translateY(${selected * rowH}px)`, height: rowH, opacity: navHits.length ? 1 : 0 }}
                 />
-                {hits.length === 0 && !(quick && (query === "" || plan)) && (
+                {navHits.length === 0 && favHits.length === 0 && !(quick && (query === "" || plan)) && (
                   <div className="empty">
                     {status.state === "scanning" ? (
                       <>
@@ -997,7 +1050,7 @@ export default function Launcher() {
                     ))}
                   </>
                 )}
-                {!plan && !(quick && query === "") && hits.map((h, i) => (
+                {!plan && !(quick && query === "") && navHits.map((h, i) => (
                   <Row
                     key={h.id}
                     hit={h}

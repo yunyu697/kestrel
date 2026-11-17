@@ -5,12 +5,12 @@
 .upd-block {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-3);
 }
 
 .upd-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
   align-items: center;
 }
@@ -19,24 +19,24 @@
 .upd-mirror {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 .upd-mirror-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-2);
   white-space: nowrap;
 }
 .upd-mirror-select {
   min-width: 148px;
   flex: 0 1 220px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .upd-mirror-custom {
   flex: 1 1 180px;
   min-width: 140px;
   height: 30px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .upd-block[data-compact="true"] .upd-mirror-select {
   min-width: 128px;
@@ -44,8 +44,8 @@
 }
 
 .upd-hint {
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-relaxed);
   color: var(--text-3);
 }
 
@@ -53,13 +53,13 @@
 .upd-done-wrap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-1);
 }
 .upd-path {
-  font-size: 11px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
   overflow-wrap: anywhere;
-  line-height: 1.5;
+  line-height: var(--lh-relaxed);
 }
 
 /* ---- progress ---- */
@@ -73,12 +73,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
   color: var(--text-2);
 }
 .upd-prog-num {
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--mono);
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -98,8 +98,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 11px;
+  gap: var(--sp-3);
+  font-size: var(--fs-caption);
   color: var(--text-3);
 }
 
@@ -107,11 +107,11 @@
 .upd-done {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
 }
 .upd-done-text {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--accent);
 }
 .upd-err {

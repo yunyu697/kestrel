@@ -147,6 +147,37 @@ pub fn urlencode(s: &str) -> String {
     out
 }
 
+/// Result order: installed applications, then favorites, then anything the
+/// user has opened before, then everything else. `hits` must already be sorted
+/// by score: a stable pass over the tier keeps the strongest match on top
+/// inside each group, so there is no second comparator to keep in sync.
+fn rank_hits(
+    hits: &mut Vec<SearchHit>,
+    fav_paths: &std::collections::HashSet<String>,
+    usage: &std::collections::HashMap<String, u32>,
+) {
+    let tier = |h: &SearchHit| -> u8 {
+        if h.kind == "app" {
+            0
+        } else if h
+            .path
+            .as_deref()
+            .map_or(false, |p| fav_paths.contains(&p.to_lowercase()))
+        {
+            1
+        } else if h
+            .path
+            .as_deref()
+            .map_or(false, |p| usage.get(p).copied().unwrap_or(0) > 0)
+        {
+            2
+        } else {
+            3
+        }
+    };
+    hits.sort_by_key(tier);
+}
+
 fn do_search(st: &Arc<AppState>, query: &str, limit: Option<usize>) -> SearchResponse {
     let started = std::time::Instant::now();
     let settings = st.settings.read().clone();
@@ -292,6 +323,18 @@ fn do_search(st: &Arc<AppState>, query: &str, limit: Option<usize>) -> SearchRes
     hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
     let mut seen = std::collections::HashSet::new();
     hits.retain(|h| seen.insert(h.id.clone()));
+
+    // Rank: apps, favorites, previously opened, everything else. The stable
+    // tier pass preserves the score order created above inside each group.
+    let fav_paths: std::collections::HashSet<String> = settings
+        .favorites
+        .iter()
+        .filter(|f| f.enabled)
+        .map(|f| f.path.to_lowercase())
+        .collect();
+    let usage = st.usage.read();
+    rank_hits(&mut hits, &fav_paths, &usage);
+    drop(usage);
     hits.truncate(max);
 
     let took = started.elapsed().as_secs_f64() * 1000.0;
@@ -354,4 +397,89 @@ pub fn history_list(state: State<'_, Arc<AppState>>) -> Vec<crate::model::Histor
 pub fn history_clear(state: State<'_, Arc<AppState>>) {
     state.history.write().clear();
     state.save_history();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::{HashMap, HashSet};
+
+    fn hit(id: &str, kind: &str, path: Option<&str>, score: f64) -> SearchHit {
+        SearchHit {
+            id: id.into(),
+            kind: kind.into(),
+            title: id.into(),
+            subtitle: String::new(),
+            path: path.map(str::to_string),
+            icon: None,
+            score,
+            badge: None,
+            meta: None,
+        }
+    }
+
+    fn ids(hits: &[SearchHit]) -> Vec<&str> {
+        hits.iter().map(|h| h.id.as_str()).collect()
+    }
+
+    fn by_score(hits: &mut Vec<SearchHit>) {
+        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    }
+
+    #[test]
+    fn apps_rank_above_a_better_file_match() {
+        let mut hits = vec![
+            hit("file", "file", Some(r"C:/docs/we.pdf"), 1000.0),
+            hit("app", "app", Some(r"C:/apps/we.lnk"), 300.0),
+        ];
+        by_score(&mut hits);
+        rank_hits(&mut hits, &HashSet::new(), &HashMap::new());
+        assert_eq!(ids(&hits), vec!["app", "file"]);
+    }
+
+    #[test]
+    fn favorite_then_used_then_plain_keeps_score_inside_a_tier() {
+        let mut hits = vec![
+            hit("plain-high", "file", Some(r"C:/d/plain.txt"), 900.0),
+            hit("used-low", "file", Some(r"C:/d/used.txt"), 700.0),
+            hit("fav-low", "file", Some(r"C:/d/fav.txt"), 600.0),
+            hit("plain-low", "file", Some(r"C:/d/other.txt"), 500.0),
+            hit("used-high", "file", Some(r"C:/d/used2.txt"), 800.0),
+        ];
+        by_score(&mut hits);
+        let favs: HashSet<String> = [r"c:/d/fav.txt".to_string()].into_iter().collect();
+        let usage: HashMap<String, u32> = [
+            (r"C:/d/used.txt".to_string(), 3),
+            (r"C:/d/used2.txt".to_string(), 1),
+        ]
+        .into_iter()
+        .collect();
+        rank_hits(&mut hits, &favs, &usage);
+        assert_eq!(
+            ids(&hits),
+            vec!["fav-low", "used-high", "used-low", "plain-high", "plain-low"]
+        );
+    }
+
+    #[test]
+    fn favorite_paths_are_matched_case_insensitively() {
+        let mut hits = vec![hit("fav", "file", Some(r"C:/Docs/Plan.docx"), 100.0)];
+        let favs: HashSet<String> = [r"c:/docs/plan.docx".to_string()].into_iter().collect();
+        rank_hits(&mut hits, &favs, &HashMap::new());
+        assert_eq!(ids(&hits), vec!["fav"]);
+    }
+
+    #[test]
+    fn commands_and_folders_stay_in_the_last_tier() {
+        let mut hits = vec![
+            hit("cmd", "command", None, 1200.0),
+            hit("folder", "folder", Some(r"C:/d"), 900.0),
+            hit("used", "file", Some(r"C:/d/used.txt"), 400.0),
+        ];
+        by_score(&mut hits);
+        let usage: HashMap<String, u32> =
+            [(r"C:/d/used.txt".to_string(), 1)].into_iter().collect();
+        rank_hits(&mut hits, &HashSet::new(), &usage);
+        assert_eq!(ids(&hits), vec!["used", "cmd", "folder"]);
+    }
 }

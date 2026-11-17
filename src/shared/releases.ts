@@ -27,6 +27,63 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.19",
+    date: "2026-11-17",
+    title: {
+      zh: "收藏收成一条，结果按类型分组，界面统一标尺",
+      en: "Favorites on one row, grouped results, one type scale everywhere",
+      ja: "お気に入りを 1 行に、結果は種類ごとに、UI はひとつの基準へ",
+      es: "Favoritos en una fila, resultados agrupados y una sola escala",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "空搜索时的收藏从纵向列表改成一行可横向滚动的图标卡片，高度从约 368px 压到约 80px，最近与历史不用再往下滑就能看到；键盘 ↑↓ 与 Enter 只作用于下方列表，收藏卡片单击即打开，右键菜单照旧",
+          en: "With an empty search, favorites are now a single horizontally scrolling row of icon cards instead of a vertical list — roughly 368 px of height becomes about 80 px, so recents and history are visible without scrolling. The arrow keys and Enter act on the list below only; a favorite card opens with a single click and keeps its context menu",
+          ja: "空の検索時、お気に入りは縦のリストから横スクロールする 1 行のカードになり、高さは約 368px から約 80px に縮みました。最近使った項目と履歴までスクロールせずに見えます。↑↓ と Enter は下のリストだけを操作し、カードはクリックで開き、右クリックメニューも従来どおりです",
+          es: "Con la búsqueda vacía, los favoritos pasan de una lista vertical a una sola fila de tarjetas con desplazamiento horizontal: de unos 368 px a unos 80 px de alto, así que los recientes y el historial se ven sin bajar. Las flechas y Enter actúan solo sobre la lista inferior; una tarjeta se abre con un clic y conserva su menú contextual",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "结果顺序改为稳定分组：已安装应用 → 收藏 → 打开过的 → 其它，组内仍按匹配度排序。以前是混合打分，一个用过很多次、与查询同名的文件可以压过已安装应用；现在应用始终在最前，同组里匹配更强的仍排在前面",
+          en: "Results are now grouped in a stable order: installed apps, then favorites, then anything opened before, then everything else — strongest match first inside each group. The old scoring was one blended number, so a frequently used file with the same name could outrank an installed app; apps now always lead, and better matches still lead within a group",
+          ja: "検索結果は「インストール済みアプリ → お気に入り → 過去に開いたもの → その他」という安定したグループ順になり、グループ内は一致度の順です。以前は単一の合成スコアだったため、同じ名前でよく使うファイルがインストール済みアプリより上に来ることがありました。現在はアプリが常に先頭で、グループ内では一致度の高いものが先に並びます",
+          es: "Los resultados se agrupan en un orden estable: aplicaciones instaladas, luego favoritos, luego lo abierto antes y por último el resto; dentro de cada grupo manda la coincidencia. Antes había una sola puntuación combinada, así que un archivo con el mismo nombre y mucho uso podía superar a una aplicación instalada; ahora las aplicaciones van siempre primero y, dentro del grupo, gana la mejor coincidencia",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "修复搜索栏配色不协调：启动器的卡片底、页脚、徽标、键帽与边框以前各用一种色层，多色系方案下同屏出现四五种色相；现在结构件统一走中性色（都由文字色派生），色相只留在强调色和选中态，11 套配色方案下都不再花",
+          en: "Fixed the mismatched launcher colours: card backgrounds, the footer band, badges, keycaps and borders each used a different tinted layer, so colour-scheme presets put four or five hues on one 780×540 screen. Structural surfaces are now neutral and derived from the text colour, with hue reserved for the accent and selected states, so all eleven presets stay coherent",
+          ja: "ランチャーの配色の不整合を修正しました。カード背景、フッター、バッジ、キーキャップ、枠線がそれぞれ別の色層を使っていたため、多色系のプリセットでは 780×540 の画面に 4〜5 色の色相が同居していました。構造面は文字色から派生した中性色に統一し、色相はアクセントと選択状態だけに残したので、11 種のプリセットすべてでまとまります",
+          es: "Corregida la incoherencia de color del lanzador: los fondos de tarjeta, la banda inferior, las insignias, las teclas y los bordes usaban cada uno una capa tintada distinta, así que los esquemas multicolor ponían cuatro o cinco tonos en una pantalla de 780×540. Las superficies estructurales ahora son neutras y derivan del color de texto, con el tono reservado al acento y a los estados seleccionados, de modo que los once esquemas quedan coherentes",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "新增界面规范并据此收敛：字号从 15 种归到 7 种（11 / 12 / 13 / 15 / 17 / 22，计算器 30 为唯一数值例外），字重 7 种归到 3 种，行高 7 种归到 3 种，间距统一到 4px 栅格。启动器、设置页、更新面板共 95 处字号改为引用同一套 token，规范写在仓库 docs/ui-spec.md",
+          en: "Added a UI spec and converged on it: fifteen text sizes became seven (11 / 12 / 13 / 15 / 17 / 22, with 30 as the single numeric exception in the calculator), seven weights became three, seven line heights became three, and spacing snapped to a 4 px grid. Ninety-five font-size declarations across the launcher, settings and update panel now reference the same tokens; the spec lives in docs/ui-spec.md",
+          ja: "UI 仕様を追加し、それに合わせて整理しました。文字サイズは 15 種から 7 種（11 / 12 / 13 / 15 / 17 / 22、計算機の 30 のみ例外）、ウェイトは 7 種から 3 種、行高は 7 種から 3 種、余白は 4px グリッドに統一。ランチャー、設定、更新パネルの 95 か所のフォントサイズが同じトークンを参照します。仕様は docs/ui-spec.md にあります",
+          es: "Nueva especificación de interfaz y convergencia: quince tamaños de texto pasan a siete (11 / 12 / 13 / 15 / 17 / 22, con 30 como única excepción numérica en la calculadora), siete pesos pasan a tres, siete alturas de línea a tres y los espaciados se ajustan a una rejilla de 4 px. Noventa y cinco declaraciones de tamaño en el lanzador, los ajustes y el panel de actualización usan ahora los mismos tokens; la especificación está en docs/ui-spec.md",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "设置窗口固定为 1040×720，不再允许拖动改尺寸或最大化。界面是按这个画布设计的，拉大只会出现半空的栏位；小屏幕上仍按可用工作区自动钳制，不会超出屏幕",
+          en: "The settings window is fixed at 1040×720 and can no longer be resized or maximised. The layout is designed for that canvas, and stretching it only produced half-empty panes; on smaller screens it still clamps to the available work area so it never spills off-screen",
+          ja: "設定ウィンドウは 1040×720 に固定され、サイズ変更と最大化ができなくなりました。レイアウトはこのキャンバス前提で、広げると空いた欄が目立つだけでした。小さい画面では引き続き作業領域に合わせて自動的に縮み、画面外には出ません",
+          es: "La ventana de ajustes queda fija en 1040×720 y ya no se puede redimensionar ni maximizar. El diseño está pensado para ese lienzo y estirarlo solo dejaba paneles medio vacíos; en pantallas pequeñas sigue ajustándose al área de trabajo disponible para no salirse",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.18",
     date: "2026-11-10",
     title: {

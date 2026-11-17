@@ -21,6 +21,36 @@
   --radius-card: 12px;
   --radius-ctl: 8px;
   --row-h: 46px;
+
+  /* Neutral structure. Derived from the text colour, so a colour scheme can
+     change hue without dyeing borders, badges and keycaps — the thing that
+     made the launcher look mismatched across palettes. */
+  --line: color-mix(in srgb, var(--text) 9%, transparent);
+  --line-strong: color-mix(in srgb, var(--text) 16%, transparent);
+  --chip: color-mix(in srgb, var(--text) 5%, transparent);
+  --chip-hover: color-mix(in srgb, var(--text) 8%, transparent);
+
+  /* Type ramp: six sizes, no in-between steps. 30px is reserved for the
+     calculator result, which is a number rather than running text. */
+  --fs-caption: 11px;
+  --fs-sm: 12px;
+  --fs-body: 13px;
+  --fs-title: 15px;
+  --fs-search: 17px;
+  --fs-display: 22px;
+  --fs-calc: 30px;
+
+  --lh-tight: 1.25;
+  --lh-normal: 1.45;
+  --lh-relaxed: 1.55;
+
+  /* Spacing: 4px grid. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
 }
 
 :root[data-theme="light"] {
@@ -136,13 +166,13 @@ select {
 
 kbd {
   font-family: var(--font);
-  font-size: 11px;
+  font-size: var(--fs-caption);
   font-weight: 600;
   line-height: 1;
   padding: 3px 5px;
   border-radius: 5px;
-  background: var(--kbd-bg);
-  border: 1px solid var(--kbd-border);
+  background: var(--chip);
+  border: 1px solid var(--line);
   color: var(--text-2);
   min-width: 18px;
   display: inline-flex;
@@ -210,7 +240,7 @@ kbd {
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-body);
   font-weight: 500;
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
@@ -250,7 +280,7 @@ kbd {
 }
 .btn[data-size="sm"] {
   height: 26px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 0 9px;
 }
 
@@ -300,7 +330,7 @@ kbd {
   height: 26px;
   padding: 0 11px;
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: var(--fs-body);
   font-weight: 500;
   color: var(--text-2);
   transition: all var(--dur-fast) var(--ease);
@@ -320,11 +350,11 @@ kbd {
   height: 18px;
   padding: 0 6px;
   border-radius: 5px;
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--text-2);
-  background: var(--surface-3);
+  background: var(--chip);
   text-transform: uppercase;
   flex: none;
 }
