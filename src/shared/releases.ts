@@ -27,6 +27,63 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.22",
+    date: "2026-11-17",
+    title: {
+      zh: "更新不再可能装重一份，索引升级不再空窗",
+      en: "Updates can no longer duplicate the install; index upgrades no longer blank search",
+      ja: "更新で二重インストールする余地をなくし、索引更新時の空振りを解消",
+      es: "Las actualizaciones ya no duplican la instalación ni vacían el índice",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "修复应用内更新可能装成第二份的问题：判断「这份是用哪种方式装的」时，如果拿不到结果，原先会默认按机器级安装处理，于是给当前用户安装的副本递上 MSI，在 Program Files 里又装一份，而不是替换原来那份。现在三种情况（设置页、后台检查、程序自身）都改为「未知就是未知」，不再猜；拿不到安装方式时只提供「打开下载页面」，由你自己选对应的安装包",
+          en: "Fixed in-app updates sometimes installing a second copy. When the app could not determine how this copy was installed, it fell back to treating it as a machine-wide install and handed the MSI to a per-user copy — which lays down a second Kestrel under Program Files instead of replacing the original. All three places that decide this (settings pane, background check, the app itself) now answer \"unknown\" instead of guessing, and an unknown mode offers the release page so you pick the matching installer yourself",
+          ja: "アプリ内更新が二重インストールになることがある問題を修正しました。このコピーがどの方式でインストールされたかを判定できなかった場合、従来はマシン単位のインストールとみなし、ユーザー単位のコピーに MSI を渡していました。その結果 Program Files にもう一つ入るだけで、元のコピーは置き換わりません。判定する三か所（設定画面・バックグラウンド確認・アプリ本体）はすべて「不明は不明」と返すようになり、不明なときはダウンロードページを案内するので、適切なインストーラーを自分で選べます",
+          es: "Corregido que la actualización pudiera instalar una segunda copia. Cuando no se podía determinar cómo estaba instalada esta copia, se asumía instalación para todo el equipo y se entregaba el MSI a una copia por usuario, lo que coloca un segundo Kestrel en Program Files en lugar de reemplazar el original. Los tres puntos que lo deciden (panel de ajustes, comprobación en segundo plano y la propia app) ahora responden «desconocido» en vez de adivinar, y en ese caso se ofrece la página de descarga para que elijas el instalador correcto",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "索引格式升级后不再出现「搜索空白几分钟」：以前版本号一变就先把旧的索引文件删掉再全量重建，重建期间搜不到任何东西（本机实测六分钟），中途取消或失败还会一份索引都不剩、下次启动重新扫一遍。现在旧文件保留到新索引写成为止——保存本来就是「先写临时文件再原子替换」，成功才退役旧文件；写入失败也会记日志，不再静默",
+          en: "A format upgrade no longer leaves search blank for minutes. A version bump used to delete the old index first and then rebuild from scratch, so nothing was searchable in the meantime (six minutes here), and a cancelled or failed rebuild left no index at all — every later start paying the full scan again. The old file now stays until the new one lands: saving already writes a temp file and renames it into place, so a successful rebuild retires the stale index atomically. A failed save is logged instead of swallowed",
+          ja: "索引形式の更新後に「検索が数分空になる」現象を解消しました。従来はバージョンが変わるとまず旧索引ファイルを削除してから全件を再構築するため、その間は何も検索できず（本機では 6 分）、途中で中止や失敗をすると索引が一つも残らず、次回起動でまた全走査になっていました。旧ファイルは新しい索引が書き上がるまで残すようにし、保存は従来どおり一時ファイル＋アトミックな置換なので、成功したときだけ旧索引が退役します。保存失敗も記録するようになりました",
+          es: "Una actualización del formato ya no deja la búsqueda vacía durante minutos. Un cambio de versión borraba primero el índice antiguo y reconstruía desde cero, así que no se podía buscar nada mientras tanto (seis minutos en este equipo), y una reconstrucción cancelada o fallida dejaba sin índice alguno, obligando a repetir el escaneo completo en cada arranque. Ahora el archivo antiguo se conserva hasta que llega el nuevo: el guardado ya escribe un temporal y lo renombra, de modo que una reconstrucción correcta retira el índice obsoleto de forma atómica. Un guardado fallido se registra en lugar de ignorarse",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "热键挂掉后自愈更快：守护线程原先要等三十分钟无输入才判定快捷键失效并重建，现在改为两分钟。这一判定只在用户确实在打字时才生效，所以不会误伤空闲状态；日志里那次「stalled 1800s」意味着快捷键实打实死了半小时",
+          en: "A dead hotkey now recovers in two minutes instead of thirty. The watchdog used to wait half an hour of silence before rebuilding the keyboard hook; it now acts after two minutes. The check only runs while you are actually typing, so idleness cannot trigger it — the \"stalled 1800s\" line in the log meant the hotkey really was dead for half an hour",
+          ja: "ホットキーが死んだあとの復帰を速くしました。監視スレッドは従来 30 分間入力がないと判断してからフックを再構築していましたが、2 分で判断するようになりました。この判定は実際に入力している間だけ働くため、アイドル状態で誤作動しません。ログの「stalled 1800s」は、ホットキーが本当に 30 分使えなかったことを意味していました",
+          es: "Un atajo que deja de responder se recupera en dos minutos en lugar de treinta. El vigilante esperaba media hora de silencio antes de reconstruir el hook del teclado; ahora actúa a los dos minutos. La comprobación solo corre mientras escribes de verdad, así que la inactividad no la dispara: la línea «stalled 1800s» del registro significaba que el atajo estuvo muerto media hora",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "在打开/保存对话框里吸附搜索栏更可靠：对话框弹出得慢时，程序原本只等八秒就放弃，之后必须再点一次对话框才生效；现在等三十秒。Windows 每次激活只发一次前台事件，所以早放弃就等于白等。放弃时日志会记下对话框是否可见和它的窗口类名，下次出问题能直接定位，不用靠猜",
+          en: "Attaching the search bar to open/save dialogs is more reliable. When a dialog painted slowly, the app gave up after eight seconds and the box only appeared after you clicked the dialog again; it now waits thirty seconds. Windows sends one foreground event per activation, so giving up early wastes the only signal there is. The give-up line now records whether the dialog was visible and its window class, so the next report can be diagnosed from the log instead of guessed at",
+          ja: "開く／保存ダイアログへの吸着がより確実になりました。ダイアログの描画が遅いと 8 秒で諦めてしまい、もう一度ダイアログをクリックしないと表示されませんでしたが、30 秒待つようになりました。Windows はアクティブ化ごとに前面イベントを一度しか送らないため、早く諦めることは唯一の合図を捨てるのと同じです。諦めた際はダイアログが見えていたかとウィンドウクラスを記録するので、次回はログから原因を追えます",
+          es: "Adjuntar la barra de búsqueda a los diálogos de abrir/guardar es más fiable. Si un diálogo tardaba en pintarse, la app se rendía a los ocho segundos y la caja solo aparecía tras volver a pulsar el diálogo; ahora espera treinta. Windows envía un único evento de primer plano por activación, así que rendirse pronto descarta la única señal disponible. Al rendirse se registra si el diálogo era visible y su clase de ventana, para poder diagnosticarlo desde el registro",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "顺手清理了旧版本留在程序目录里的退出标志文件（早期版本把它写在程序旁边，装在 Program Files 时删不掉也写不进）。它已经没人读了，但看上去像是还在生效，容易误导排查。清理需要管理员权限，所以只在真的删掉时记一行日志",
+          en: "The quit flag file that older builds left next to the executable is now cleaned up. Early versions wrote it there, which is exactly the directory an installed copy cannot write to. Nothing reads it any more, but it looks live and misleads anyone debugging a shutdown problem. Removing it needs elevation, so the cleanup logs only when it actually succeeds",
+          ja: "旧バージョンが実行ファイルの隣に残した終了フラグを掃除するようにしました。初期の実装はそこに書いており、Program Files にインストールすると書き込めない場所でもあります。現在は誰も読んでいませんが、有効に見えるため終了まわりの調査を誤らせます。削除には管理者権限が要るので、実際に消せたときだけ記録します",
+          es: "Ahora se limpia el archivo de bandera de salida que las versiones antiguas dejaban junto al ejecutable. Las primeras versiones lo escribían ahí, justo el directorio donde una copia instalada no puede escribir. Ya nadie lo lee, pero parece activo y confunde al depurar problemas de cierre. Borrarlo requiere elevación, así que solo se registra cuando se consigue",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.21",
     date: "2026-11-17",
     title: {
