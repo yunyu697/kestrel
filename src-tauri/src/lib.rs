@@ -420,16 +420,17 @@ pub fn ensure_settings_window(app: &AppHandle) -> tauri::Result<()> {
     let (avail_w, avail_h) = crate::win::work_area_logical();
     let w = 1040.0f64.min(avail_w - 24.0).max(560.0);
     let h = 720.0f64.min(avail_h - 24.0).max(420.0);
-    let min_w = 840.0f64.min(w);
-    let min_h = 520.0f64.min(h);
     for attempt in 1..=4 {
         debug_log::qs_log(&format!("window 'settings' creating (attempt {attempt})"));
         let mut b = WebviewWindowBuilder::new(&a, "settings", WebviewUrl::App("settings.html".into()))
             .title("Kestrel 设置")
             .inner_size(w, h)
-            .min_inner_size(min_w, min_h)
             .center()
-            .resizable(true)
+            // Fixed canvas on purpose: the settings layout is designed for one
+            // size, and letting the user drag it around only produces
+            // half-empty panes. A fixed size was an explicit requirement.
+            .resizable(false)
+            .maximizable(false)
             .decorations(false)
             .transparent(false)
             .visible(false)
