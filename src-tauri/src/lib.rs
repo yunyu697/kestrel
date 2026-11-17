@@ -87,7 +87,10 @@ pub fn run() {
     let builder = tauri::Builder::default();
     builder
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -106,11 +109,10 @@ pub fn run() {
             // to an elevated copy and quit before anything is shown (no tray
             // icon flash, no half-built UI).
             if !win::is_elevated() {
-                let wanted = state::load_json::<crate::model::Settings>(
-                    &data_dir.join("settings.json"),
-                )
-                .map(|s| s.run_as_admin)
-                .unwrap_or(false);
+                let wanted =
+                    state::load_json::<crate::model::Settings>(&data_dir.join("settings.json"))
+                        .map(|s| s.run_as_admin)
+                        .unwrap_or(false);
                 if wanted {
                     // Announce the hand-off: the elevated copy is allowed past
                     // the instance guard only because of this flag.
@@ -152,6 +154,7 @@ pub fn run() {
             // Guard the process with a watchdog-visible alive mutex.
             watchdog::hold_alive_mutex();
             watchdog::clear_quit_flag();
+            watchdog::clean_legacy_flags();
             debug_log::qs_log("setup: watchdog ok");
 
             commands::settings::apply_side_effects(&handle, &state);
@@ -223,18 +226,16 @@ pub fn run() {
                     let _ = window.hide();
                 }
             }
-            WindowEvent::Focused(false) => {
-                if window.label() == "launcher" {
-                    if let Some(state) = window.app_handle().try_state::<Arc<AppState>>() {
-                        // An attached Quick Switch session survives focus loss:
-                        // clicking the dialog must never dismiss the box.
-                        if state.qs_active.load(std::sync::atomic::Ordering::Relaxed) {
-                            return;
-                        }
-                        let keep = !state.settings.read().close_after_open;
-                        if !keep {
-                            crate::ui::hide_launcher(window.app_handle());
-                        }
+            WindowEvent::Focused(false) if window.label() == "launcher" => {
+                if let Some(state) = window.app_handle().try_state::<Arc<AppState>>() {
+                    // An attached Quick Switch session survives focus loss:
+                    // clicking the dialog must never dismiss the box.
+                    if state.qs_active.load(std::sync::atomic::Ordering::Relaxed) {
+                        return;
+                    }
+                    let keep = !state.settings.read().close_after_open;
+                    if !keep {
+                        crate::ui::hide_launcher(window.app_handle());
                     }
                 }
             }
@@ -422,19 +423,20 @@ pub fn ensure_settings_window(app: &AppHandle) -> tauri::Result<()> {
     let h = 720.0f64.min(avail_h - 24.0).max(420.0);
     for attempt in 1..=4 {
         debug_log::qs_log(&format!("window 'settings' creating (attempt {attempt})"));
-        let mut b = WebviewWindowBuilder::new(&a, "settings", WebviewUrl::App("settings.html".into()))
-            .title("Kestrel 设置")
-            .inner_size(w, h)
-            .center()
-            // Fixed canvas on purpose: the settings layout is designed for one
-            // size, and letting the user drag it around only produces
-            // half-empty panes. A fixed size was an explicit requirement.
-            .resizable(false)
-            .maximizable(false)
-            .decorations(false)
-            .transparent(false)
-            .visible(false)
-            .skip_taskbar(false);
+        let mut b =
+            WebviewWindowBuilder::new(&a, "settings", WebviewUrl::App("settings.html".into()))
+                .title("Kestrel 设置")
+                .inner_size(w, h)
+                .center()
+                // Fixed canvas on purpose: the settings layout is designed for one
+                // size, and letting the user drag it around only produces
+                // half-empty panes. A fixed size was an explicit requirement.
+                .resizable(false)
+                .maximizable(false)
+                .decorations(false)
+                .transparent(false)
+                .visible(false)
+                .skip_taskbar(false);
         if restart::is_relaunching() {
             if let Some(dir) = restart::profile_dir() {
                 b = b.data_directory(dir);

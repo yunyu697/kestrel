@@ -74,6 +74,33 @@ pub fn clear_stop_flag() {
     }
 }
 
+/// Older builds kept the flags next to the executable. Nothing reads them any
+/// more, but they sit in `C:\Program Files\Kestrel` and look live to anyone
+/// debugging a "关掉又自己起来" report. Removing them needs elevation, so this
+/// is best-effort and logs only when it actually succeeds.
+pub fn clean_legacy_flags() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let Some(dir) = exe.parent() else {
+        return;
+    };
+    for name in [QUIT_FLAG, STOP_FLAG] {
+        if remove_flag_in(dir, name) {
+            crate::debug_log::qs_log(&format!(
+                "watchdog: removed legacy flag {name} next to the exe"
+            ));
+        }
+    }
+}
+
+/// Split out so the cleanup is testable without controlling the test binary's
+/// own location. Returns whether a file was actually removed.
+fn remove_flag_in(dir: &std::path::Path, name: &str) -> bool {
+    let p = dir.join(name);
+    p.exists() && std::fs::remove_file(&p).is_ok()
+}
+
 /// Hold a named mutex so the watchdog can tell the app is alive. The handle
 /// is intentionally never closed: the OS releases it when the process dies.
 pub fn hold_alive_mutex() {
@@ -124,5 +151,32 @@ pub fn run() {
         if !app_alive() && !quit.exists() && !stop.exists() {
             crate::win::shell::spawn(&exe.to_string_lossy(), None, None);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{remove_flag_in, QUIT_FLAG, STOP_FLAG};
+
+    fn scratch(tag: &str) -> std::path::PathBuf {
+        let p = std::env::temp_dir().join(format!("kestrel-watchdog-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&p);
+        std::fs::create_dir_all(&p).expect("temp dir");
+        p
+    }
+
+    #[test]
+    fn legacy_flags_are_removed_and_absent_ones_report_false() {
+        let dir = scratch("flags");
+        std::fs::write(dir.join(QUIT_FLAG), b"1794900000").expect("quit flag");
+        std::fs::write(dir.join(STOP_FLAG), b"1794900000").expect("stop flag");
+
+        assert!(remove_flag_in(&dir, QUIT_FLAG));
+        assert!(!dir.join(QUIT_FLAG).exists());
+        assert!(remove_flag_in(&dir, STOP_FLAG));
+        // A second pass must be a no-op, not an error report.
+        assert!(!remove_flag_in(&dir, STOP_FLAG));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
