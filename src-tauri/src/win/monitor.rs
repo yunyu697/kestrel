@@ -205,11 +205,7 @@ fn attach_action(
 /// `candidates` is in z-order (topmost first). Prefer a dialog from the
 /// foreground process — that is where the user's attention went — then fall
 /// back to the topmost one. Never resurrect a box the user dismissed.
-fn choose_next_dialog(
-    candidates: &[(HWND, u32)],
-    fg_pid: u32,
-    dismissed: &[HWND],
-) -> Option<HWND> {
+fn choose_next_dialog(candidates: &[(HWND, u32)], fg_pid: u32, dismissed: &[HWND]) -> Option<HWND> {
     let live: Vec<(HWND, u32)> = candidates
         .iter()
         .copied()
@@ -558,23 +554,28 @@ fn late_gen_is_current(hwnd: HWND, gen: u64) -> bool {
 /// are not delayed while we wait.
 fn spawn_late_attach(hwnd: HWND, gen: u64) {
     std::thread::spawn(move || {
-        // ~8s is far beyond any real dialog's cold start, but bounded so a
-        // zombie window cannot keep a poller alive forever.
-        for _ in 0..40 {
+        // 30s, not the original 8s: a cold Electron or Office dialog can take
+        // longer than that to finish painting, and Windows sends exactly one
+        // foreground event — giving up early means the user has to click the
+        // dialog a second time. The poll costs one sleeping thread.
+        // The give-up line records what we actually saw, so the next report of
+        // "吸附没生效" can be diagnosed from the log instead of guessed at.
+        let mut seen_visible = false;
+        for _ in 0..150 {
             std::thread::sleep(Duration::from_millis(200));
             if !late_gen_is_current(hwnd, gen) {
                 crate::debug_log::qs_log("late attach: superseded by newer focus");
                 return;
             }
-            unsafe {
-                if IsWindow(hwnd) == 0 {
-                    crate::debug_log::qs_log("late attach: dialog died");
-                    return;
-                }
-                if IsWindowVisible(hwnd) == 0 {
-                    continue;
-                }
+            let alive = unsafe { IsWindow(hwnd) } != 0;
+            if !alive {
+                crate::debug_log::qs_log("late attach: dialog died");
+                return;
             }
+            if unsafe { IsWindowVisible(hwnd) } == 0 {
+                continue;
+            }
+            seen_visible = true;
             if !window::is_quick_switch_target(hwnd) {
                 continue;
             }
@@ -601,7 +602,10 @@ fn spawn_late_attach(hwnd: HWND, gen: u64) {
             }
             return;
         }
-        crate::debug_log::qs_log("late attach: gave up waiting for dialog");
+        crate::debug_log::qs_log(&format!(
+            "late attach: gave up after 30s (visible={seen_visible} class={} quick_switch_target=false)",
+            crate::win::class_name(hwnd)
+        ));
     });
 }
 
@@ -795,7 +799,7 @@ fn explorer_location(target: HWND) -> Option<(isize, String)> {
                     continue;
                 };
                 let Ok(h) = wb.HWND() else { continue };
-                let hwnd = h.0 as isize;
+                let hwnd = h.0;
                 if hwnd != target {
                     continue;
                 }
@@ -1272,7 +1276,9 @@ fn spawn_follower(app: AppHandle, state: Arc<AppState>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{attach_action, bump_late_gen, choose_next_dialog, late_gen_is_current, AttachAction};
+    use super::{
+        attach_action, bump_late_gen, choose_next_dialog, late_gen_is_current, AttachAction,
+    };
 
     const A: isize = 0x1111;
     const B: isize = 0x2222;

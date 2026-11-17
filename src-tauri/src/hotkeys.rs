@@ -365,9 +365,7 @@ pub fn install_hook(app: AppHandle, state: Arc<AppState>) {
                         // A while the user pressed Ctrl+G in B. Move it first,
                         // or the jump below would navigate A.
                         let fg = window::foreground();
-                        if fg != 0
-                            && Some(fg) != bound
-                            && window::is_manual_quick_switch_target(fg)
+                        if fg != 0 && Some(fg) != bound && window::is_manual_quick_switch_target(fg)
                         {
                             crate::ui::retarget_quick_switch(&app, &state, fg);
                         }
@@ -427,7 +425,11 @@ pub fn install_hook(app: AppHandle, state: Arc<AppState>) {
             let stall_secs = std::env::var("KESTREL_HOOK_STALL_SECS")
                 .ok()
                 .and_then(|v| v.parse::<u64>().ok())
-                .unwrap_or(1800)
+                // Two minutes, not the original thirty: the idle guard below
+                // means we only act while the user is demonstrably typing, so a
+                // silent hook at that point is already broken — waiting half an
+                // hour just leaves the hotkey dead for half an hour.
+                .unwrap_or(120)
                 .clamp(15, 7200);
             let frozen = now_ms().saturating_sub(WATCH_LAST_CHANGE.load(Ordering::Relaxed));
             // A silent hook and an idle user look identical from the event
