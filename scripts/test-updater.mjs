@@ -95,6 +95,11 @@ check(
   "两种安装方式选出的文件不同",
   !!perMachine && !!currentUser && perMachine.url !== currentUser.url,
 );
+// An unknown mode must not fall through to MSI: that is exactly how a second
+// copy ended up under Program Files next to the per-user install.
+check("未知安装方式不选包", pickInstallAsset(info?.assets ?? [], "unknown") === null);
+check("空安装方式不选包", pickInstallAsset(info?.assets ?? [], "") === null);
+check("null 安装方式不选包", pickInstallAsset(info?.assets ?? [], null) === null);
 
 // 5) The download file name comes from the URL.
 check(

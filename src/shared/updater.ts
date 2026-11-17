@@ -234,10 +234,20 @@ export function pickAsset(assets: ReleaseAsset[]): ReleaseAsset | null {
  *  a current-user copy (NSIS → AppData) with the NSIS setup — running the
  *  other one would install a second copy next to the running one instead of
  *  replacing it. */
+/** Pick the installer that matches how this copy was installed.
+ *
+ *  Getting this wrong is not a cosmetic bug: handing an MSI to a per-user
+ *  install lays down a *second* Kestrel under Program Files, and handing an
+ *  NSIS setup to a per-machine install does the same in reverse. So when the
+ *  mode is not positively known — the IPC failed, or the backend could not
+ *  read its own path — return null and let the caller fall back to the release
+ *  page. Guessing "perMachine" here is what produced the duplicate installs in
+ *  the first place. */
 export function pickInstallAsset(
   assets: ReleaseAsset[],
-  mode: string,
+  mode: string | null | undefined,
 ): ReleaseAsset | null {
+  if (mode !== "currentUser" && mode !== "perMachine") return null;
   if (mode === "currentUser") {
     return (
       assets.find((a) => a.name.includes("setup") && a.name.endsWith(".exe")) ??
@@ -349,8 +359,10 @@ export async function checkForUpdate(current: string): Promise<UpdateCheckResult
     localStorage.setItem(LS_LAST, String(r.checkedAt));
     if (r.hasUpdate && r.info) {
       // The installer has to match how this copy was installed, otherwise
-      // the update installs a second Kestrel next to the running one.
-      const mode = await api.installMode().catch(() => "perMachine");
+      // the update installs a second Kestrel next to the running one. If we
+      // cannot find out, cache no asset at all: an empty url makes the panel
+      // offer the release page instead of a possibly-wrong installer.
+      const mode = await api.installMode().catch(() => "unknown");
       const asset = pickInstallAsset(r.info.assets, mode);
       localStorage.setItem(
         LS_FOUND,

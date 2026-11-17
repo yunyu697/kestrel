@@ -183,20 +183,21 @@ pub fn update_download(
     let thread_keep = keep_file;
     std::thread::spawn(move || {
         let started = std::time::Instant::now();
-        let emit = |app: &AppHandle, status: &str, received: u64, total: u64, path: &str, error: &str| {
-            let _ = app.emit(
-                "update://progress",
-                UpdateProgress {
-                    id: thread_id.clone(),
-                    received,
-                    total,
-                    status: status.to_string(),
-                    path: path.to_string(),
-                    error: error.to_string(),
-                    ms: started.elapsed().as_millis() as u64,
-                },
-            );
-        };
+        let emit =
+            |app: &AppHandle, status: &str, received: u64, total: u64, path: &str, error: &str| {
+                let _ = app.emit(
+                    "update://progress",
+                    UpdateProgress {
+                        id: thread_id.clone(),
+                        received,
+                        total,
+                        status: status.to_string(),
+                        path: path.to_string(),
+                        error: error.to_string(),
+                        ms: started.elapsed().as_millis() as u64,
+                    },
+                );
+            };
 
         let result = net::download_to_file(&url, &thread_dest, 180_000, |received, total| {
             if thread_cancel.load(Ordering::Relaxed) {
@@ -264,29 +265,56 @@ pub fn update_reveal(path: String) -> bool {
 /// How this copy was installed: "perMachine" (MSI, Program Files) or
 /// "currentUser" (NSIS, AppData). The updater uses it to pick the installer
 /// that replaces *this* installation instead of adding a second one.
+///
+/// "unknown" is a real answer, not a failure to care: the front end turns it
+/// into "offer the release page" rather than guessing an installer. Guessing
+/// is what left duplicate copies behind, so an unreadable path must not
+/// silently become "perMachine".
 #[tauri::command]
 pub fn install_mode() -> String {
     let Ok(exe) = std::env::current_exe() else {
-        return "perMachine".into();
+        return UNKNOWN.into();
     };
-    let path = exe.to_string_lossy().to_ascii_lowercase();
     let local = dirs::data_local_dir()
-        .map(|d| d.to_string_lossy().to_ascii_lowercase())
+        .map(|d| d.to_string_lossy().into_owned())
         .unwrap_or_default();
-    if !local.is_empty() && path.starts_with(&local) {
-        "currentUser".into()
+    classify_install_mode(&exe.to_string_lossy(), &local).into()
+}
+
+const UNKNOWN: &str = "unknown";
+
+/// Split from `install_mode` so the decision is testable without controlling
+/// the test binary's own location.
+fn classify_install_mode(exe: &str, local_app_data: &str) -> &'static str {
+    let path = exe.to_ascii_lowercase();
+    let local = local_app_data.trim().to_ascii_lowercase();
+    if local.is_empty() || path.is_empty() {
+        // Without a home directory there is no way to prove this is a per-user
+        // copy; claiming perMachine would be the duplicate-install bug again.
+        return UNKNOWN;
+    }
+    if path.starts_with(&local) {
+        "currentUser"
+    } else if path.contains("\\program files") {
+        "perMachine"
     } else {
-        "perMachine".into()
+        // Portable zip, a dev build under target\release, or an unusual
+        // location: replacing it with either installer would be wrong, so the
+        // release page is the honest answer.
+        UNKNOWN
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{dest_dir, downloads_dir, safe_name, unique_path, update_dir};
+    use super::{
+        classify_install_mode, dest_dir, downloads_dir, safe_name, unique_path, update_dir,
+    };
     use std::path::PathBuf;
 
     fn scratch(tag: &str) -> PathBuf {
-        let p = std::env::temp_dir().join(format!("kestrel-update-test-{tag}-{}", std::process::id()));
+        let p =
+            std::env::temp_dir().join(format!("kestrel-update-test-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         p
@@ -321,7 +349,10 @@ mod tests {
     fn download_only_uses_the_users_downloads_folder() {
         let expected = downloads_dir().expect("Windows always has a Downloads folder");
         assert_eq!(dest_dir("download"), expected);
-        assert!(expected.to_string_lossy().to_ascii_lowercase().contains("download"));
+        assert!(expected
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .contains("download"));
         assert_ne!(dest_dir("download"), update_dir());
     }
 
@@ -329,6 +360,49 @@ mod tests {
     fn install_mode_uses_the_private_folder() {
         assert_eq!(dest_dir("install"), update_dir());
         assert_eq!(dest_dir(""), update_dir());
+    }
+
+    /// The mapper must never invent an install mode: each wrong answer below
+    /// would hand the user an installer that lays down a second copy.
+    #[test]
+    fn install_mode_classification_is_exact() {
+        let local = r"C:\Users\someone\AppData\Local";
+        assert_eq!(
+            classify_install_mode(r"C:\Users\someone\AppData\Local\Kestrel\kestrel.exe", local),
+            "currentUser"
+        );
+        // Case and spelling of the drive must not matter.
+        assert_eq!(
+            classify_install_mode(r"c:\users\someone\appdata\local\kestrel\kestrel.exe", local),
+            "currentUser"
+        );
+        assert_eq!(
+            classify_install_mode(r"C:\Program Files\Kestrel\kestrel.exe", local),
+            "perMachine"
+        );
+        assert_eq!(
+            classify_install_mode(r"C:\Program Files (x86)\Kestrel\kestrel.exe", local),
+            "perMachine"
+        );
+        // Portable zip and dev builds land outside both roots: the release
+        // page is the only correct offer, so these must stay unknown.
+        assert_eq!(
+            classify_install_mode(r"D:\Tools\Kestrel\kestrel.exe", local),
+            "unknown"
+        );
+        assert_eq!(
+            classify_install_mode(
+                r"C:\Projects\kestrel\src-tauri\target\release\kestrel.exe",
+                local
+            ),
+            "unknown"
+        );
+        // No home directory means nothing can be proven.
+        assert_eq!(
+            classify_install_mode(r"C:\Program Files\Kestrel\kestrel.exe", ""),
+            "unknown"
+        );
+        assert_eq!(classify_install_mode("", local), "unknown");
     }
 
     #[test]

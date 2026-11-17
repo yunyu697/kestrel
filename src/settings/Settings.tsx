@@ -1848,13 +1848,28 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
   const [testing, setTesting] = useState(false);
   // How this copy was installed: the update has to use the matching
   // installer, or it would install a second Kestrel next to this one.
-  const [installMode, setInstallMode] = useState("perMachine");
+  //   null      -> still asking; render nothing yet rather than a wrong button
+  //   "unknown" -> the backend could not tell; offer the release page
+  const [installMode, setInstallMode] = useState<string | null>(null);
 
   useEffect(() => {
+    let alive = true;
+    const apply = (m: string) => {
+      if (alive) setInstallMode(m);
+    };
+    // One retry: a transient IPC failure must not be answered with a guess.
     void api
       .installMode()
-      .then(setInstallMode)
-      .catch(() => setInstallMode("perMachine"));
+      .then(apply)
+      .catch(() => {
+        void api
+          .installMode()
+          .then(apply)
+          .catch(() => apply("unknown"));
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Same normalisation as `mirrorPrefix`, including the empty case: "" means
@@ -1961,15 +1976,17 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
                   .slice(0, 12)
                   .join("\n")}
               </pre>
-              <UpdateActions
-                assetUrl={pickInstallAsset(chkResult.info.assets, installMode)?.url ?? ""}
-                htmlUrl={chkResult.info.htmlUrl}
-                mirror={mirrorPrefix(s)}
-                onMirrorChange={(v) => {
-                  update("updateMirror", v);
-                  setCustomMode(mirrorIdFor(v) === "custom");
-                }}
-              />
+              {installMode !== null && (
+                <UpdateActions
+                  assetUrl={pickInstallAsset(chkResult.info.assets, installMode)?.url ?? ""}
+                  htmlUrl={chkResult.info.htmlUrl}
+                  mirror={mirrorPrefix(s)}
+                  onMirrorChange={(v) => {
+                    update("updateMirror", v);
+                    setCustomMode(mirrorIdFor(v) === "custom");
+                  }}
+                />
+              )}
             </div>
           )}
           <Row label={t("检查频率")} desc={t("启动时与运行期间按此周期自动检查")}>
