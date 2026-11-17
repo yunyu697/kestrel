@@ -74,18 +74,23 @@ pub fn spawn_rebuild(app: AppHandle, state: Arc<AppState>) {
             };
 
             let st = state.clone();
-            let entries = idx::scan::scan(&opts, &state.index.cancel, &state.index.scanned, |n, cur| {
-                *st.index.current.write() = cur.to_string();
-                let now = crate::commands::now_ms() as u64;
-                let prev = last_emit.load(Ordering::Relaxed);
-                if now.saturating_sub(prev) > 220 {
-                    last_emit.store(now, Ordering::Relaxed);
-                    let _ = app_progress.emit(
-                        "index://progress",
-                        serde_json::json!({ "scanned": n, "current": cur }),
-                    );
-                }
-            });
+            let entries = idx::scan::scan(
+                &opts,
+                &state.index.cancel,
+                &state.index.scanned,
+                |n, cur| {
+                    *st.index.current.write() = cur.to_string();
+                    let now = crate::commands::now_ms() as u64;
+                    let prev = last_emit.load(Ordering::Relaxed);
+                    if now.saturating_sub(prev) > 220 {
+                        last_emit.store(now, Ordering::Relaxed);
+                        let _ = app_progress.emit(
+                            "index://progress",
+                            serde_json::json!({ "scanned": n, "current": cur }),
+                        );
+                    }
+                },
+            );
 
             let count = entries.len();
             // A cancelled walk only produced a *partial* entry set. Swapping it
@@ -114,7 +119,13 @@ pub fn spawn_rebuild(app: AppHandle, state: Arc<AppState>) {
             state
                 .index
                 .replace(entries, settings.indexed_drives.clone());
-            let _ = idx::save(&state.index, &state.paths.index());
+            // A silent failure here is invisible until the next cold start,
+            // which then re-scans the whole disk for no visible reason.
+            if let Err(e) = idx::save(&state.index, &state.paths.index()) {
+                crate::debug_log::qs_log(&format!(
+                    "index: saving {count} entries failed: {e} (next start will re-scan)"
+                ));
+            }
             state.index.scanning.store(false, Ordering::SeqCst);
             *state.index.current.write() = String::new();
 
@@ -145,23 +156,38 @@ pub fn cancel_index(state: State<'_, Arc<AppState>>) {
 /// Load a previously persisted index on startup.
 ///
 /// Returns the format version of the loaded index, or `None` when there is
-/// none. An index written by an older build is stale (different exclusions,
-/// different entry layout) — it is deleted right away and rebuilt, which also
-/// frees the hundreds of megabytes the old uncompressed format occupied.
+/// none. An index written by an older build cannot be decoded (different entry
+/// layout), so the caller rebuilds from scratch — but the stale file is *kept*
+/// until that rebuild succeeds. Two reasons:
+///
+/// * `idx::save` writes a temp file and renames it over the old one, so a
+///   successful rebuild replaces it atomically and never leaves a half-written
+///   index behind. Deleting up front buys nothing there.
+/// * Deleting up front means a cancelled or failed rebuild leaves the user with
+///   no index at all, and every later start pays the full scan again. Keeping
+///   the stale file makes a failed rebuild cost one wasted scan instead of a
+///   permanent regression to cold starts.
+///
+/// The historical reason for deleting eagerly was disk space: the old
+/// uncompressed format ran to hundreds of megabytes. The current format is
+/// deflate-compressed (about 20 MB for a full disk), so holding it for the
+/// length of one rebuild is cheap.
 pub fn load_persisted(state: &Arc<AppState>) -> Option<u32> {
-    // Check the version before decoding: a stale file is about to be deleted,
+    // Check the version before decoding: a stale file is about to be replaced,
     // and decoding it first would keep the old index in memory alongside the
     // rebuild that replaces it.
     if let Some(v) = idx::peek_version(&state.paths.index()) {
         if v != idx::CURRENT_VERSION {
-            let _ = std::fs::remove_file(state.paths.index());
+            crate::debug_log::qs_log(&format!(
+                "index: on-disk format v{v} != v{}, rebuilding (old file kept until the new one lands)",
+                idx::CURRENT_VERSION
+            ));
             return None;
         }
     }
     let version = idx::load(&state.index, &state.paths.index());
     if let Some(v) = version {
         if v != idx::CURRENT_VERSION {
-            let _ = std::fs::remove_file(state.paths.index());
             return None;
         }
     }

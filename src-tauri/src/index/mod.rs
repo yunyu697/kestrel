@@ -400,7 +400,7 @@ pub fn pinyin_fields(name: &str) -> (String, String) {
             if let Some(c) = plain.chars().next() {
                 initials.push(c);
             }
-            full.push_str(&plain);
+            full.push_str(plain);
         }
     }
     (initials, full)
@@ -571,9 +571,78 @@ mod tests {
         assert_eq!(store.entries[0].size, 12345);
         assert_eq!(store.entries[0].mtime, 1_700_000_000);
         // Non-ASCII names must survive with their pinyin intact.
-        let cjk = store.entries.iter().find(|e| e.name.ends_with("中文文件.txt")).expect("cjk");
+        let cjk = store
+            .entries
+            .iter()
+            .find(|e| e.name.ends_with("中文文件.txt"))
+            .expect("cjk");
         assert!(!cjk.pyf.is_empty(), "pinyin was lost");
         drop(store);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A rebuild must be able to replace an existing file in place, and must
+    /// not leave a `.tmp` next to it: `load_persisted` now keeps a stale index
+    /// until the rebuild lands, so the replace path is the only thing that
+    /// retires the old file.
+    #[test]
+    fn save_replaces_an_existing_index_and_leaves_no_temp() {
+        let dir = temp("replace");
+        let file = dir.join("index.bin");
+        for name in ["a.txt", "b.txt", "c.txt"] {
+            std::fs::write(dir.join(name), b"x").expect("file");
+        }
+
+        let first = Index::new();
+        first.replace(vec![entry(&dir.join("a.txt").to_string_lossy())], vec![]);
+        save(&first, &file).expect("first save");
+
+        let second = Index::new();
+        second.replace(
+            vec![
+                entry(&dir.join("b.txt").to_string_lossy()),
+                entry(&dir.join("c.txt").to_string_lossy()),
+            ],
+            vec![],
+        );
+        save(&second, &file).expect("second save");
+
+        let loaded = Index::new();
+        assert_eq!(load(&loaded, &file), Some(INDEX_VERSION));
+        assert_eq!(loaded.count(), 2, "the newer index must win");
+        assert!(
+            !file.with_extension("tmp").exists(),
+            "temp file left behind"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A file from an older format is reported by version only — it must never
+    /// be decoded (the entry layout may not match) and must never be deleted
+    /// by the reader, or a cancelled rebuild would leave nothing behind.
+    #[test]
+    fn a_stale_version_is_reported_but_the_file_is_left_alone() {
+        use std::io::Write;
+
+        let dir = temp("stale");
+        let file = dir.join("index.bin");
+
+        // fixarray(4) + uint32 0 + three nulls standing in for the payload.
+        let mut raw = vec![0x94, 0xce, 0, 0, 0, 0, 0xc0, 0xc0, 0xc0];
+        raw.shrink_to_fit();
+        let mut enc = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::new(6));
+        enc.write_all(&raw).expect("encode");
+        let compressed = enc.finish().expect("finish");
+        let mut out = INDEX_MAGIC.to_vec();
+        out.extend_from_slice(&(compressed.len() as u64).to_le_bytes());
+        out.extend_from_slice(&compressed);
+        std::fs::write(&file, &out).expect("write");
+
+        assert_eq!(peek_version(&file), Some(0));
+        assert_eq!(load(&Index::new(), &file), None, "undecodable payload");
+        assert!(file.exists(), "the reader must not delete a stale index");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
