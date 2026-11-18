@@ -27,6 +27,63 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.25",
+    date: "2026-11-18",
+    title: {
+      zh: "窗口设置现在真正生效，双击名称可还原默认值",
+      en: "Window settings now take effect; double-click a label to reset it",
+      ja: "ウィンドウ設定が実際に反映され、名前のダブルクリックで初期化できます",
+      es: "La configuración de ventana ahora se aplica; doble clic en el nombre para restaurar",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "透明度滑块现在能改变窗口的通透程度",
+          en: "The opacity slider now changes how see-through the window is",
+          ja: "不透明度スライダーがウィンドウの透け具合を変更できるようになりました",
+          es: "El control de opacidad cambia la transparencia de la ventana",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "背景模糊开关可切换毛玻璃效果",
+          en: "The background blur switch toggles the frosted-glass effect",
+          ja: "背景ぼかしの切り替えですりガラス効果がオン／オフできます",
+          es: "El interruptor de desenfoque activa y desactiva el efecto de cristal esmerilado",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "圆角滑块会同步改变窗口、卡片与控件的圆角",
+          en: "The corner slider resizes windows, cards and controls together",
+          ja: "角丸スライダーがウィンドウ、カード、コントロールに同時に反映されます",
+          es: "El control de esquinas redondea ventanas, tarjetas y controles a la vez",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "字体缩放现在会放大或缩小整个界面的文字",
+          en: "Font scaling now enlarges or shrinks all interface text",
+          ja: "フォント拡大縮小が画面全体の文字サイズに反映されます",
+          es: "El escalado de fuente amplía o reduce todo el texto de la interfaz",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "双击设置项名称即可把该项恢复为默认值",
+          en: "Double-clicking an option name restores that option to its default",
+          ja: "設定項目の名前をダブルクリックすると初期値に戻ります",
+          es: "Hacer doble clic en el nombre de una opción restaura su valor predeterminado",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.24",
     date: "2026-11-18",
     title: {
