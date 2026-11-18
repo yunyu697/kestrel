@@ -38,6 +38,9 @@ jobs:
       - name: Updater asset selection
         run: npm run test:updater
 
+      - name: Release notes
+        run: npm run test:releases
+
       - name: Rust format
         working-directory: src-tauri
         run: cargo fmt --check

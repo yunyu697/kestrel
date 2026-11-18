@@ -13,7 +13,8 @@
     "tauri": "tauri",
     "app:dev": "npm run build:info && tauri dev",
     "app:build": "npm run build:info && tauri build",
-    "test:updater": "esbuild scripts/test-updater.mjs --bundle --platform=node --format=esm --outfile=.tmp/updater-test.mjs && node .tmp/updater-test.mjs"
+    "test:updater": "esbuild scripts/test-updater.mjs --bundle --platform=node --format=esm --outfile=.tmp/updater-test.mjs && node .tmp/updater-test.mjs",
+    "test:releases": "esbuild scripts/test-releases.mjs --bundle --platform=node --format=esm --outfile=.tmp/releases-test.mjs && node .tmp/releases-test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
