@@ -3,7 +3,9 @@
    ------------------------------------------------------------------ */
 
 body.win-settings {
-  background: var(--bg);
+  /* The window is transparent so the rounded corners and the opacity slider
+     have something to reveal. The surface is painted by .settings-root. */
+  background: transparent;
 }
 
 .settings-root {
@@ -13,6 +15,14 @@ body.win-settings {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+  border-radius: var(--radius-win);
+  opacity: var(--win-alpha, 1);
+}
+
+/* 背景模糊: same rule as the launcher card — a native blur only shows through
+   a surface that is not fully opaque. */
+:root[data-blur="on"] .settings-root {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
 }
 
 /* ---- title bar ---- */
@@ -216,6 +226,21 @@ body.win-settings {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+}
+
+/* Double-click to restore one row's default. The hint only appears on hover of
+   a resettable row so the page does not sprout a label next to every setting. */
+.row .row-main[data-resettable="true"] {
+  cursor: default;
+  border-radius: var(--radius-ctl);
+  outline-offset: 2px;
+}
+.row .row-main[data-resettable="true"]:hover .row-label::after {
+  content: attr(data-hint);
+  margin-left: var(--sp-2);
+  font-size: var(--fs-caption);
+  font-weight: 400;
+  color: var(--text-3);
 }
 
 /* inline field */

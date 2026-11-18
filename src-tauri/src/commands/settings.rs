@@ -27,6 +27,47 @@ pub fn apply_side_effects(app: &AppHandle, state: &Arc<AppState>) {
     } else if !s.launch_at_startup && enabled {
         let _ = autolaunch.disable();
     }
+
+    apply_window_effects(app, &s);
+}
+
+/// Push the stored blur setting onto the native windows.
+///
+/// The opacity slider and the corner radius are pure CSS (the webview paints
+/// them), but a real backdrop blur has to come from the compositor. Windows
+/// applies it behind the client area, which is why both windows are created
+/// transparent and the surface itself is mixed with alpha in CSS — without
+/// that the blur would sit under an opaque sheet and be invisible.
+///
+/// `Effect::Blur` (ACCENT_ENABLE_BLURBEHIND) renders as a black rectangle on
+/// Windows 11 when the window is fully transparent, which is exactly what this
+/// window is. Acrylic is the effect Win11 still composites correctly.
+pub fn apply_window_effects(app: &AppHandle, s: &Settings) {
+    use tauri::window::{Effect, EffectsBuilder};
+
+    let effects = if s.blur {
+        Some(
+            EffectsBuilder::new()
+                .effect(Effect::Acrylic)
+                .radius(s.corner_radius)
+                .build(),
+        )
+    } else {
+        None
+    };
+    for label in ["launcher", "settings"] {
+        if let Some(w) = app.get_webview_window(label) {
+            match w.set_effects(effects.clone()) {
+                Ok(()) => crate::debug_log::qs_log(&format!(
+                    "window '{label}': effects {}",
+                    if s.blur { "acrylic" } else { "cleared" }
+                )),
+                Err(e) => {
+                    crate::debug_log::qs_log(&format!("window '{label}': set_effects failed: {e}"))
+                }
+            }
+        }
+    }
 }
 
 #[tauri::command]

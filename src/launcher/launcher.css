@@ -30,9 +30,19 @@
   box-shadow: var(--shadow);
   overflow: hidden;
   transform-origin: 50% 12%;
+  /* 窗口透明度: the whole card fades, text included. Anything subtler would
+     need every nested surface to carry its own alpha, and the nested layers
+     change per palette. */
+  opacity: var(--win-alpha, 1);
   /* Enter/exit via transition: the hidden state is applied BEFORE the window
      is shown again, so the first painted frame is already correct (no flash). */
   transition: opacity 200ms var(--ease), transform 200ms var(--ease);
+}
+
+/* 背景模糊: the native blur effect sits behind the window, so the card has to
+   stop being opaque or nothing shows through it. */
+:root[data-blur="on"] .card {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
 }
 
 /* Start state — applied while the window is still hidden. */

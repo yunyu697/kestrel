@@ -408,6 +408,8 @@ fn create_windows(app: &AppHandle) -> tauri::Result<()> {
         b.build()
     })?;
 
+    // The blur setting is applied later, once AppState is managed: it cannot be
+    // read from here, because setup() creates the state after the windows.
     Ok(())
 }
 
@@ -446,7 +448,11 @@ pub fn ensure_settings_window(app: &AppHandle) -> tauri::Result<()> {
                 .resizable(false)
                 .maximizable(false)
                 .decorations(false)
-                .transparent(false)
+                // Transparent so the corner-radius slider and the opacity
+                // slider have something to reveal; the surface is painted by
+                // .settings-root in CSS. Also required for the native blur.
+                .transparent(true)
+                .shadow(false)
                 .visible(false)
                 .skip_taskbar(false);
         if restart::is_relaunching() {
@@ -458,6 +464,14 @@ pub fn ensure_settings_window(app: &AppHandle) -> tauri::Result<()> {
         match built {
             Ok(win) => {
                 debug_log::qs_log(&format!("window 'settings' created (attempt {attempt})"));
+                // Created after the last side-effect pass, so the stored blur
+                // setting has to be pushed onto the new window explicitly.
+                // try_state: this is public and must not panic if it is ever
+                // called before setup() has registered the state.
+                if let Some(s) = a.try_state::<std::sync::Arc<crate::state::AppState>>() {
+                    let snapshot = s.settings.read().clone();
+                    crate::commands::settings::apply_window_effects(&a, &snapshot);
+                }
                 let _ = win;
                 return Ok(());
             }

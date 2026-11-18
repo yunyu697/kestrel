@@ -86,3 +86,37 @@ export function applyColors(s: Settings, theme: "light" | "dark"): void {
     if (value) root.style.setProperty(key, value);
   }
 }
+
+/** Clamp to the range a slider offers, so a hand-edited config cannot push
+ *  the window past something the UI can recover from. */
+function clamp(v: number, lo: number, hi: number): number {
+  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo;
+}
+
+/**
+ * Window chrome: scale, corners and translucency.
+ *
+ * These four settings are stored in the config and shown in the settings page,
+ * but nothing used to read them — the values only ever reached the file. They
+ * live here rather than in each window's own `applyTheme` because the launcher
+ * and the settings page had drifted apart once already: both copies forgot the
+ * same four fields.
+ *
+ * Radius ratios keep the current defaults exact: 18px window, 12px card, 8px
+ * control. Scaling the window radius therefore scales the whole roundness
+ * family instead of only the outer shell.
+ */
+export function applyWindowChrome(
+  s: Pick<Settings, "opacity" | "blur" | "cornerRadius" | "fontScale">,
+): void {
+  const root = document.documentElement;
+  const scale = clamp(s.fontScale, 0.85, 1.2);
+  const radius = clamp(s.cornerRadius, 0, 22);
+
+  root.style.setProperty("--font-scale", String(scale));
+  root.style.setProperty("--radius-win", `${radius}px`);
+  root.style.setProperty("--radius-card", `${Math.round((radius * 2) / 3)}px`);
+  root.style.setProperty("--radius-ctl", `${Math.round((radius * 4) / 9)}px`);
+  root.style.setProperty("--win-alpha", String(clamp(s.opacity, 0.6, 1)));
+  root.setAttribute("data-blur", s.blur ? "on" : "off");
+}

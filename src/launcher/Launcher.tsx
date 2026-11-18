@@ -15,7 +15,7 @@ import {
   trimEnd,
   upOne,
 } from "../shared/pathnav";
-import { applyColors } from "../shared/theme";
+import { applyColors, applyWindowChrome } from "../shared/theme";
 import {
   checkForUpdate,
   clearFoundUpdate,
@@ -258,7 +258,7 @@ export default function Launcher() {
     document.documentElement.setAttribute("data-anim", s.animations ? "on" : "off");
     // Per-element colour overrides (empty value = theme default).
     applyColors(s, themeName);
-    document.documentElement.style.setProperty("--font-scale", String(s.fontScale));
+    applyWindowChrome(s);
   }
 
   // Chromium (WebView2) owns a few accelerators we never want here: Ctrl+F and

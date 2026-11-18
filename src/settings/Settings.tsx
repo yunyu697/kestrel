@@ -5,7 +5,7 @@ import { Icon } from "../shared/icons";
 import { api } from "../shared/api";
 import { LANGS, setLang, systemLang, t, useLang } from "../shared/i18n";
 import { resolveTheme } from "../shared/format";
-import { applyColors, currentPalette, schemeFor } from "../shared/theme";
+import { applyColors, applyWindowChrome, currentPalette, schemeFor } from "../shared/theme";
 import {
   MONO_SCHEME_LIST,
   NEUTRAL_SCHEME,
@@ -89,7 +89,7 @@ function applyTheme(s: Settings) {
   root.setAttribute("data-theme", theme);
   // Per-element colour overrides (empty value = theme default).
   applyColors(s, theme);
-  root.style.setProperty("--font-scale", String(s.fontScale));
+  applyWindowChrome(s);
   root.setAttribute("data-anim", s.animations ? "on" : "off");
 }
 
@@ -267,6 +267,14 @@ export default function Settings() {
 
 type Updater = <K extends keyof Settings>(key: K, value: Settings[K]) => void;
 
+/** Mirrors `Settings::default()` in src-tauri/src/model.rs — keep the two in step. */
+const WINDOW_DEFAULTS = {
+  opacity: 0.98,
+  blur: true,
+  cornerRadius: 18,
+  fontScale: 1,
+};
+
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <button className="switch" data-on={on} onClick={() => onChange(!on)} aria-pressed={on}>
@@ -278,15 +286,23 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 function Row({
   label,
   desc,
+  onReset,
   children,
 }: {
   label: string;
   desc?: string;
+  /** Double-clicking the label column restores this row's default. */
+  onReset?: () => void;
   children?: React.ReactNode;
 }) {
   return (
     <div className="row">
-      <div className="row-main">
+      <div
+        className="row-main"
+        data-resettable={onReset ? "true" : undefined}
+        data-hint={onReset ? t("双击恢复默认") : undefined}
+        onDoubleClick={onReset}
+      >
         <div className="row-label">{label}</div>
         {desc && <div className="row-desc">{desc}</div>}
       </div>
@@ -811,7 +827,11 @@ function AppearancePane({
 
       <Section title={t("窗口")}>
         <div className="card">
-          <Row label={t("窗口透明度")} desc={t("数值越低越通透（需关闭模糊效果最佳）")}>
+          <Row
+            label={t("窗口透明度")}
+            desc={t("数值越低越通透（需关闭模糊效果最佳）")}
+            onReset={() => update("opacity", WINDOW_DEFAULTS.opacity)}
+          >
             <Slider
               value={s.opacity}
               min={0.6}
@@ -821,10 +841,18 @@ function AppearancePane({
               onChange={(v) => update("opacity", v)}
             />
           </Row>
-          <Row label={t("背景模糊")} desc={t("毛玻璃效果，提升层次感")}>
+          <Row
+            label={t("背景模糊")}
+            desc={t("毛玻璃效果，提升层次感")}
+            onReset={() => update("blur", WINDOW_DEFAULTS.blur)}
+          >
             <Toggle on={s.blur} onChange={(v) => update("blur", v)} />
           </Row>
-          <Row label={t("圆角半径")} desc={t("窗口与卡片的圆角大小")}>
+          <Row
+            label={t("圆角半径")}
+            desc={t("窗口与卡片的圆角大小")}
+            onReset={() => update("cornerRadius", WINDOW_DEFAULTS.cornerRadius)}
+          >
             <Slider
               value={s.cornerRadius}
               min={0}
@@ -834,7 +862,11 @@ function AppearancePane({
               onChange={(v) => update("cornerRadius", v)}
             />
           </Row>
-          <Row label={t("字体缩放")} desc={t("整体界面字号")}>
+          <Row
+            label={t("字体缩放")}
+            desc={t("整体界面字号")}
+            onReset={() => update("fontScale", WINDOW_DEFAULTS.fontScale)}
+          >
             <Slider
               value={s.fontScale}
               min={0.85}

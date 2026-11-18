@@ -24,6 +24,8 @@
   --radius-card: 12px;
   --radius-ctl: 8px;
   --row-h: 46px;
+  /* Window translucency, written by applyWindowChrome(). 1 = opaque. */
+  --win-alpha: 1;
 
   /* Neutral structure. Derived from the text colour, so a colour scheme can
      change hue without dyeing borders, badges and keycaps — the thing that
@@ -34,14 +36,16 @@
   --chip-hover: color-mix(in srgb, var(--text) 8%, transparent);
 
   /* Type ramp: six sizes, no in-between steps. 30px is reserved for the
-     calculator result, which is a number rather than running text. */
-  --fs-caption: 11px;
-  --fs-sm: 12px;
-  --fs-body: 13px;
-  --fs-title: 15px;
-  --fs-search: 17px;
-  --fs-display: 22px;
-  --fs-calc: 30px;
+     calculator result, which is a number rather than running text.
+     Every step rides --font-scale so the 字体缩放 slider resizes text rather
+     than only the inherited root size (which nothing used in absolute px). */
+  --fs-caption: calc(11px * var(--font-scale, 1));
+  --fs-sm: calc(12px * var(--font-scale, 1));
+  --fs-body: calc(13px * var(--font-scale, 1));
+  --fs-title: calc(15px * var(--font-scale, 1));
+  --fs-search: calc(17px * var(--font-scale, 1));
+  --fs-display: calc(22px * var(--font-scale, 1));
+  --fs-calc: calc(30px * var(--font-scale, 1));
 
   --lh-tight: 1.25;
   --lh-normal: 1.45;
