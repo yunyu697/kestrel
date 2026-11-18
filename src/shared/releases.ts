@@ -27,6 +27,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.24",
+    date: "2026-11-18",
+    title: {
+      zh: "更新日志更短，提示文案不再直呼使用者",
+      en: "Shorter changelog entries, prompts that do not address the reader",
+      ja: "更新履歴を簡潔にし、案内文は読み手に呼びかけない形に",
+      es: "Registro de cambios más breve y avisos sin dirigirse al lector",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "关于页的更新日志重写：一条只讲一件事，去掉内部细节",
+          en: "The changelog under About is rewritten: one change per line, internal detail dropped",
+          ja: "「このアプリについて」の更新履歴を書き直しました。1 項目につき 1 件、内部の詳細は省いています",
+          es: "El registro de cambios de Acerca de se reescribió: un cambio por línea, sin detalles internos",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "扫描提示等文案改为陈述句，语气更克制",
+          en: "Scan progress and similar prompts now state the situation rather than addressing the reader",
+          ja: "スキャン中の案内などを、読み手に呼びかけない言い切りに変更しました",
+          es: "Los avisos de escaneo describen la situación sin dirigirse al lector",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.23",
     date: "2026-11-18",
     title: {
