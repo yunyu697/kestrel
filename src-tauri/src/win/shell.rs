@@ -187,6 +187,62 @@ pub fn run_as_admin(path: &str) -> bool {
     h as isize > 32
 }
 
+/// Outcome of [`run_elevated_waited`].
+pub enum ElevateRun {
+    /// The program ran and exited; carries its exit code.
+    Exited(i32),
+    /// The user dismissed the UAC prompt.
+    Cancelled,
+    /// Windows refused to start it for another reason (Win32 error code).
+    Failed(u32),
+}
+
+/// Run a program elevated and wait for it to exit.
+///
+/// `ShellExecuteW` with the "runas" verb is the only supported way to raise a
+/// child's integrity level, but it hands back no handle — a caller could only
+/// poll for a process *named* msiexec, which is wrong as soon as two installs
+/// run. The `Ex` variant returns the handle when asked for it with
+/// `SEE_MASK_NOCLOSEPROCESS`, and that handle is what makes "wait for the
+/// installer to finish" possible at all.
+pub fn run_elevated_waited(program: &str, args: &str, cwd: Option<&str>) -> ElevateRun {
+    const SEE_MASK_NOCLOSEPROCESS: u32 = 0x0000_0040;
+    const ERROR_CANCELLED: u32 = 1223;
+    const INFINITE: u32 = 0xFFFF_FFFF;
+
+    let verb = wide("runas");
+    let file = wide(program);
+    let params = wide(args);
+    let dir = cwd.map(wide);
+    let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    info.fMask = SEE_MASK_NOCLOSEPROCESS;
+    info.lpVerb = verb.as_ptr();
+    info.lpFile = file.as_ptr();
+    info.lpParameters = params.as_ptr();
+    info.lpDirectory = dir.as_ref().map(|d| d.as_ptr()).unwrap_or(ptr::null());
+    info.nShow = SW_SHOWNORMAL;
+    // The UAC prompt belongs in front of the user, not behind the window that
+    // asked for it.
+    grant_foreground();
+    if unsafe { ShellExecuteExW(&mut info) } == 0 {
+        return match unsafe { GetLastError() } {
+            ERROR_CANCELLED => ElevateRun::Cancelled,
+            e => ElevateRun::Failed(e),
+        };
+    }
+    if info.hProcess == 0 {
+        return ElevateRun::Exited(-1);
+    }
+    unsafe {
+        WaitForSingleObject(info.hProcess, INFINITE);
+        let mut code: u32 = 0;
+        GetExitCodeProcess(info.hProcess, &mut code);
+        CloseHandle(info.hProcess);
+        ElevateRun::Exited(code as i32)
+    }
+}
+
 /// Restart this executable, optionally asking Windows for elevation.
 ///
 /// `extra_args` is appended to the command line (`--no-single-instance` is

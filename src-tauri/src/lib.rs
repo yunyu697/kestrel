@@ -66,7 +66,15 @@ pub fn run() {
             .and_then(|i| args.get(i + 1))
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(0);
-        install::run(&path, parent);
+        // The installed executable the update was started from. This process
+        // runs from a staging copy in temp, so current_exe() is the wrong thing
+        // to relaunch.
+        let target = args
+            .iter()
+            .position(|a| a == "--exe")
+            .and_then(|i| args.get(i + 1))
+            .cloned();
+        install::run(&path, parent, target.as_deref());
         return;
     }
     // A self-relaunch (elevation change) is the one copy that may start while
@@ -156,6 +164,10 @@ pub fn run() {
             watchdog::clear_quit_flag();
             watchdog::clean_legacy_flags();
             debug_log::qs_log("setup: watchdog ok");
+
+            // Each update stages a copy of the binary in temp; without this the
+            // directory would grow by one 10 MB copy per release.
+            std::thread::spawn(install::cleanup_stale);
 
             commands::settings::apply_side_effects(&handle, &state);
             debug_log::qs_log("setup: side effects ok");

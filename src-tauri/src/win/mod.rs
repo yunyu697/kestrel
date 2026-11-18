@@ -387,6 +387,8 @@ extern "system" {
         -> BOOL;
     pub fn CloseHandle(h: HANDLE) -> BOOL;
     pub fn GetLastError() -> u32;
+    pub fn WaitForSingleObject(h: HANDLE, ms: u32) -> u32;
+    pub fn GetExitCodeProcess(h: HANDLE, code: *mut u32) -> BOOL;
     pub fn CreateMutexW(attrs: *mut c_void, initial_owner: BOOL, name: *const u16) -> HANDLE;
     pub fn GlobalAlloc(flags: u32, bytes: usize) -> *mut c_void;
     pub fn GlobalLock(mem: *mut c_void) -> *mut c_void;
