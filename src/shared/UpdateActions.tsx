@@ -15,6 +15,12 @@ export interface UpdateActionsProps {
   mirror: string;
   /** Persist a mirror chosen here, so the settings page agrees next time. */
   onMirrorChange?: (prefix: string) => void;
+  /**
+   * The installer is machine-wide, so Windows will ask for elevation. Worth
+   * saying up front: the app quits and the UAC prompt appears afterwards, which
+   * otherwise reads as "it closed and nothing happened".
+   */
+  needsElevation?: boolean;
   /** Compact layout, used inside the launcher banner. */
   compact?: boolean;
 }
@@ -44,6 +50,7 @@ export default function UpdateActions({
   htmlUrl,
   mirror,
   onMirrorChange,
+  needsElevation = false,
   compact = false,
 }: UpdateActionsProps) {
   // Re-render on a language change so every label below is translated.
@@ -306,6 +313,11 @@ export default function UpdateActions({
         <div className="upd-hint">
           {t("「仅下载」会保存到系统的「下载」文件夹，完成后可随时安装")}
         </div>
+        {needsElevation && (
+          <div className="upd-hint">
+            {t("安装需要管理员权限：程序会先退出，随后弹出 UAC 确认，请点「是」")}
+          </div>
+        )}
       </>
     );
   }

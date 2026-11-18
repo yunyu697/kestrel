@@ -370,6 +370,7 @@ export async function checkForUpdate(current: string): Promise<UpdateCheckResult
           version: info.version,
           assetUrl: asset?.url ?? "",
           htmlUrl: info.htmlUrl,
+          needsElevation: mode === "perMachine",
         }),
       );
     } else {
@@ -398,6 +399,8 @@ export interface FoundUpdate {
   version: string;
   assetUrl: string;
   htmlUrl: string;
+  /** The cached installer is machine-wide, so installing will prompt for UAC. */
+  needsElevation?: boolean;
 }
 
 /** The stored "update found" record, but only while it really is newer than

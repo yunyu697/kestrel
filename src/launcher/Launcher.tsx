@@ -887,6 +887,7 @@ export default function Launcher() {
                 <UpdateActions
                   assetUrl={updateFound.assetUrl}
                   htmlUrl={updateFound.htmlUrl}
+                  needsElevation={updateFound.needsElevation}
                   mirror={mirrorPrefix({ updateMirror: settings?.updateMirror ?? "" })}
                   onMirrorChange={changeMirror}
                   compact

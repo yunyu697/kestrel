@@ -1976,17 +1976,23 @@ function AboutPane({ build, s, update }: { build: BuildInfo | null; s: Settings;
                   .slice(0, 12)
                   .join("\n")}
               </pre>
-              {installMode !== null && (
-                <UpdateActions
-                  assetUrl={pickInstallAsset(chkResult.info.assets, installMode)?.url ?? ""}
-                  htmlUrl={chkResult.info.htmlUrl}
-                  mirror={mirrorPrefix(s)}
-                  onMirrorChange={(v) => {
-                    update("updateMirror", v);
-                    setCustomMode(mirrorIdFor(v) === "custom");
-                  }}
-                />
-              )}
+              {/* An unknown install mode renders the same block with no asset,
+                  which falls back to "打开下载页面" — better than hiding the
+                  update section and leaving the user with nothing. */}
+              <UpdateActions
+                assetUrl={
+                  installMode === null
+                    ? ""
+                    : (pickInstallAsset(chkResult.info.assets, installMode)?.url ?? "")
+                }
+                htmlUrl={chkResult.info.htmlUrl}
+                needsElevation={installMode === "perMachine"}
+                mirror={mirrorPrefix(s)}
+                onMirrorChange={(v) => {
+                  update("updateMirror", v);
+                  setCustomMode(mirrorIdFor(v) === "custom");
+                }}
+              />
             </div>
           )}
           <Row label={t("检查频率")} desc={t("启动时与运行期间按此周期自动检查")}>
