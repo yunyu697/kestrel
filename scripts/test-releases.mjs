@@ -57,8 +57,10 @@ function scan(where, text) {
 }
 
 function tone(where, text) {
-  // 「迷你窗口」is a loanword, not an address.
-  const probe = text.replaceAll("迷你", "");
+  // 「迷你窗口」is a loanword, not an address. Terms wrapped in backticks are
+  // quoted (code identifiers, and the banned words themselves in a rule line),
+  // so they are stripped before matching.
+  const probe = text.replaceAll("迷你", "").replace(/`[^`]*`/g, "");
   for (const [label, re] of TONE) {
     assert.ok(!re.test(probe), `${where} 用了${label}：${text}`);
   }
@@ -129,23 +131,27 @@ assert.equal(
 
 // Release bodies live in .tmp and never reach CI, so they are checked only when present.
 // Lines starting with ">" quote a system message and keep its wording.
-let notes = 0;
+// Only the directory listing is guarded: wrapping the assertions too would swallow
+// their failures and quietly stop the scan partway through.
+let names = [];
+let dir = null;
 try {
-  const dir = new URL("../.tmp/", import.meta.url);
-  for (const name of readdirSync(dir)) {
-    if (!/^release-notes-.*\.md$/.test(name)) continue;
-    notes++;
-    readFileSync(new URL(name, dir), "utf8")
-      .split("\n")
-      .forEach((line, i) => {
-        if (line.trim() && !line.startsWith(">")) {
-          tone(`.tmp/${name} 第 ${i + 1} 行`, line);
-        }
-      });
-  }
+  dir = new URL("../.tmp/", import.meta.url);
+  names = readdirSync(dir).filter((n) => /^release-notes-.*\.md$/.test(n));
 } catch {
   // No .tmp directory in a fresh checkout.
 }
+
+for (const name of names) {
+  readFileSync(new URL(name, dir), "utf8")
+    .split("\n")
+    .forEach((line, i) => {
+      if (line.trim() && !line.startsWith(">")) {
+        tone(`.tmp/${name} 第 ${i + 1} 行`, line);
+      }
+    });
+}
+const notes = names.length;
 
 console.log(
   `更新日志检查通过：${live.length} 版 / ${items} 条 / README ${rows} 行` +
