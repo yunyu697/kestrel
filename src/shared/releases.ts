@@ -27,6 +27,54 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.23",
+    date: "2026-11-18",
+    title: {
+      zh: "应用内更新终于能真正装上了",
+      en: "In-app updates now actually install",
+      ja: "アプリ内更新が実際にインストールできるようになりました",
+      es: "Las actualizaciones desde la app por fin se instalan",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "修复「下载完成、软件退出、但没有更新」：装在 Program Files 的机器级安装需要管理员权限，而更新程序原来是用当前用户身份静默调用安装引擎的，于是被系统直接拒绝（返回码 1603，安装日志里写的是 1730「必须是 Administrator 才能删除此应用程序」），程序退出后仍然停在旧版本。现在会正常弹出 UAC 确认，点「是」即可完成安装",
+          en: "Fixed \"the download finishes, the app quits, and nothing is installed\". A machine-wide install under Program Files needs administrator rights, but the updater used to call the installer silently as the logged-on user, so Windows refused outright (exit code 1603; the installer log recorded 1730, \"you must be an administrator to remove this application\") and the app came back on the old version. The update now raises a normal UAC prompt — choose Yes and it installs",
+          ja: "「ダウンロードは終わるのに、アプリが終了して更新されない」問題を修正しました。Program Files に入るマシン単位のインストールには管理者権限が必要ですが、更新処理は従来ログオンユーザーの権限でインストーラーをサイレント実行していたため、Windows に拒否され（終了コード 1603、インストーラーのログには 1730「このアプリケーションを削除するには Administrator である必要があります」）、アプリは古いバージョンのまま戻っていました。現在は通常どおり UAC の確認が表示され、「はい」でインストールが完了します",
+          es: "Corregido el caso «la descarga termina, la aplicación se cierra y no se instala nada». Una instalación para todo el equipo en Program Files necesita permisos de administrador, pero el actualizador ejecutaba el instalador en silencio con el usuario actual, así que Windows lo rechazaba (código 1603; el registro del instalador anotaba 1730, «debe ser administrador para quitar esta aplicación») y la app volvía con la versión antigua. Ahora aparece el aviso normal de UAC: elige Sí y la instalación se completa",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "更新程序不再从安装目录里运行：安装时需要替换 kestrel.exe，而那份正在运行的副本一直占用着这个文件，安装程序无法覆盖它（静默安装下连提示都不会出现）。现在先把自身复制到临时目录再执行安装，装完清理掉",
+          en: "The updater no longer runs from the install directory. Installing has to replace kestrel.exe, but the running copy held that file open, so it could not be overwritten — silently, since a quiet install shows no FilesInUse prompt. It now copies itself to a temp directory first, installs from there, and cleans up afterwards",
+          ja: "更新処理はインストール先から実行しないようにしました。インストールでは kestrel.exe を置き換える必要がありますが、実行中のコピーがそのファイルを開いたままなので上書きできません（サイレントインストールでは警告も出ません）。現在は自身を一時ディレクトリにコピーしてからインストールし、終了後に片付けます",
+          es: "El actualizador ya no se ejecuta desde el directorio de instalación. Instalar requiere reemplazar kestrel.exe, pero la copia en ejecución mantenía ese archivo abierto, así que no se podía sobrescribir, y en silencio, porque una instalación desatendida no muestra el aviso de archivos en uso. Ahora se copia a una carpeta temporal, instala desde allí y limpia al terminar",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "安装失败后不再「人间蒸发」：以前安装没成功就直接退出，什么也不启动，看起来就是软件消失、版本没变。现在无论成功还是失败都会把 Kestrel 重新启动（失败则回到原来的版本）",
+          en: "A failed install no longer leaves you with nothing. It used to exit without starting anything, which looked like the app had vanished while the version stayed the same. Kestrel now restarts either way — on the old version if the install did not go through",
+          ja: "インストールに失敗しても「何も残らない」状態をなくしました。従来は失敗するとそのまま終了して何も起動せず、アプリが消えたのにバージョンは変わらない、という状態でした。現在は成否にかかわらず Kestrel を再起動します（失敗時は元のバージョン）",
+          es: "Una instalación fallida ya no deja la aplicación sin arrancar. Antes terminaba sin iniciar nada, lo que parecía que la app había desaparecido mientras la versión seguía igual. Ahora Kestrel se reinicia en ambos casos, con la versión anterior si la instalación no salió bien",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "安装时显示进度条，并在设置页提前说明「会先退出、随后弹出 UAC 确认」——以前完全静默，唯一能看到的现象就是程序消失了",
+          en: "The install now shows a progress bar, and the settings pane says up front that the app quits and a UAC prompt follows. Before, it was fully silent and the only visible effect was the app disappearing",
+          ja: "インストール中に進行状況が表示され、設定画面に「いったん終了し、その後 UAC の確認が出る」ことが事前に書かれるようになりました。従来は完全にサイレントで、見える変化はアプリが消えることだけでした",
+          es: "La instalación muestra una barra de progreso y el panel de ajustes avisa de que la app se cierra y luego aparece UAC. Antes era totalmente silenciosa y el único efecto visible era que la aplicación desaparecía",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.22",
     date: "2026-11-17",
     title: {
