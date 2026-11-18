@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.26",
+    date: "2026-11-18",
+    title: {
+      zh: "窗口改为原生圆角，背景透明度不再影响文字",
+      en: "Native rounded window corners and transparency that leaves text clear",
+      ja: "ウィンドウがネイティブの角丸になり、背景の透明度が文字に影響しなくなりました",
+      es: "Esquinas redondeadas nativas y transparencia que no afecta al texto",
+    },
+    items: [
+      {
+        kind: "improve",
+        text: {
+          zh: "窗口四角改为原生圆角，边缘不再露出方形边框",
+          en: "Window corners use the system rounding, with no square edge left behind",
+          ja: "ウィンドウの四角がシステムの角丸になり、四角い縁が出なくなりました",
+          es: "El sistema redondea las esquinas y ya no aparece un borde cuadrado",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "背景模糊开关已移除，界面不再出现局部模糊",
+          en: "The background blur switch is gone, so no area stays partly blurred",
+          ja: "背景ぼかしの切り替えを削除し、一部だけぼかされる現象がなくなりました",
+          es: "Se retiró el interruptor de desenfoque y ya no hay zonas parcialmente borrosas",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "透明度只调整背景，最低档位也保证文字清晰",
+          en: "Transparency affects only the background; text stays clear at every level",
+          ja: "透明度は背景だけに影響し、最も低い設定でも文字は鮮明です",
+          es: "La transparencia solo afecta al fondo; el texto sigue nítido en todo ajuste",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.25",
     date: "2026-11-18",
     title: {
@@ -39,19 +78,19 @@ export const RELEASES: Release[] = [
       {
         kind: "improve",
         text: {
-          zh: "透明度只调整背景，文字始终保持清晰",
-          en: "Transparency changes only the background; text stays sharp",
-          ja: "透明度は背景だけに影響し、文字は常に鮮明です",
-          es: "La transparencia solo cambia el fondo; el texto sigue nítido",
+          zh: "透明度滑块现在能改变窗口的通透程度",
+          en: "The opacity slider now changes how see-through the window is",
+          ja: "不透明度スライダーがウィンドウの透け具合を変更できるようになりました",
+          es: "El control de opacidad cambia la transparencia de la ventana",
         },
       },
       {
         kind: "improve",
         text: {
-          zh: "窗口四角改为圆角，边缘不再露出方形边框",
-          en: "Window corners are rounded, with no square edge left behind",
-          ja: "ウィンドウの四角が丸くなり、角に四角い縁が出なくなりました",
-          es: "Las esquinas de la ventana son redondeadas y ya no muestran un borde cuadrado",
+          zh: "背景模糊开关可切换毛玻璃效果",
+          en: "The background blur switch toggles the frosted-glass effect",
+          ja: "背景ぼかしの切り替えですりガラス効果がオン／オフできます",
+          es: "El interruptor de desenfoque activa y desactiva el efecto de cristal esmerilado",
         },
       },
       {
