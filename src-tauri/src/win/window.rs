@@ -252,7 +252,7 @@ pub struct DialogShape {
     /// Any plain text edit — a search box, a message box input, ...
     pub has_edit: bool,
     /// An **editable** combo box, i.e. one whose text field is a real `Edit`
-    /// child. That is the "you can type a path in here" marker: a plain
+    /// child. That is the "path can be typed in here" marker: a plain
     /// drop-down list (`CBS_DROPDOWNLIST`) has no `Edit` inside it, so a
     /// settings dialog with a picker and a search box does not qualify.
     pub has_path_edit: bool,
@@ -1626,7 +1626,7 @@ mod tests {
     ///
     /// `"ComboBox>Edit"` spells out a parent/child pair a flat class list
     /// cannot express: an **editable** combo, whose text field is a real `Edit`
-    /// child window. That relation is the "you can type a path here" marker.
+    /// child window. That relation is the "a path can be typed here" marker.
     fn shape_of(classes: &[&str]) -> DialogShape {
         let mut s = DialogShape::default();
         for c in classes {

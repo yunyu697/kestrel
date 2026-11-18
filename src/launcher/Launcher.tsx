@@ -975,7 +975,7 @@ export default function Launcher() {
                     {status.state === "scanning" ? (
                       <>
                         <div className="big">{t("正在建立索引…")}</div>
-                        <div className="small">{t("已扫描 {n} 个文件。你可以先搜索应用与命令，文件结果会随索引完善逐步出现。", { n: shownCount.toLocaleString() })}</div>
+                        <div className="small">{t("已扫描 {n} 个文件。可先搜索应用与命令，文件结果会随索引完善逐步出现。", { n: shownCount.toLocaleString() })}</div>
                       </>
                     ) : query ? (
                       <>

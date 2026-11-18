@@ -214,7 +214,7 @@ const en: Dict = {
   "添加收藏": "Add favorite",
   "添加磁盘": "Add drive",
   "添加自己的快捷指令：打开网址、运行程序或执行命令。":
-    "Add your own shortcuts: open a URL, run a program or execute a command.",
+    "Add custom shortcuts: open a URL, run a program or execute a command.",
   "清空": "Clear",
   "清除": "Clear",
   "点击取消索引": "Click to cancel indexing",
@@ -290,7 +290,7 @@ const en: Dict = {
   "重建索引": "Rebuild index",
   "重新扫描": "Rescan",
   "随启动器一同提供的扩展功能。": "Extra features that ship with the launcher.",
-  "随启随记的便签文本": "Notes you can jot down anytime",
+  "随启随记的便签文本": "Quick notes, saved automatically",
   "随手记点什么，内容会自动保存在本地…": "Jot something down — it is saved locally…",
   "随时呼出 / 隐藏 Kestrel（需含修饰键）":
     "Show / hide Kestrel anytime (must include a modifier)",
@@ -320,7 +320,7 @@ const en: Dict = {
   "{n} 项": "{n} items",
   "{n} 个": "{n}",
   "{n} 个应用": "{n} apps",
-  "已扫描 {n} 个文件。你可以先搜索应用与命令，文件结果会随索引完善逐步出现。":
+  "已扫描 {n} 个文件。可先搜索应用与命令，文件结果会随索引完善逐步出现。":
     "Scanned {n} files. Apps and commands work already; file results appear as the index fills in.",
   "正在索引：{name}": "Indexing: {name}",
   "已收录 {n} 项": "{n} entries indexed",
@@ -355,7 +355,7 @@ const en: Dict = {
   "选择侧栏按钮可随时隐藏右侧预览": "Use the sidebar button to hide the preview",
   "常用预设": "Common presets",
   "点击套用常用组合，也可在上方手动录制":
-    "Click to apply a common combination, or record your own above",
+    "Click to apply a common combination, or record one above",
   "快捷键注册失败，可能已被其他程序占用":
     "Shortcut could not be registered — another program may already own it",
   "固定": "Built-in",
@@ -474,7 +474,7 @@ const en: Dict = {
   "正在下载更新": "Downloading update…",
   "下载完成": "Download finished",
   "已保存到": "Saved to",
-  "「仅下载」会保存到系统的「下载」文件夹，完成后可随时安装": "Download only saves the installer to your Downloads folder; install it whenever you like",
+  "「仅下载」会保存到系统的「下载」文件夹，完成后可随时安装": "Download only saves the installer to the Downloads folder; install it at any time",
   "安装需要管理员权限：程序会先退出，随后弹出 UAC 确认，请点「是」": "Installing needs administrator rights: the app quits first, then Windows asks for permission — choose Yes",
   "立即安装": "Install now",
   "打开所在文件夹": "Show in folder",
@@ -803,7 +803,7 @@ const ja: Dict = {
   "{n} 项": "{n} 件",
   "{n} 个": "{n}",
   "{n} 个应用": "{n} 個のアプリ",
-  "已扫描 {n} 个文件。你可以先搜索应用与命令，文件结果会随索引完善逐步出现。":
+  "已扫描 {n} 个文件。可先搜索应用与命令，文件结果会随索引完善逐步出现。":
     "{n} ファイルをスキャンしました。アプリとコマンドはすぐ使えます。ファイル結果はインデックスの進行に伴って表示されます。",
   "正在索引：{name}": "インデックス中：{name}",
   "已收录 {n} 项": "{n} 件を収録",
@@ -1190,7 +1190,7 @@ const es: Dict = {
   "添加收藏": "Añadir favorito",
   "添加磁盘": "Añadir unidad",
   "添加自己的快捷指令：打开网址、运行程序或执行命令。":
-    "Añade tus propios accesos: abrir una URL, ejecutar un programa o un comando.",
+    "Añadir accesos propios: abrir una URL, ejecutar un programa o un comando.",
   "清空": "Vaciar",
   "清除": "Borrar",
   "点击取消索引": "Haz clic para cancelar la indexación",
@@ -1304,7 +1304,7 @@ const es: Dict = {
   "{n} 项": "{n} elementos",
   "{n} 个": "{n}",
   "{n} 个应用": "{n} aplicaciones",
-  "已扫描 {n} 个文件。你可以先搜索应用与命令，文件结果会随索引完善逐步出现。":
+  "已扫描 {n} 个文件。可先搜索应用与命令，文件结果会随索引完善逐步出现。":
     "{n} archivos escaneados. Las aplicaciones y comandos ya funcionan; los archivos aparecen a medida que avanza el índice.",
   "正在索引：{name}": "Indexando: {name}",
   "已收录 {n} 项": "{n} entradas indexadas",
@@ -1340,7 +1340,7 @@ const es: Dict = {
     "El botón del panel lateral oculta la vista previa",
   "常用预设": "Preajustes comunes",
   "点击套用常用组合，也可在上方手动录制":
-    "Haz clic para aplicar una combinación habitual o graba la tuya arriba",
+    "Haz clic para aplicar una combinación habitual o grabar una arriba",
   "快捷键注册失败，可能已被其他程序占用":
     "No se pudo registrar el atajo: puede que otro programa ya lo use",
   "固定": "Integrada",
@@ -1459,7 +1459,7 @@ const es: Dict = {
   "正在下载更新": "Descargando la actualización…",
   "下载完成": "Descarga completada",
   "已保存到": "Guardado en",
-  "「仅下载」会保存到系统的「下载」文件夹，完成后可随时安装": "Solo descargar guarda el instalador en tu carpeta Descargas; instálalo cuando quieras",
+  "「仅下载」会保存到系统的「下载」文件夹，完成后可随时安装": "Solo descargar guarda el instalador en la carpeta Descargas; se puede instalar en cualquier momento",
   "安装需要管理员权限：程序会先退出，随后弹出 UAC 确认，请点「是」": "Instalar requiere permisos de administrador: la aplicación se cierra primero y luego Windows pedirá permiso; elige Sí",
   "立即安装": "Instalar ahora",
   "打开所在文件夹": "Mostrar en la carpeta",
@@ -1782,8 +1782,8 @@ const zhTW: Dict = {
   "{n} 项": "{n} 項",
   "{n} 个": "{n} 個",
   "{n} 个应用": "{n} 個應用程式",
-  "已扫描 {n} 个文件。你可以先搜索应用与命令，文件结果会随索引完善逐步出现。":
-    "已掃描 {n} 個檔案。你可以先搜尋應用程式與命令，檔案結果會隨索引完善逐步出現。",
+  "已扫描 {n} 个文件。可先搜索应用与命令，文件结果会随索引完善逐步出现。":
+    "已掃描 {n} 個檔案。可先搜尋應用程式與命令，檔案結果會隨索引完善逐步出現。",
   "正在索引：{name}": "正在索引：{name}",
   "已收录 {n} 项": "已收錄 {n} 項",
   "已扫描 {n} 项": "已掃描 {n} 項",

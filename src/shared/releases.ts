@@ -49,9 +49,9 @@ export const RELEASES: Release[] = [
         kind: "fix",
         text: {
           zh: "安装失败也会自动重开，不会只剩一个空桌面",
-          en: "A failed install restarts the app too, so you are never left with nothing",
+          en: "A failed install restarts the app as well, so the desktop is never left empty",
           ja: "インストールに失敗しても自動で再起動するので、何も残らない状態にはなりません",
-          es: "Si la instalación falla, la app también se reinicia: nunca te quedas sin nada",
+          es: "Si la instalación falla, la app también se reinicia: el escritorio nunca queda vacío",
         },
       },
       {
@@ -78,7 +78,7 @@ export const RELEASES: Release[] = [
       {
         kind: "fix",
         text: {
-          zh: "认不出安装方式时改为引导你去下载页，更新不会再装出第二份",
+          zh: "认不出安装方式时改为打开下载页，更新不会再装出第二份",
           en: "When the app cannot tell how it was installed, it now opens the download page instead of risking a second copy",
           ja: "インストール方法を判別できないときはダウンロードページを案内するようになり、二重インストールは起きません",
           es: "Si la app no puede determinar cómo se instaló, ahora abre la página de descarga en lugar de arriesgar una segunda copia",
@@ -339,9 +339,9 @@ export const RELEASES: Release[] = [
       {
         kind: "improve",
         text: {
-          zh: "按反馈移除了全部自定义颜色功能：主色色板、染色强度滑块、12 项逐槽调色与「自动修正对比度」按钮都不再出现，设置里只挑方案，不会出现难读的组合。旧的 auto / custom / 未知值会按原强调色的色相自动落到最接近的同色系预设，已有配置不会丢失",
-          en: "All custom-colour controls were removed as requested: the seed swatches, tint-strength slider, twelve per-slot colour pickers and the auto-fix button are gone. Picking a scheme is the only colour decision, so an unreadable combination cannot be built. Legacy auto / custom / unknown values are migrated to the nearest monochrome preset by the hue of the previous accent, keeping existing settings intact",
-          ja: "ご要望に合わせてカスタムカラー機能をすべて削除しました。原色スウォッチ、染色強度スライダー、12 項目の個別カラーピッカー、「コントラスト自動修正」ボタンは表示されません。スキームを選ぶだけなので読みにくい組み合わせは作れません。旧 auto / custom / 未知の値は元の強調色の色相から最も近い同色系プリセットへ自動移行し、既存設定は失われません",
+          zh: "移除了全部自定义颜色功能：主色色板、染色强度滑块、12 项逐槽调色与「自动修正对比度」按钮都不再出现，设置里只挑方案，不会出现难读的组合。旧的 auto / custom / 未知值会按原强调色的色相自动落到最接近的同色系预设，已有配置不会丢失",
+          en: "All custom-colour controls were removed: the seed swatches, tint-strength slider, twelve per-slot colour pickers and the auto-fix button are gone. Picking a scheme is the only colour decision, so an unreadable combination cannot be built. Legacy auto / custom / unknown values are migrated to the nearest monochrome preset by the hue of the previous accent, keeping existing settings intact",
+          ja: "カスタムカラー機能はすべて削除しました。原色スウォッチ、染色強度スライダー、12 項目の個別カラーピッカー、「コントラスト自動修正」ボタンは表示されません。スキームを選ぶだけなので読みにくい組み合わせは作れません。旧 auto / custom / 未知の値は元の強調色の色相から最も近い同色系プリセットへ自動移行し、既存設定は失われません",
           es: "Se eliminaron todas las opciones de color personalizado: las muestras de color, el deslizador de intensidad, los doce selectores por elemento y el botón de corrección automática. Solo se elige un esquema, así que no se puede crear una combinación ilegible. Los valores antiguos auto / custom / desconocidos se migran al preset monocromo más cercano según el tono del acento anterior, sin perder la configuración",
         },
       },
@@ -426,10 +426,10 @@ export const RELEASES: Release[] = [
       {
         kind: "improve",
         text: {
-          zh: "同时打开多个文件对话框时，QS 栏现在服务你正在使用的那一个：切换对话框只是平滑移动，不重置输入、不抢焦点；其中某个对话框关闭或隐藏后，会自动交给仍打开的那个，而不是跟着一起消失。每个对话框各自记住你是否手动关过 QS 栏；从资源管理器带回来的自动跳转也不会被顺手点开的另一个对话框消耗掉",
-          en: "With several file dialogs open, Quick Switch now serves the one you are actually using: switching dialogs just moves the box smoothly, without clearing your input or stealing focus. When one dialog closes or hides, the box is handed to another one that is still open instead of disappearing. Each dialog remembers its own manual dismissal, and an Explorer round trip is no longer consumed by a dialog you merely clicked past",
+          zh: "同时打开多个文件对话框时，QS 栏跟随当前正在操作的那一个：切换对话框只是平滑移动，不重置输入、不抢焦点；其中某个对话框关闭或隐藏后，会自动交给仍打开的那个，而不是跟着一起消失。每个对话框各自记住手动关闭的状态；从资源管理器带回来的自动跳转也不会被顺手点开的另一个对话框消耗掉",
+          en: "With several file dialogs open, Quick Switch follows the one in use: switching dialogs just moves the box smoothly, without clearing typed input or stealing focus. When one dialog closes or hides, the box is handed to another one that is still open instead of disappearing. Each dialog remembers its own manual dismissal, and an Explorer round trip is no longer consumed by a dialog that was only clicked past",
           ja: "複数のファイルダイアログを開いている場合、QS バーは操作中のダイアログに追従します。切り替えても位置を滑らかに動かすだけで、入力内容は消えずフォーカスも奪いません。1 つ閉じたり隠したりしても、開いている別のダイアログに引き継がれ、消えてしまいません。手動で閉じた状態はダイアログごとに記憶され、エクスプローラーで訪れたフォルダーへの自動ジャンプも、通りすがりにクリックした別のダイアログに消費されません",
-          es: "Con varios diálogos de archivo abiertos, Quick Switch ahora atiende al que estás usando: al cambiar de diálogo la caja solo se desplaza, sin borrar lo escrito ni robar el foco. Si un diálogo se cierra u oculta, la caja pasa a otro que siga abierto en vez de desaparecer. Cada diálogo recuerda su propio cierre manual, y la visita al Explorador ya no la consume un diálogo en el que solo hiciste clic de pasada",
+          es: "Con varios diálogos de archivo abiertos, Quick Switch ahora atiende al que se está usando: al cambiar de diálogo la caja solo se desplaza, sin borrar lo escrito ni robar el foco. Si un diálogo se cierra u oculta, la caja pasa a otro que siga abierto en vez de desaparecer. Cada diálogo recuerda su propio cierre manual, y la visita al Explorador ya no la consume un diálogo en el que solo se hizo clic de pasada",
         },
       },
     ],
@@ -456,10 +456,10 @@ export const RELEASES: Release[] = [
       {
         kind: "improve",
         text: {
-          zh: "「仅下载」现在把安装包存到系统的「下载」文件夹（跟随你在资源管理器里改过的下载位置），不再是藏在 AppData 里的临时目录。完成后显示保存路径，并给出「立即安装」和「打开所在文件夹」；重复下载同名文件会自动加 (1)，不会覆盖之前那份",
-          en: "Download only now saves the installer to your real Downloads folder (including a location you redirected in Explorer), not a hidden AppData folder. When it finishes you get the path, an Install now button and Show in folder. Downloading the same release twice appends (1) instead of overwriting the earlier file",
+          zh: "「仅下载」现在把安装包存到系统的「下载」文件夹（跟随资源管理器里改过的下载位置），不再是藏在 AppData 里的临时目录。完成后显示保存路径，并给出「立即安装」和「打开所在文件夹」；重复下载同名文件会自动加 (1)，不会覆盖之前那份",
+          en: "Download only now saves the installer to the real Downloads folder (including a location redirected in Explorer), not a hidden AppData folder. When it finishes, the path appears with an Install now button and Show in folder. Downloading the same release twice appends (1) instead of overwriting the earlier file",
           ja: "「ダウンロードのみ」は、AppData の隠しフォルダーではなくシステムの「ダウンロード」フォルダー（エクスプローラーで移動した場合もその場所）に保存するようになりました。完了後は保存先、「今すぐインストール」「フォルダーを開く」を表示します。同じファイル名は上書きせず (1) を付けます",
-          es: "Solo descargar guarda el instalador en tu carpeta Descargas real (incluida una ubicación redirigida en el Explorador), no en una carpeta oculta de AppData. Al terminar muestra la ruta, Instalar ahora y Mostrar en la carpeta. Descargar dos veces lo mismo añade (1) en lugar de sobrescribir",
+          es: "Solo descargar guarda el instalador en la carpeta Descargas real (incluida una ubicación redirigida en el Explorador), no en una carpeta oculta de AppData. Al terminar muestra la ruta, Instalar ahora y Mostrar en la carpeta. Descargar dos veces lo mismo añade (1) en lugar de sobrescribir",
         },
       },
       {
@@ -517,9 +517,9 @@ export const RELEASES: Release[] = [
     date: "2026-11-04",
     title: {
       zh: "点开搜索结果不再空等一秒半",
-      en: "Opening a result no longer leaves you waiting second and a half",
+      en: "Opening a result no longer costs a second and a half of waiting",
       ja: "検索結果を開くときに 1.5 秒待たされなくなりました",
-      es: "Abrir un resultado ya no te hace esperar segundo y medio",
+      es: "Abrir un resultado ya no cuesta segundo y medio de espera",
     },
     items: [
       {
@@ -652,7 +652,7 @@ export const RELEASES: Release[] = [
     date: "2026-11-02",
     title: {
       zh: "刚装好的软件立刻就能搜到",
-      en: "Programs you just installed are searchable right away",
+      en: "Newly installed programs are searchable right away",
       ja: "インストールしたばかりのアプリがすぐ検索できます",
       es: "Los programas recién instalados se encuentran al instante",
     },
@@ -679,9 +679,9 @@ export const RELEASES: Release[] = [
         kind: "fix",
         text: {
           zh: "公共桌面（`%PUBLIC%\\Desktop`）以前没有被扫描。只在公共桌面放图标的程序，无论重启多少次都搜不到",
-          en: "The all-users desktop (`%PUBLIC%\\Desktop`) was never scanned. A program that only put its shortcut there could not be found no matter how often you restarted",
+          en: "The all-users desktop (`%PUBLIC%\\Desktop`) was never scanned. A program that only put its shortcut there could not be found however often the app restarted",
           ja: "共有デスクトップ（`%PUBLIC%\\Desktop`）がスキャン対象外でした。そこにしかショートカットを置かないアプリは、何度再起動しても検索できませんでした",
-          es: "El escritorio de todos los usuarios (`%PUBLIC%\\Desktop`) no se escaneaba. Un programa que solo dejaba ahí su acceso directo no se encontraba por muchas veces que reiniciaras",
+          es: "El escritorio de todos los usuarios (`%PUBLIC%\\Desktop`) no se escaneaba. Un programa que solo dejaba ahí su acceso directo no se encontraba por muchas veces que se reiniciara la app",
         },
       },
       {
@@ -1074,8 +1074,8 @@ export const RELEASES: Release[] = [
     version: "1.1.0",
     date: "2026-10-31",
     title: {
-      zh: "快速切换：路径导航，跳转不替你确认",
-      en: "Quick Switch: path navigation, jumping without confirming for you",
+      zh: "快速切换：路径导航，跳转只移动不确认",
+      en: "Quick Switch: path navigation that moves without confirming",
       ja: "クイック切替：パス移動と、確認しないジャンプ",
       es: "Cambio rápido: navegación por rutas y saltos sin confirmar",
     },
@@ -1101,10 +1101,10 @@ export const RELEASES: Release[] = [
       {
         kind: "fix",
         text: {
-          zh: "快速切换不再替你按下「打开/保存」：现在只跳转目录，要不要用由你决定",
-          en: "Quick Switch no longer presses Open/Save for you: it moves the dialog and leaves the choice to you",
+          zh: "快速切换不再代为按下「打开/保存」：只跳转目录，是否使用由用户决定",
+          en: "Quick Switch no longer presses Open/Save on the user's behalf: it moves the dialog and leaves the choice to the user",
           ja: "クイック切替が「開く／保存」を自動で押さなくなりました。移動するだけで、使うかどうかはユーザーが決めます",
-          es: "Cambio rápido ya no pulsa Abrir/Guardar por ti: mueve el diálogo y la decisión es tuya",
+          es: "Cambio rápido ya no pulsa Abrir/Guardar en nombre del usuario: mueve el diálogo y la decisión queda en sus manos",
         },
       },
       {

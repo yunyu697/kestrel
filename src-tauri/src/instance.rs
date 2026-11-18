@@ -31,7 +31,7 @@ const MUTEX_NAME: &str = "Local\\Kestrel-SingleInstance";
 const CLASS_NAME: &str = "KestrelSingleInstanceWnd";
 const WINDOW_NAME: &str = "KestrelSingleInstance";
 
-/// Posted by a second launch: "you are the instance, show yourself".
+/// Posted by a second launch: claims the instance and asks it to show.
 const WM_KESTREL_SHOW: u32 = WM_APP + 1;
 
 // WM_APP + 1 .. 0xBFFF is the range reserved for applications; below 0x8000
@@ -77,7 +77,7 @@ pub fn acquire(successor: bool) -> bool {
     true
 }
 
-/// Publish the app handle so later "show yourself" messages reach the UI.
+/// Publish the app handle so later show messages reach the UI.
 pub fn mark_ready(app: &tauri::AppHandle) {
     let _ = APP.set(app.clone());
 }
@@ -167,7 +167,7 @@ fn create_window() {
             std::ptr::null_mut(),
         );
         if hwnd == 0 {
-            // Still the instance — just unreachable for "show yourself".
+            // Still the instance — just unreachable for show messages.
             crate::debug_log::qs_log("instance: message window could not be created");
             return;
         }

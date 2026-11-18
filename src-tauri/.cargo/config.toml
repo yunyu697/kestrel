@@ -1,5 +1,5 @@
 # Use a domestic crates.io mirror for fast, reliable dependency fetching.
-# Remove this file if you prefer the default registry.
+# Delete this file to fall back to the default registry.
 [source.crates-io]
 replace-with = "rsproxy-sparse"
 
