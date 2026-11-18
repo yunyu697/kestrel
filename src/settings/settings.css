@@ -12,17 +12,12 @@ body.win-settings {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg);
+  /* One glass layer for the whole surface; text never fades with it. */
+  background: color-mix(in srgb, var(--bg) calc(var(--surface-alpha, 1) * 100%), transparent);
   color: var(--text);
   overflow: hidden;
   border-radius: var(--radius-win);
-  opacity: var(--win-alpha, 1);
-}
-
-/* 背景模糊: same rule as the launcher card — a native blur only shows through
-   a surface that is not fully opaque. */
-:root[data-blur="on"] .settings-root {
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  transition: background 200ms var(--ease);
 }
 
 /* ---- title bar ---- */

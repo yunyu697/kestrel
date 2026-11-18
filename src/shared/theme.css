@@ -24,8 +24,13 @@
   --radius-card: 12px;
   --radius-ctl: 8px;
   --row-h: 46px;
-  /* Window translucency, written by applyWindowChrome(). 1 = opaque. */
+  /* Window translucency. Written by applyWindowChrome(). This is a *background*
+     alpha, never an element opacity: text must stay fully opaque so that
+     lowering transparency cannot make the interface unreadable. The two
+     surfaces below are the only glass layers; inner surfaces stay solid so
+     the blur reads as one continuous pane rather than patchy holes. */
   --win-alpha: 1;
+  --surface-alpha: 1;
 
   /* Neutral structure. Derived from the text colour, so a colour scheme can
      change hue without dyeing borders, badges and keycaps — the thing that

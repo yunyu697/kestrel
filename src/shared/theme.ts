@@ -105,18 +105,34 @@ function clamp(v: number, lo: number, hi: number): number {
  * Radius ratios keep the current defaults exact: 18px window, 12px card, 8px
  * control. Scaling the window radius therefore scales the whole roundness
  * family instead of only the outer shell.
+ *
+ * Transparency is a *background* alpha, not an element opacity. Fading the
+ * whole surface faded the text with it, which is why the slider stopped being
+ * useful below about 70%. The floor here is the alpha at which body text still
+ * clears 4.5:1 over a light desktop; below it the slider would trade
+ * legibility for decoration.
+ *
+ * The blur field is kept in Settings for config compatibility but has no
+ * visual effect: Windows' system acrylic cannot round a layered window, so
+ * enabling it produced square corners and a patchy backdrop. The setting
+ * page no longer offers the switch.
  */
+const MIN_READABLE_ALPHA = 0.82;
+
 export function applyWindowChrome(
   s: Pick<Settings, "opacity" | "blur" | "cornerRadius" | "fontScale">,
 ): void {
   const root = document.documentElement;
   const scale = clamp(s.fontScale, 0.85, 1.2);
   const radius = clamp(s.cornerRadius, 0, 22);
+  const alpha = clamp(s.opacity, 0.6, 1);
+  // Map the slider's 0.6–1 range onto the readable 0.82–1 range.
+  const surfaceAlpha = MIN_READABLE_ALPHA + (alpha - 0.6) / 0.4 * (1 - MIN_READABLE_ALPHA);
 
   root.style.setProperty("--font-scale", String(scale));
   root.style.setProperty("--radius-win", `${radius}px`);
   root.style.setProperty("--radius-card", `${Math.round((radius * 2) / 3)}px`);
   root.style.setProperty("--radius-ctl", `${Math.round((radius * 4) / 9)}px`);
-  root.style.setProperty("--win-alpha", String(clamp(s.opacity, 0.6, 1)));
-  root.setAttribute("data-blur", s.blur ? "on" : "off");
+  root.style.setProperty("--win-alpha", String(alpha));
+  root.style.setProperty("--surface-alpha", surfaceAlpha.toFixed(3));
 }

@@ -39,19 +39,19 @@ export const RELEASES: Release[] = [
       {
         kind: "improve",
         text: {
-          zh: "透明度滑块现在能改变窗口的通透程度",
-          en: "The opacity slider now changes how see-through the window is",
-          ja: "不透明度スライダーがウィンドウの透け具合を変更できるようになりました",
-          es: "El control de opacidad cambia la transparencia de la ventana",
+          zh: "透明度只调整背景，文字始终保持清晰",
+          en: "Transparency changes only the background; text stays sharp",
+          ja: "透明度は背景だけに影響し、文字は常に鮮明です",
+          es: "La transparencia solo cambia el fondo; el texto sigue nítido",
         },
       },
       {
         kind: "improve",
         text: {
-          zh: "背景模糊开关可切换毛玻璃效果",
-          en: "The background blur switch toggles the frosted-glass effect",
-          ja: "背景ぼかしの切り替えですりガラス効果がオン／オフできます",
-          es: "El interruptor de desenfoque activa y desactiva el efecto de cristal esmerilado",
+          zh: "窗口四角改为圆角，边缘不再露出方形边框",
+          en: "Window corners are rounded, with no square edge left behind",
+          ja: "ウィンドウの四角が丸くなり、角に四角い縁が出なくなりました",
+          es: "Las esquinas de la ventana son redondeadas y ya no muestran un borde cuadrado",
         },
       },
       {

@@ -829,7 +829,7 @@ function AppearancePane({
         <div className="card">
           <Row
             label={t("窗口透明度")}
-            desc={t("数值越低越通透（需关闭模糊效果最佳）")}
+            desc={t("只调整背景，文字始终保持清晰")}
             onReset={() => update("opacity", WINDOW_DEFAULTS.opacity)}
           >
             <Slider
@@ -840,13 +840,6 @@ function AppearancePane({
               fmt={(v) => `${Math.round(v * 100)}%`}
               onChange={(v) => update("opacity", v)}
             />
-          </Row>
-          <Row
-            label={t("背景模糊")}
-            desc={t("毛玻璃效果，提升层次感")}
-            onReset={() => update("blur", WINDOW_DEFAULTS.blur)}
-          >
-            <Toggle on={s.blur} onChange={(v) => update("blur", v)} />
           </Row>
           <Row
             label={t("圆角半径")}
