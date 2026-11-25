@@ -160,4 +160,74 @@ assert.ok(
   "设置窗口又变成透明分层窗口，圆角会失效",
 );
 
-console.log(`window chrome: ${ramp.length} 字号档位跟随缩放，透明度有可读下限，无模糊`);
+// --- wake-up reliability -------------------------------------------------
+//
+// Losing the foreground right after a show used to hide the launcher at once,
+// so pressing the shortcut looked like it did nothing. A focus loss inside the
+// grace period must take the focus back, and a later one must be confirmed
+// before hiding. The old code also decided this from `close_after_open`, which
+// means something else entirely (closing after opening a result).
+const focusArm = libRs.slice(libRs.indexOf('WindowEvent::Focused(false)'));
+const focusBlock = focusArm.slice(0, 1800);
+assert.ok(
+  focusBlock.includes("in_show_grace"),
+  "失焦处理没有显示保护期，窗口会闪一下消失",
+);
+assert.ok(
+  focusBlock.includes("reclaim_focus"),
+  "保护期内失焦没有抢回焦点",
+);
+assert.ok(
+  focusBlock.includes("dismiss_after_blur"),
+  "失焦没有延迟确认，焦点抖动会直接关闭窗口",
+);
+assert.ok(
+  !/settings\.read\(\)\.close_after_open|let keep = !/.test(focusBlock),
+  "失焦隐藏又和 close_after_open 混在一起了",
+);
+const uiRs = readFileSync(new URL("../src-tauri/src/ui.rs", import.meta.url), "utf8");
+assert.ok(
+  /BLUR_CONFIRM_MS\s*:\s*u64\s*=\s*\d+/.test(uiRs),
+  "ui.rs 没有失焦确认延迟常量",
+);
+assert.ok(
+  /fn mark_shown\(\)/.test(uiRs) && (uiRs.match(/mark_shown\(\)/g) || []).length >= 3,
+  "show 路径没有统一记录显示时间",
+);
+
+// The main shortcut is a registered system hotkey. A refusal has to be logged
+// and retried, otherwise a combination that is busy at startup stays dead for
+// the whole session with no trace.
+const hotkeysRs = readFileSync(
+  new URL("../src-tauri/src/hotkeys.rs", import.meta.url),
+  "utf8",
+);
+assert.ok(
+  /register\s*\{accelerator:\?\}\s*(ok|FAILED)/.test(hotkeysRs) ||
+    hotkeysRs.includes("register {accelerator:?} ok"),
+  "热键注册结果没有写日志",
+);
+assert.ok(
+  /fn retry_toggle_shortcut/.test(hotkeysRs),
+  "热键注册失败后没有重试",
+);
+assert.ok(
+  /retry_toggle_shortcut\(&app\)/.test(hotkeysRs),
+  "watchdog 没有调用热键重试",
+);
+
+// A refused dialog now leaves a line in the normal log; without it "the box
+// did not appear" has no diagnosable evidence at all.
+const windowRs = readFileSync(
+  new URL("../src-tauri/src/win/window.rs", import.meta.url),
+  "utf8",
+);
+assert.ok(
+  /fn log_quick_switch_skip/.test(windowRs) &&
+    /quick switch skip \{hwnd:#x\}/.test(windowRs),
+  "被拒绝的对话框没有留下诊断日志",
+);
+
+console.log(
+  `window chrome: ${ramp.length} 字号档位跟随缩放，透明度有可读下限，无模糊，唤醒有保护期`,
+);

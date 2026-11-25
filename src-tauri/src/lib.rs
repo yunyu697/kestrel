@@ -245,10 +245,22 @@ pub fn run() {
                     if state.qs_active.load(std::sync::atomic::Ordering::Relaxed) {
                         return;
                     }
-                    let keep = !state.settings.read().close_after_open;
-                    if !keep {
-                        crate::ui::hide_launcher(window.app_handle());
+                    // A window that just appeared can lose the foreground to
+                    // whatever the shell or a browser is still activating, and
+                    // hiding on that event made the launcher look like it never
+                    // opened. Take the focus back during the grace period.
+                    //
+                    // `close_after_open` does not belong here: it says whether
+                    // opening a result should close the launcher, which is a
+                    // different question. Using it here meant the default
+                    // setting ("close after opening a result") silently turned
+                    // every stray focus change into a dismissal.
+                    if crate::ui::in_show_grace() {
+                        crate::debug_log::qs_log("blur during grace -> reclaim focus");
+                        crate::ui::reclaim_focus(window.app_handle());
+                        return;
                     }
+                    crate::ui::dismiss_after_blur(window.app_handle().clone());
                 }
             }
             _ => {}

@@ -688,11 +688,35 @@ pub fn is_quick_switch_target(hwnd: HWND) -> bool {
     }
     let facts = scan_dialog_facts(hwnd, shape);
     let decision = qs_decision(&facts);
-    crate::debug_log::qs_log_verbose(&format!(
-        "quick switch {hwnd:#x}: exe={} title={:?} edits={} combos={} decision={decision:?}",
-        facts.exe, facts.title, facts.shape.edits, facts.shape.combos
-    ));
+    match decision {
+        QsDecision::Attach(reason) => crate::debug_log::qs_log_verbose(&format!(
+            "quick switch {hwnd:#x}: exe={} title={:?} edits={} combos={} attach={reason}",
+            facts.exe, facts.title, facts.shape.edits, facts.shape.combos
+        )),
+        // A refusal is the answer to "why did the box not appear here?", so it
+        // belongs in the normal log rather than the verbose one. Rate limited:
+        // dragging across windows fires this many times per second.
+        QsDecision::Skip(reason) => log_quick_switch_skip(hwnd, &facts, reason),
+    }
     matches!(decision, QsDecision::Attach(_))
+}
+
+/// One refusal line every couple of seconds is enough to identify a dialog
+/// that should have been recognised without drowning the log in repeats.
+fn log_quick_switch_skip(hwnd: HWND, f: &DialogFacts, reason: &str) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LAST: AtomicU64 = AtomicU64::new(0);
+    static START: once_cell::sync::Lazy<std::time::Instant> =
+        once_cell::sync::Lazy::new(std::time::Instant::now);
+    let now = START.elapsed().as_millis() as u64;
+    if now.saturating_sub(LAST.load(Ordering::Relaxed)) < 1500 {
+        return;
+    }
+    LAST.store(now, Ordering::Relaxed);
+    crate::debug_log::qs_log(&format!(
+        "quick switch skip {hwnd:#x}: exe={} title={:?} reason={reason}",
+        f.exe, f.title
+    ));
 }
 
 /// Ctrl+G is an explicit request, so it gets a wider rule than the automatic

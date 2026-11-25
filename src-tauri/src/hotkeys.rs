@@ -25,6 +25,38 @@ static REPLACE_WIN_SEARCH: AtomicBool = AtomicBool::new(false);
 static WIN_SEARCH_HELD: AtomicBool = AtomicBool::new(false);
 static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+// Registered system shortcut state.
+//
+// `register_toggle_shortcut` used to throw its result away, so a combination
+// the system refused — normally because another program already owns it —
+// left the app looking healthy while the shortcut did nothing at all. The
+// target is kept so the watchdog can keep trying: the holder is often a
+// program that is still starting up, and it may release the combination a few
+// seconds later.
+static TOGGLE_TARGET: once_cell::sync::Lazy<parking_lot::Mutex<String>> =
+    once_cell::sync::Lazy::new(|| parking_lot::Mutex::new(String::new()));
+static TOGGLE_REGISTERED: AtomicBool = AtomicBool::new(false);
+static TOGGLE_LAST_TRY_MS: AtomicU64 = AtomicU64::new(0);
+/// Minimum gap between registration attempts, so a permanently occupied
+/// combination does not produce a registration call every watchdog tick.
+const TOGGLE_RETRY_MS: u64 = 15_000;
+
+/// Try the last requested combination again if it never registered.
+fn retry_toggle_shortcut(app: &AppHandle) {
+    if TOGGLE_REGISTERED.load(Ordering::Relaxed) {
+        return;
+    }
+    let target = TOGGLE_TARGET.lock().clone();
+    if target.is_empty() {
+        return;
+    }
+    if now_ms().saturating_sub(TOGGLE_LAST_TRY_MS.load(Ordering::Relaxed)) < TOGGLE_RETRY_MS {
+        return;
+    }
+    crate::debug_log::qs_log(&format!("hotkey: retrying {target:?}"));
+    register_toggle_shortcut(app, &target);
+}
+
 // ---- system idle time (watchdog input) -----------------------------------
 #[repr(C)]
 struct LastInputInfo {
@@ -402,8 +434,13 @@ pub fn install_hook(app: AppHandle, state: Arc<AppState>) {
     // mouse-only use is a far better trade: a genuinely removed hook still
     // self-heals, and normal reading never trips it.
     {
+        let app = app.clone();
         crate::supervise_forever("kestrel-hotkey-watchdog", move || loop {
             std::thread::sleep(std::time::Duration::from_secs(3));
+            // The main shortcut is a registered system hotkey, not part of the
+            // hook; it is retried here so a combination that was busy at
+            // startup recovers on its own.
+            retry_toggle_shortcut(&app);
             let hook_id = HOOK_THREAD_ID.load(Ordering::SeqCst);
             if hook_id != 0 {
                 unsafe { PostThreadMessageW(hook_id, WM_NULL, 0, 0) };
@@ -481,8 +518,15 @@ pub fn register_toggle_shortcut(app: &AppHandle, accelerator: &str) -> bool {
         }
     }
 
+    // Remember what was asked for even when the system refuses it, so the
+    // watchdog can try again once whatever held the combination is gone.
+    *TOGGLE_TARGET.lock() = accelerator.trim().to_string();
+    TOGGLE_LAST_TRY_MS.store(now_ms(), Ordering::Relaxed);
+
     let gs = app.global_shortcut();
     let Ok(shortcut) = accelerator.parse::<Shortcut>() else {
+        TOGGLE_REGISTERED.store(false, Ordering::Relaxed);
+        crate::debug_log::qs_log(&format!("hotkey: cannot parse accelerator {accelerator:?}"));
         return false;
     };
     let handle = app.clone();
@@ -496,8 +540,16 @@ pub fn register_toggle_shortcut(app: &AppHandle, accelerator: &str) -> bool {
         })
         .is_err()
     {
+        TOGGLE_REGISTERED.store(false, Ordering::Relaxed);
+        // Silent failure was the worst part of this: the app looked fine and
+        // the shortcut simply did nothing until the next restart.
+        crate::debug_log::qs_log(&format!(
+            "hotkey: register {accelerator:?} FAILED (owned by another program?)"
+        ));
         return false;
     }
+    TOGGLE_REGISTERED.store(true, Ordering::Relaxed);
+    crate::debug_log::qs_log(&format!("hotkey: register {accelerator:?} ok"));
     // The new combination works — release the old one.
     let mut cur = CURRENT.lock();
     if let Some(old) = cur.as_ref() {

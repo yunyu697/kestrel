@@ -17,6 +17,91 @@ use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 /// user kept reporting.
 static TOPMOST: AtomicBool = AtomicBool::new(true);
 
+/// When the shared window was last shown, and how many times.
+///
+/// The launcher is shown by a global shortcut, which is delivered while
+/// another window still owns the foreground. Windows happily hands the focus
+/// to us and then gives it back to the previous window a moment later (a
+/// browser finishing activation, the shell restoring itself). Appearing and
+/// vanishing within one sentence is what "the shortcut does not wake it up"
+/// looks like from the outside, so a fresh show gets a short grace period: a
+/// focus loss inside it takes the focus back instead of hiding the window.
+///
+/// `SHOW_GEN` lets a delayed dismissal tell whether the window it was
+/// scheduled for is still the current one — a new show must cancel it.
+static SHOW_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static LAST_SHOW: once_cell::sync::Lazy<parking_lot::Mutex<Option<std::time::Instant>>> =
+    once_cell::sync::Lazy::new(|| parking_lot::Mutex::new(None));
+
+/// How long a freshly shown window is protected from a focus loss.
+const SHOW_GRACE_MS: u64 = 400;
+/// How long a focus loss has to survive before the window is hidden.
+const BLUR_CONFIRM_MS: u64 = 220;
+
+fn mark_shown() {
+    *LAST_SHOW.lock() = Some(std::time::Instant::now());
+    SHOW_GEN.fetch_add(1, Ordering::SeqCst);
+}
+
+/// Whether a show happened so recently that a focus loss is noise, not intent.
+pub fn in_show_grace() -> bool {
+    shown_recently(SHOW_GRACE_MS)
+}
+
+/// Whether the window was shown less than `ms` ago.
+fn shown_recently(ms: u64) -> bool {
+    LAST_SHOW
+        .lock()
+        .map(|t| t.elapsed() < std::time::Duration::from_millis(ms))
+        .unwrap_or(false)
+}
+
+/// Take the foreground back after a spurious focus loss.
+///
+/// `WebviewWindow::set_focus` goes through `SetForegroundWindow`, which Windows
+/// refuses when the calling process is not already in front — exactly the case
+/// here, because the window just lost the foreground. `window::activate`
+/// attaches to the current foreground thread first, which makes the call
+/// legal, and is the same helper the result list already uses.
+pub fn reclaim_focus(app: &AppHandle) {
+    let Some(win) = launcher(app) else { return };
+    if let Ok(h) = win.hwnd() {
+        crate::win::window::activate(h.0 as isize);
+    }
+    set_topmost(app, true);
+}
+
+/// Hide the window once the focus loss has been confirmed.
+///
+/// A single `Focused(false)` is not proof that the user moved on: the shell and
+/// browsers bounce the foreground for a few dozen milliseconds while they
+/// settle. Waiting briefly and re-checking turns those bounces into a no-op,
+/// while a real click elsewhere still dismisses the launcher.
+pub fn dismiss_after_blur(app: AppHandle) {
+    let gen = SHOW_GEN.load(Ordering::SeqCst);
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(BLUR_CONFIRM_MS));
+        if SHOW_GEN.load(Ordering::SeqCst) != gen {
+            return; // a newer show superseded this dismissal
+        }
+        let Some(state) = app.try_state::<Arc<AppState>>() else {
+            return;
+        };
+        if state.qs_active.load(Ordering::Relaxed) {
+            return;
+        }
+        let Some(win) = launcher(&app) else { return };
+        if !win.is_visible().unwrap_or(false) {
+            return;
+        }
+        if win.is_focused().unwrap_or(false) {
+            return; // the focus came back on its own
+        }
+        crate::debug_log::qs_log("blur confirmed -> hide_launcher");
+        hide_launcher(&app);
+    });
+}
+
 /// Set the box's always-on-top state, only touching the window when it really
 /// changes. Every call is a `SetWindowPos`, and the foreground monitor calls
 /// this on each activation — unconditional calls made the box flicker.
@@ -116,6 +201,7 @@ pub fn show_launcher(app: &AppHandle, state: &Arc<AppState>) {
     set_topmost(app, true);
     crate::debug_log::qs_log_verbose("show: topmost");
     let _ = win.set_focus();
+    mark_shown();
     crate::debug_log::qs_log_verbose("show: focused");
     state
         .launcher_visible
@@ -184,6 +270,8 @@ fn show_quick_switch_at(app: &AppHandle, state: &Arc<AppState>, hwnd: isize, tak
     // is still invisible, so the first painted frame is already the QS box.
     std::thread::sleep(std::time::Duration::from_millis(40));
     let _ = win.show();
+    // Cancels a dismissal still pending from the launcher that just closed.
+    mark_shown();
     // Z-order: the box must look like part of the dialog — directly above it,
     // in the *same* band.
     //
@@ -571,4 +659,47 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The grace period has to be a real deadline: if it never expired, a
+    /// focus loss after the user moved on would never dismiss the window.
+    #[test]
+    fn show_grace_expires() {
+        mark_shown();
+        assert!(in_show_grace(), "刚显示时应处于保护期");
+        std::thread::sleep(std::time::Duration::from_millis(SHOW_GRACE_MS + 60));
+        assert!(!in_show_grace(), "保护期应已结束");
+    }
+
+    /// Every show must invalidate a dismissal scheduled for the previous one,
+    /// otherwise closing and reopening quickly leaves a stray hide behind.
+    #[test]
+    fn each_show_invalidates_pending_dismissal() {
+        mark_shown();
+        let before = SHOW_GEN.load(Ordering::SeqCst);
+        mark_shown();
+        assert!(
+            SHOW_GEN.load(Ordering::SeqCst) > before,
+            "第二次显示没有使旧的延迟隐藏失效"
+        );
+    }
+
+    /// A dismissal must never be scheduled while the grace period is still
+    /// running: that would hide a window the user has not had time to see.
+    #[test]
+    fn dismissal_waits_for_the_grace_period() {
+        mark_shown();
+        let started = std::time::Instant::now();
+        while in_show_grace() {
+            assert!(
+                started.elapsed() < std::time::Duration::from_millis(SHOW_GRACE_MS + 200),
+                "保护期没有在上限内结束"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
 }
