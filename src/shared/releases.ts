@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.27",
+    date: "2026-11-25",
+    title: {
+      zh: "快捷键唤醒更稳，焦点抖动不再让窗口闪掉",
+      en: "The shortcut wakes the launcher reliably; a focus bounce no longer hides it",
+      ja: "ショートカットでの呼び出しが安定し、フォーカスの揺れで消えなくなりました",
+      es: "El atajo abre el buscador de forma fiable y un cambio de foco ya no lo oculta",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "窗口刚出现时被抢走焦点会重新取得，不再一闪而过",
+          en: "A focus grab right after opening no longer makes the window vanish",
+          ja: "表示直後にフォーカスを奪われても取得し直し、一瞬で消えなくなりました",
+          es: "Recuperar el foco al abrir evita que la ventana desaparezca de inmediato",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "主快捷键注册失败会记入日志并自动重试，不再整段会话失效",
+          en: "A refused shortcut is logged and retried instead of staying dead",
+          ja: "ショートカットの登録失敗を記録し、自動で再試行します",
+          es: "Un atajo rechazado se registra y se reintenta en lugar de quedar inactivo",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "对话框未被识别为文件对话框时记录程序与原因，便于定位",
+          en: "An unrecognised dialog now records the program and the reason",
+          ja: "ファイルダイアログと判定されなかった場合にプログラム名と理由を記録します",
+          es: "Un diálogo no reconocido registra el programa y el motivo",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.26",
     date: "2026-11-18",
     title: {
