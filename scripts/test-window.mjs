@@ -228,6 +228,48 @@ assert.ok(
   "被拒绝的对话框没有留下诊断日志",
 );
 
+// The grace period must cover the whole show sequence, not start after it:
+// `show()`, the topmost change and `set_focus()` all report focus changes
+// asynchronously, and a grace that started last judged them against the
+// previous show — the window hid itself a moment after appearing.
+const markIdx = uiRs.indexOf("mark_shown();", uiRs.indexOf("pub fn show_launcher"));
+const showIdx = uiRs.indexOf("win.show()", uiRs.indexOf("pub fn show_launcher"));
+assert.ok(markIdx > 0 && showIdx > 0 && markIdx < showIdx, "保护期没有从窗口显示之前开始");
+
+// Losing the foreground to the desktop or the shell is a deactivation, not a
+// click somewhere else; hiding on it was the flash the user kept reporting.
+assert.ok(
+  /SHELL_CLASSES/.test(uiRs) && /blur to shell/.test(uiRs),
+  "失焦到桌面/任务栏仍然直接隐藏窗口",
+);
+
+// A silent hook while our own window has the focus is normal: a low-level hook
+// never sees keys delivered to its own process. Respawning on that threw away
+// a healthy hook every two minutes (235 times in ten days).
+assert.ok(
+  /hook silent \{stall_secs\}s -> reinstall/.test(hotkeysRs) &&
+    !/hook stalled \{stall_secs\}s -> respawning/.test(hotkeysRs),
+  "钩子静默判定仍会把自窗口焦点当成故障",
+);
+assert.ok(
+  /win\.is_focused\(\)/.test(hotkeysRs.slice(hotkeysRs.indexOf("frozen > stall_secs"))),
+  "钩子看门狗没有排除自窗口焦点",
+);
+
+// Double Ctrl must not depend on the hook: it is gone most of the time, and
+// without the chord flag Ctrl+C followed by Ctrl+V toggled the launcher.
+assert.ok(
+  /fn chord_keys_down/.test(hotkeysRs) && /ctrl && chord_keys_down\(\)/.test(hotkeysRs),
+  "双击 Ctrl 仍然依赖钩子判断是否为组合键",
+);
+
+// "Pressed the shortcut and nothing happened" has to be distinguishable from
+// "did not press it": the press itself is logged.
+assert.ok(
+  /qs_log\("hotkey: pressed"\)/.test(hotkeysRs),
+  "按下主快捷键没有留下日志",
+);
+
 console.log(
   `window chrome: ${ramp.length} 字号档位跟随缩放，透明度有可读下限，无模糊，唤醒有保护期`,
 );

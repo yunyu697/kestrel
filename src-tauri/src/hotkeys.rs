@@ -98,11 +98,21 @@ static HOOK_GEN: AtomicU64 = AtomicU64::new(0);
 // Watchdog-side bookkeeping (only the watchdog touches these).
 static WATCH_LAST_EVENTS: AtomicU64 = AtomicU64::new(0);
 static WATCH_LAST_CHANGE: AtomicU64 = AtomicU64::new(0);
+/// Last ping count the watchdog saw, used to tell a live pump from a wedged one.
+static WATCH_LAST_PINGS: AtomicU64 = AtomicU64::new(0);
 // The watchdog pings the pump thread with WM_NULL; the pump counts them.
 // Rising pings + frozen events = the hook was removed while the pump lives
 // (i.e. Windows silently dropped it). Frozen pings = the pump thread itself
 // is stuck.
 static PUMP_PINGS: AtomicU64 = AtomicU64::new(0);
+/// Set by the watchdog to make the *existing* pump reinstall its hook.
+///
+/// Respawning the whole thread on every suspected stall meant a new thread for
+/// every attempt — 235 in ten days — and each superseded pump parked forever
+/// instead of exiting. A pump that still answers pings can simply drop its
+/// hook and install a fresh one; only a genuinely wedged pump needs a new
+/// thread.
+static REINSTALL: AtomicBool = AtomicBool::new(false);
 const WM_NULL: u32 = 0x0000;
 
 const WM_QUIT: u32 = 0x0012;
@@ -134,6 +144,19 @@ fn hook_thread_body() {
                 if msg.message == WM_NULL {
                     // Watchdog liveness probe — no dispatch needed.
                     PUMP_PINGS.fetch_add(1, Ordering::Relaxed);
+                    if REINSTALL.swap(false, Ordering::SeqCst) {
+                        // Same thread, fresh hook: no parked thread, no
+                        // generation handshake, and the log says whether the
+                        // reinstall actually worked.
+                        let _ = UnhookWindowsHookEx(hook);
+                        hook = SetWindowsHookExW(
+                            WH_KEYBOARD_LL,
+                            hook_proc,
+                            GetModuleHandleW(std::ptr::null()),
+                            0,
+                        );
+                        crate::debug_log::qs_log(&format!("hook: reinstalled={}", hook != 0));
+                    }
                     continue;
                 }
                 TranslateMessage(&msg);
@@ -188,6 +211,18 @@ fn is_ctrl(vk: u32) -> bool {
 
 fn is_modifier(vk: u32) -> bool {
     is_ctrl(vk) || vk == VK_SHIFT || vk == VK_MENU || (0x5B..=0x5C).contains(&vk)
+}
+
+/// Whether a letter or digit is held down right now — i.e. whether Ctrl is
+/// being used as a modifier rather than tapped on its own.
+///
+/// Only called while Ctrl is down, so the 36 probes cost nothing in the common
+/// case. `GetAsyncKeyState` reads the real key state, so this works no matter
+/// which process owns the focus and without a keyboard hook.
+fn chord_keys_down() -> bool {
+    (0x30..=0x39)
+        .chain(0x41..=0x5A)
+        .any(|vk| unsafe { (GetAsyncKeyState(vk) as u16 & 0x8000) != 0 })
 }
 
 extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -309,6 +344,19 @@ fn poll_double_ctrl() {
     }
 
     let was = POLL_DOWN.swap(ctrl, Ordering::Relaxed);
+    if ctrl && chord_keys_down() {
+        // Polled replacement for the hook's `CTRL_DIRTY`. The hook is gone
+        // most of the time (see the watchdog), and while it is gone nothing
+        // set the chord flag: Ctrl+C then Ctrl+V inside the double-Ctrl
+        // interval counted as two bare Ctrl taps and toggled the launcher in
+        // the middle of typing. Letters and digits are enough — no shortcut
+        // chording happens on other keys with Ctrl.
+        POLL_LAST.store(0, Ordering::Relaxed);
+        if !was {
+            // The press that started this chord must not arm either.
+            return;
+        }
+    }
     if ctrl && !was {
         // Rising edge: one Ctrl press.
         let enabled = DOUBLE_CTRL_ENABLED.load(Ordering::Relaxed);
@@ -477,16 +525,42 @@ pub fn install_hook(app: AppHandle, state: Arc<AppState>) {
                 continue;
             }
             if app_alive && frozen > stall_secs * 1000 {
-                crate::debug_log::qs_log(&format!(
-                    "hookwatch: hook stalled {stall_secs}s -> respawning"
-                ));
-                WATCH_LAST_CHANGE.store(now_ms(), Ordering::Relaxed); // don't respawn in a loop
-                let old_id = HOOK_THREAD_ID.load(Ordering::SeqCst);
-                HOOK_GEN.fetch_add(1, Ordering::SeqCst);
-                if old_id != 0 {
-                    unsafe { PostThreadMessageW(old_id, WM_QUIT, 0, 0) };
+                // While our own window has the foreground the hook is silent
+                // *by design* — a low-level hook never sees keys delivered to
+                // its own process. Counting that as a stall tore down a
+                // healthy hook every two minutes of typing in the launcher.
+                if let Some(win) = crate::ui::launcher(&app) {
+                    if win.is_focused().unwrap_or(false) {
+                        WATCH_LAST_CHANGE.store(now_ms(), Ordering::Relaxed);
+                        continue;
+                    }
                 }
-                spawn_hook_thread();
+                // A pump that still answers pings can reinstall its hook in
+                // place; only a wedged pump needs a replacement thread.
+                let pings = PUMP_PINGS.load(Ordering::Relaxed);
+                let pump_alive = pings != WATCH_LAST_PINGS.swap(pings, Ordering::Relaxed);
+                if pump_alive {
+                    crate::debug_log::qs_log(&format!(
+                        "hookwatch: hook silent {stall_secs}s -> reinstall"
+                    ));
+                    WATCH_LAST_CHANGE.store(now_ms(), Ordering::Relaxed);
+                    REINSTALL.store(true, Ordering::SeqCst);
+                    let id = HOOK_THREAD_ID.load(Ordering::SeqCst);
+                    if id != 0 {
+                        unsafe { PostThreadMessageW(id, WM_NULL, 0, 0) };
+                    }
+                } else {
+                    crate::debug_log::qs_log(&format!(
+                        "hookwatch: pump wedged {stall_secs}s -> respawning"
+                    ));
+                    WATCH_LAST_CHANGE.store(now_ms(), Ordering::Relaxed);
+                    let old_id = HOOK_THREAD_ID.load(Ordering::SeqCst);
+                    HOOK_GEN.fetch_add(1, Ordering::SeqCst);
+                    if old_id != 0 {
+                        unsafe { PostThreadMessageW(old_id, WM_QUIT, 0, 0) };
+                    }
+                    spawn_hook_thread();
+                }
             }
         });
     }
@@ -534,6 +608,12 @@ pub fn register_toggle_shortcut(app: &AppHandle, accelerator: &str) -> bool {
         .on_shortcut(shortcut, move |_app, _sc, event| {
             if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                 if let Some(state) = handle.try_state::<Arc<AppState>>() {
+                    // The only proof that the shortcut works at all. Without
+                    // this line "pressed the shortcut and nothing happened"
+                    // and "never pressed it" look identical in the log, and a
+                    // silent drop between the message queue and the handler
+                    // stays invisible.
+                    crate::debug_log::qs_log("hotkey: pressed");
                     crate::ui::toggle_launcher(&handle, &state);
                 }
             }

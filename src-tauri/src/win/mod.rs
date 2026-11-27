@@ -201,6 +201,9 @@ pub const VK_RCONTROL: u32 = 0xA3;
 pub const VK_SHIFT: u32 = 0x10;
 pub const VK_MENU: u32 = 0x12;
 
+/// `GetAncestor` flag: walk up to the top-level (root) window.
+pub const GA_ROOT: u32 = 2;
+
 pub const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
 pub const PROCESS_VM_OPERATION: u32 = 0x0008;
 pub const PROCESS_VM_READ: u32 = 0x0010;

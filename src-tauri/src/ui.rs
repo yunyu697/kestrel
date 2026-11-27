@@ -37,6 +37,14 @@ static LAST_SHOW: once_cell::sync::Lazy<parking_lot::Mutex<Option<std::time::Ins
 const SHOW_GRACE_MS: u64 = 400;
 /// How long a focus loss has to survive before the window is hidden.
 const BLUR_CONFIRM_MS: u64 = 220;
+/// Window classes that mean "no application has the foreground": the desktop
+/// and the shell. Losing the foreground to one of these right after a show is
+/// the window being *deactivated*, not the user moving on — see
+/// [`dismiss_after_blur`].
+const SHELL_CLASSES: [&str; 3] = ["Progman", "WorkerW", "Shell_TrayWnd"];
+/// For this long after a show, a focus loss to the shell is taken back instead
+/// of dismissing the window.
+const SHELL_SETTLE_MS: u64 = 1_500;
 
 fn mark_shown() {
     *LAST_SHOW.lock() = Some(std::time::Instant::now());
@@ -97,9 +105,38 @@ pub fn dismiss_after_blur(app: AppHandle) {
         if win.is_focused().unwrap_or(false) {
             return; // the focus came back on its own
         }
+        // Losing the foreground to the desktop or the taskbar is not a click
+        // somewhere else: it is what Windows reports when a window is
+        // activated and then deactivated again with nothing taking its place.
+        // Observed in the field as four shows in thirty seconds, three of them
+        // ending on `Progman` about a second after appearing — the launcher
+        // looked like it refused to open. Take the foreground back instead,
+        // and only while the show is still fresh.
+        let fg = crate::win::window::foreground();
+        if fg != 0 && !same_window(fg, &win) {
+            let class = crate::win::class_name(fg);
+            if SHELL_CLASSES.iter().any(|c| class.eq_ignore_ascii_case(c))
+                && shown_recently(SHELL_SETTLE_MS)
+            {
+                crate::debug_log::qs_log(&format!("blur to shell ({class}) -> reclaim focus"));
+                reclaim_focus(&app);
+                return;
+            }
+        }
         crate::debug_log::qs_log("blur confirmed -> hide_launcher");
         hide_launcher(&app);
     });
+}
+
+/// Whether `fg` is the given window or one of its children (a WebView2 host
+/// window can own the foreground while the top-level window is active).
+fn same_window(fg: isize, win: &WebviewWindow) -> bool {
+    let Ok(own) = win.hwnd() else { return false };
+    let own = own.0 as isize;
+    if fg == own {
+        return true;
+    }
+    unsafe { crate::win::GetAncestor(fg, crate::win::GA_ROOT) == own }
 }
 
 /// Set the box's always-on-top state, only touching the window when it really
@@ -196,12 +233,18 @@ pub fn show_launcher(app: &AppHandle, state: &Arc<AppState>) {
         let _ = win.center();
     }
     crate::debug_log::qs_log_verbose("show: sized");
+    // The grace period has to start *before* the window appears. `show()`,
+    // the topmost change and `set_focus()` all reach the window procedure
+    // asynchronously, so a focus change can be reported while the show is
+    // still in progress; with `mark_shown` at the end those events were
+    // judged against the *previous* show and the window hid itself a moment
+    // after appearing.
+    mark_shown();
     let _ = win.show();
     crate::debug_log::qs_log_verbose("show: shown");
     set_topmost(app, true);
     crate::debug_log::qs_log_verbose("show: topmost");
     let _ = win.set_focus();
-    mark_shown();
     crate::debug_log::qs_log_verbose("show: focused");
     state
         .launcher_visible
@@ -700,6 +743,35 @@ mod tests {
                 "保护期没有在上限内结束"
             );
             std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    /// The shell guard has to outlast the grace period: it exists for the
+    /// window being deactivated *after* it settled, which is exactly when the
+    /// grace period no longer applies.
+    #[test]
+    fn shell_guard_outlasts_the_grace_period() {
+        let (grace, settle) = (SHOW_GRACE_MS, SHELL_SETTLE_MS);
+        assert!(
+            settle > grace,
+            "桌面失焦保护期不比显示保护期长，等于没有作用"
+        );
+        assert!(
+            settle <= 3_000,
+            "桌面失焦保护期过长，用户点开别的窗口后会被抢回焦点"
+        );
+    }
+
+    /// The classes that mean "no application has the foreground". Matching is
+    /// case-insensitive, so the canonical spellings are what matter.
+    #[test]
+    fn shell_classes_cover_desktop_and_taskbar() {
+        let classes: Vec<&str> = SHELL_CLASSES.to_vec();
+        for want in ["Progman", "Shell_TrayWnd"] {
+            assert!(
+                classes.iter().any(|c| c.eq_ignore_ascii_case(want)),
+                "{want} 不在桌面/任务栏窗口类里"
+            );
         }
     }
 }
