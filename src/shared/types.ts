@@ -7,7 +7,8 @@ export type HitKind =
   | "web"
   | "favorite"
   | "clipboard"
-  | "window";
+  | "window"
+  | "run";
 
 export interface SearchHit {
   id: string;
@@ -114,6 +115,8 @@ export interface Settings {
   searchFileContent: boolean;
   historyEnabled: boolean;
   historyLimit: number;
+  runEnabled: boolean;
+  runRemember: boolean;
 
   clipboardEnabled: boolean;
   clipboardLimit: number;

@@ -428,6 +428,7 @@ extern "system" {
 
 pub mod icon;
 pub mod monitor;
+pub mod reg;
 pub mod shell;
 pub mod tree;
 pub mod window;

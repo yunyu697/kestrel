@@ -12,6 +12,7 @@ mod install;
 mod instance;
 mod model;
 mod restart;
+mod run;
 mod search;
 mod state;
 mod ui;
@@ -35,6 +36,18 @@ pub fn run() {
         if let Some(token) = args.get(i + 1) {
             if let Some(path) = win::shell::decode_open_target(token) {
                 win::shell::open_path(&path);
+            }
+        }
+        return;
+    }
+
+    // The same helper for a typed command line: the program and its arguments
+    // are started with the desktop's token rather than an elevated one, so a
+    // launcher that runs as administrator does not elevate everything it runs.
+    if let Some(i) = args.iter().position(|a| a == "--run-helper") {
+        if let Some(token) = args.get(i + 1) {
+            if let Some((program, cmd_args, cwd)) = win::shell::decode_run_payload(token) {
+                win::shell::spawn(&program, cmd_args.as_deref(), cwd.as_deref());
             }
         }
         return;
@@ -295,6 +308,8 @@ pub fn run() {
             commands::files::file_hashes,
             commands::files::run_shell_command,
             commands::files::spawn_program,
+            // run dialog
+            commands::run::run_command_line,
             // network
             commands::net::http_probe,
             // update

@@ -278,6 +278,12 @@ pub struct Settings {
     pub search_file_content: bool,
     pub history_enabled: bool,
     pub history_limit: u32,
+    /// Offer a typed command line as a result — the Windows "Run" behaviour:
+    /// a path, a program with arguments, a `shell:` folder or a URL.
+    pub run_enabled: bool,
+    /// Write executed commands into `RunMRU`, which is also where `Win+R`
+    /// reads its history, so the two lists stay the same list.
+    pub run_remember: bool,
 
     // ---- extras ----
     pub clipboard_enabled: bool,
@@ -345,6 +351,8 @@ impl Default for Settings {
             search_file_content: false,
             history_enabled: true,
             history_limit: 200,
+            run_enabled: true,
+            run_remember: true,
 
             clipboard_enabled: true,
             clipboard_limit: 200,

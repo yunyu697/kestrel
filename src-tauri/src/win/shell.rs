@@ -547,6 +547,82 @@ pub fn spawn(program: &str, args: Option<&str>, cwd: Option<&str>) -> bool {
     }
 }
 
+/// Start a program unelevated, with arguments.
+///
+/// A command typed into the launcher means what it means in the Run dialog:
+/// it runs with the user's own token. When Kestrel itself is elevated, a child
+/// would inherit that elevation, and only a process holding somebody else's
+/// token can avoid it — so the request goes through the same short-lived
+/// helper `open_path_unelevated` uses.
+pub fn spawn_program_unelevated(program: &str, args: Option<&str>, cwd: Option<&str>) -> bool {
+    if !crate::win::is_elevated() {
+        return spawn(program, args, cwd);
+    }
+    grant_foreground();
+    let Ok(exe) = std::env::current_exe() else {
+        return spawn(program, args, cwd);
+    };
+    let token = encode_run_payload(program, args, cwd);
+    if spawn_unelevated(&exe, &format!("--run-helper {token}")) {
+        return true;
+    }
+    spawn(program, args, cwd)
+}
+
+/// Elevate one program with arguments (`Ctrl+Shift+Enter` on a Run row).
+pub fn run_as_admin_args(program: &str, args: Option<&str>, cwd: Option<&str>) -> bool {
+    let verb = wide("runas");
+    let file = wide(program);
+    let a = args.map(wide);
+    let d = cwd.map(wide);
+    grant_foreground();
+    let h = unsafe {
+        ShellExecuteW(
+            0,
+            verb.as_ptr(),
+            file.as_ptr(),
+            a.as_ref().map(|v| v.as_ptr()).unwrap_or(ptr::null()),
+            d.as_ref().map(|v| v.as_ptr()).unwrap_or(ptr::null()),
+            SW_SHOWNORMAL,
+        )
+    };
+    h as isize > 32
+}
+
+/// Pack one command line for the de-elevating helper's argument.
+///
+/// Newline-separated rather than JSON: a file name cannot contain a newline,
+/// so the split is unambiguous, and the whole thing is then base64 so the
+/// helper's own command line needs no quoting.
+pub fn encode_run_payload(program: &str, args: Option<&str>, cwd: Option<&str>) -> String {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    let raw = format!(
+        "{}\n{}\n{}",
+        program,
+        args.unwrap_or_default(),
+        cwd.unwrap_or_default()
+    );
+    STANDARD.encode(raw.as_bytes())
+}
+
+pub fn decode_run_payload(token: &str) -> Option<(String, Option<String>, Option<String>)> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    let bytes = STANDARD.decode(token.as_bytes()).ok()?;
+    let raw = String::from_utf8(bytes).ok()?;
+    let mut parts = raw.splitn(3, '\n');
+    let program = parts.next()?.to_string();
+    if program.is_empty() {
+        return None;
+    }
+    let args = parts.next().unwrap_or_default().to_string();
+    let cwd = parts.next().unwrap_or_default().to_string();
+    Some((
+        program,
+        (!args.is_empty()).then_some(args),
+        (!cwd.is_empty()).then_some(cwd),
+    ))
+}
+
 /// Put real file references (CF_HDROP) on the clipboard so they can be pasted in Explorer.
 pub fn copy_files_to_clipboard(paths: &[String]) -> bool {
     if paths.is_empty() {

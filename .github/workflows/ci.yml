@@ -44,6 +44,9 @@ jobs:
       - name: Window chrome
         run: npm run test:window
 
+      - name: Run command line
+        run: npm run test:run
+
       - name: Rust format
         working-directory: src-tauri
         run: cargo fmt --check

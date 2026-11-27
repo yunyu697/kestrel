@@ -120,6 +120,23 @@ pub fn tr(lang: &str, key: &str) -> &'static str {
         "badge.favorite" => ["收藏", "收藏", "Favorite", "お気に入り", "Favorito"],
         "badge.frequent" => ["常用", "常用", "Frequent", "よく使う", "Frecuente"],
         "badge.calc" => ["计算", "計算", "Calc", "計算", "Cálculo"],
+        "badge.run" => ["运行", "執行", "Run", "実行", "Ejecutar"],
+        // The dialog's own wording, so a failed lookup reads the same wherever
+        // the command was typed.
+        "run.not_found" => [
+            "Windows 找不到文件“{name}”。请确定文件名是否正确后，再试一次。",
+            "Windows 找不到檔案「{name}」。請確定檔案名稱是否正確後，再試一次。",
+            "Windows cannot find “{name}”. Make sure the name is spelled correctly and try again.",
+            "Windows で「{name}」が見つかりません。名前を確認してから、もう一度お試しください。",
+            "Windows no encuentra «{name}». Compruebe que el nombre esté bien escrito e inténtelo de nuevo.",
+        ],
+        "run.failed" => [
+            "无法启动“{name}”",
+            "無法啟動「{name}」",
+            "Could not start “{name}”",
+            "「{name}」を起動できませんでした",
+            "No se pudo iniciar «{name}»",
+        ],
         "web.search_title" => [
             "用 {engine} 搜索 “{q}”",
             "用 {engine} 搜尋「{q}」",

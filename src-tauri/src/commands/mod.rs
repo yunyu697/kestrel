@@ -1,6 +1,7 @@
 pub mod files;
 pub mod index;
 pub mod net;
+pub mod run;
 pub mod search;
 pub mod settings;
 pub mod system;

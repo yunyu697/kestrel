@@ -151,6 +151,32 @@ fn web_hit(engines: &[crate::model::WebEngine], raw: &str, lang: &str) -> Option
     })
 }
 
+/// One row for a typed command line.
+///
+/// It sits above everything else: a line the user typed to run is not a
+/// suggestion, and burying it under file matches is what makes a launcher feel
+/// like it "did not take" the input. The resolved executable goes into `path`
+/// so the row gets the program's real icon.
+fn run_hit(plan: crate::run::Plan, lang: &str) -> SearchHit {
+    let ok = plan.target.is_some();
+    let subtitle = match (&plan.detail, &plan.missing) {
+        (Some(d), _) => d.clone(),
+        (None, Some(name)) => crate::i18n::tr(lang, "run.not_found").replace("{name}", name),
+        _ => String::new(),
+    };
+    SearchHit {
+        id: format!("run:{}", plan.title.to_lowercase()),
+        kind: "run".into(),
+        title: plan.title.clone(),
+        subtitle,
+        path: plan.path,
+        icon: None,
+        score: if ok { 7500.0 } else { 1500.0 },
+        badge: Some(crate::i18n::tr(lang, "badge.run").into()),
+        meta: Some(json!({ "raw": plan.title, "ok": ok })),
+    }
+}
+
 pub fn urlencode(s: &str) -> String {
     let mut out = String::with_capacity(s.len() * 3);
     for b in s.as_bytes() {
@@ -175,22 +201,26 @@ fn rank_hits(
     usage: &std::collections::HashMap<String, u32>,
 ) {
     let tier = |h: &SearchHit| -> u8 {
-        if h.kind == "app" {
+        // A typed command line outranks every suggestion below it: the user
+        // has already said what to do, so nothing to guess.
+        if h.kind == "run" {
             0
+        } else if h.kind == "app" {
+            1
         } else if h
             .path
             .as_deref()
             .is_some_and(|p| fav_paths.contains(&p.to_lowercase()))
         {
-            1
+            2
         } else if h
             .path
             .as_deref()
             .is_some_and(|p| usage.get(p).copied().unwrap_or(0) > 0)
         {
-            2
-        } else {
             3
+        } else {
+            4
         }
     };
     hits.sort_by_key(tier);
@@ -299,13 +329,44 @@ fn do_search(st: &Arc<AppState>, query: &str, limit: Option<usize>) -> SearchRes
         }
     }
 
-    // 3. Applications.
+    // 3. A typed command line: the Run dialog's whole job. Resolved before the
+    //    file search so the row exists even when nothing is indexed yet.
+    let run_plan = if settings.run_enabled {
+        crate::run::plan(raw)
+    } else {
+        None
+    };
+    if let Some(plan) = &run_plan {
+        // A bare name that already resolved to an installed application would
+        // otherwise appear twice — once as the app, once as itself — and the
+        // second row only adds a path nobody asked to see.
+        let covered = plan
+            .path
+            .as_deref()
+            .filter(|_| {
+                matches!(
+                    plan.target,
+                    Some(crate::run::Target::Program { ref args, .. }) if args.is_empty()
+                )
+            })
+            .is_some_and(|exe| {
+                st.apps
+                    .read()
+                    .iter()
+                    .any(|a| a.target.eq_ignore_ascii_case(exe))
+            });
+        if !covered {
+            hits.push(run_hit(plan.clone(), &settings.language));
+        }
+    }
+
+    // 4. Applications.
     if settings.search_apps {
         let apps = st.apps.read();
         hits.extend(app_hits(&apps, &lower, 12, &settings.language));
     }
 
-    // 4. Built-in commands and user-defined custom commands.
+    // 5. Built-in commands and user-defined custom commands.
     if settings.search_commands {
         hits.extend(command_hits(&lower, 8, &settings.language));
         if !settings.custom_commands.is_empty() {
@@ -318,7 +379,7 @@ fn do_search(st: &Arc<AppState>, query: &str, limit: Option<usize>) -> SearchRes
         }
     }
 
-    // 5. Files and folders.
+    // 6. Files and folders.
     let parsed = search::parse(raw);
     if !parsed.terms.is_empty()
         || !parsed.exts.is_empty()
@@ -494,6 +555,50 @@ mod tests {
                 "plain-low"
             ]
         );
+    }
+
+    #[test]
+    fn a_run_hit_carries_the_command_and_the_executable_it_landed_on() {
+        let plan = crate::run::plan("cmd /k echo hi").expect("cmd 应被识别");
+        let h = run_hit(plan, "zh");
+        assert_eq!(h.kind, "run");
+        assert_eq!(h.badge.as_deref(), Some("运行"));
+        let meta = h.meta.expect("meta");
+        assert_eq!(meta["raw"], "cmd /k echo hi");
+        assert_eq!(meta["ok"], true);
+        assert!(
+            h.path
+                .as_deref()
+                .is_some_and(|p| p.to_lowercase().ends_with("cmd.exe")),
+            "path 应指向 cmd.exe，实际 {:?}",
+            h.path
+        );
+    }
+
+    /// A name that cannot be resolved still gets a row when the input was
+    /// unmistakably a command, and that row has to say why.
+    #[test]
+    fn an_unresolvable_command_explains_itself() {
+        let plan = crate::run::plan(">definitely-not-installed-xyz").expect("显式调用");
+        let h = run_hit(plan, "zh");
+        assert_eq!(h.meta.as_ref().and_then(|m| m["ok"].as_bool()), Some(false));
+        assert!(
+            h.subtitle.contains("definitely-not-installed-xyz"),
+            "{}",
+            h.subtitle
+        );
+        assert!(h.subtitle.starts_with("Windows"), "{}", h.subtitle);
+    }
+
+    #[test]
+    fn a_typed_command_outranks_an_application() {
+        let mut hits = vec![
+            hit("app", "app", Some(r"C:/apps/notepad.lnk"), 9000.0),
+            hit("run", "run", Some(r"C:/Windows/notepad.exe"), 100.0),
+        ];
+        by_score(&mut hits);
+        rank_hits(&mut hits, &HashSet::new(), &HashMap::new());
+        assert_eq!(ids(&hits), vec!["run", "app"]);
     }
 
     #[test]

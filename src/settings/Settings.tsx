@@ -1118,6 +1118,23 @@ function SearchPane({ s, update }: { s: Settings; update: Updater }) {
         </div>
       </Section>
 
+      <Section title={t("运行")}>
+        <div className="card">
+          <Row
+            label={t("把输入当作命令运行")}
+            desc={t("输入路径、程序加参数、shell: 文件夹或网址时，第一条结果可以直接运行；Ctrl+Shift+Enter 以管理员身份运行")}
+          >
+            <Toggle on={s.runEnabled} onChange={(v) => update("runEnabled", v)} />
+          </Row>
+          <Row
+            label={t("与系统“运行”共享历史")}
+            desc={t("运行过的命令会写进 Win+R 的历史记录，两处共用同一份列表")}
+          >
+            <Toggle on={s.runRemember} onChange={(v) => update("runRemember", v)} />
+          </Row>
+        </div>
+      </Section>
+
       <Section title={t("历史")}>
         <div className="card">
           <Row label={t("记录搜索历史")} desc={t("空查询时展示常用条目")}>

@@ -404,6 +404,15 @@ const en: Dict = {
   "全部沿用当前主题的默认配色": "All colours follow the current theme",
   "恢复默认配色": "Reset colours",
   "双击恢复默认": "Double-click to restore the default",
+  "把输入当作命令运行": "Treat typed input as a command",
+  "输入路径、程序加参数、shell: 文件夹或网址时，第一条结果可以直接运行；Ctrl+Shift+Enter 以管理员身份运行":
+    "A path, a program with arguments, a shell: folder or a URL becomes the first result and runs from there; Ctrl+Shift+Enter runs it as administrator",
+  "与系统“运行”共享历史": "Share history with the system Run",
+  "运行过的命令会写进 Win+R 的历史记录，两处共用同一份列表":
+    "Commands that were run are written to the Win+R history, so both places show the same list",
+  "复制命令": "Copy command",
+  "在终端中运行": "Run in terminal",
+  "已复制命令": "Command copied",
   "主题、配色与窗口观感。": "Theme, colour scheme and window appearance.",
   "当前方案": "Active scheme",
   "对比度全部达标": "All contrast checks pass",
@@ -888,6 +897,15 @@ const ja: Dict = {
   "全部沿用当前主题的默认配色": "すべてテーマの既定色を使用中",
   "恢复默认配色": "配色を初期化",
   "双击恢复默认": "ダブルクリックで初期値に戻す",
+  "把输入当作命令运行": "入力をコマンドとして実行",
+  "输入路径、程序加参数、shell: 文件夹或网址时，第一条结果可以直接运行；Ctrl+Shift+Enter 以管理员身份运行":
+    "パス、引数付きのプログラム、shell: フォルダー、URL を入力すると先頭の結果から実行できます。Ctrl+Shift+Enter で管理者として実行します",
+  "与系统“运行”共享历史": "システムの「ファイル名を指定して実行」と履歴を共有",
+  "运行过的命令会写进 Win+R 的历史记录，两处共用同一份列表":
+    "実行したコマンドは Win+R の履歴に書き込まれ、両方で同じ一覧を使います",
+  "复制命令": "コマンドをコピー",
+  "在终端中运行": "ターミナルで実行",
+  "已复制命令": "コマンドをコピーしました",
   "主题、配色与窗口观感。": "テーマ、配色、ウィンドウの見た目。",
   "当前方案": "適用中の配色",
   "对比度全部达标": "コントラストはすべて基準を満たしています",
@@ -1388,6 +1406,15 @@ const es: Dict = {
   "全部沿用当前主题的默认配色": "Todos los colores siguen el tema actual",
   "恢复默认配色": "Restablecer colores",
   "双击恢复默认": "Doble clic para restaurar el valor predeterminado",
+  "把输入当作命令运行": "Tratar lo escrito como un comando",
+  "输入路径、程序加参数、shell: 文件夹或网址时，第一条结果可以直接运行；Ctrl+Shift+Enter 以管理员身份运行":
+    "Una ruta, un programa con argumentos, una carpeta shell: o una URL pasa a ser el primer resultado y se ejecuta desde ahí; Ctrl+Shift+Enter lo ejecuta como administrador",
+  "与系统“运行”共享历史": "Compartir historial con Ejecutar de Windows",
+  "运行过的命令会写进 Win+R 的历史记录，两处共用同一份列表":
+    "Los comandos ejecutados se escriben en el historial de Win+R, de modo que ambos lugares muestran la misma lista",
+  "复制命令": "Copiar comando",
+  "在终端中运行": "Ejecutar en la terminal",
+  "已复制命令": "Comando copiado",
   "主题、配色与窗口观感。": "Tema, esquema de color y apariencia de la ventana.",
   "当前方案": "Esquema activo",
   "对比度全部达标": "Todos los contrastes cumplen",
@@ -1863,6 +1890,15 @@ const zhTW: Dict = {
   "全部沿用当前主题的默认配色": "全部沿用目前主題的預設配色",
   "恢复默认配色": "恢復預設配色",
   "双击恢复默认": "連按兩下恢復預設值",
+  "把输入当作命令运行": "把輸入當作命令執行",
+  "输入路径、程序加参数、shell: 文件夹或网址时，第一条结果可以直接运行；Ctrl+Shift+Enter 以管理员身份运行":
+    "輸入路徑、程式加參數、shell: 資料夾或網址時，第一條結果可以直接執行；Ctrl+Shift+Enter 以管理員身分執行",
+  "与系统“运行”共享历史": "與系統「執行」共用歷史",
+  "运行过的命令会写进 Win+R 的历史记录，两处共用同一份列表":
+    "執行過的指令會寫進 Win+R 的歷史記錄，兩處共用同一份清單",
+  "复制命令": "複製指令",
+  "在终端中运行": "在終端機中執行",
+  "已复制命令": "已複製指令",
   "主题、配色与窗口观感。": "主題、配色與視窗觀感。",
   "当前方案": "目前配色",
   "对比度全部达标": "對比度全部達標",

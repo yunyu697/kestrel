@@ -38,6 +38,7 @@ const KIND_ICON: Record<string, string> = {
   web: "globe",
   favorite: "star",
   window: "window",
+  run: "terminal",
 };
 
 function glyphFor(hit: SearchHit): string {
@@ -81,6 +82,17 @@ function canRunAsAdmin(hit: SearchHit): boolean {
 }
 
 function buildActions(hit: SearchHit) {
+  // A typed command line is not a file on disk, even when it resolves to one:
+  // revealing, renaming or deleting it would act on the program instead of on
+  // what was typed. Its menu is entirely about running it.
+  if (hit.kind === "run") {
+    return [
+      { id: "run", label: t("运行"), icon: "terminal", key: "↵" },
+      { id: "runadmin", label: t("以管理员身份运行"), icon: "lock", key: "Ctrl ⇧ ↵" },
+      { id: "runcopy", label: t("复制命令"), icon: "copy" },
+      { id: "runterm", label: t("在终端中运行"), icon: "code" },
+    ];
+  }
   const isFolder = hit.kind === "folder" || hit.kind === "favorite";
   // A Store app is a `shell:AppsFolder` id, not a file: revealing, renaming,
   // deleting or hashing it cannot work, so those actions are not offered.
@@ -397,7 +409,7 @@ export default function Launcher() {
     // keystroke was a major source of lag while typing.
     const paths = list
       .slice(0, 16)
-      .filter((h) => (h.kind === "file" || h.kind === "folder" || h.kind === "app" || h.kind === "favorite") && h.path)
+      .filter((h) => (h.kind === "file" || h.kind === "folder" || h.kind === "app" || h.kind === "favorite" || h.kind === "run") && h.path)
       .map((h) => h.path as string)
       .filter((p) => !iconCache.current[p] && !iconPending.current.has(p));
     if (!paths.length) return;
@@ -533,8 +545,13 @@ export default function Launcher() {
     [hits, showFavStrip],
   );
   const navHits = useMemo(
-    () => (showFavStrip ? hits.filter((h) => h.kind !== "favorite") : hits),
-    [hits, showFavStrip],
+    () =>
+      (showFavStrip ? hits.filter((h) => h.kind !== "favorite") : hits).filter(
+        // Quick Switch is filling in a file dialog: a row that starts a program
+        // has no place in it, and Enter there must never run anything.
+        (h) => !quick || h.kind !== "run",
+      ),
+    [hits, showFavStrip, quick],
   );
 
   // ---- preview ----
@@ -601,10 +618,34 @@ export default function Launcher() {
     [launch],
   );
 
+  /**
+   * Run a typed line. The box only goes away when something actually started:
+   * hiding on a name that does not resolve would look like it worked, and the
+   * reason would be the one thing the user cannot see.
+   */
+  const runTyped = useCallback(
+    async (raw: string, admin: boolean) => {
+      api.recordQuery(query);
+      try {
+        await api.runCommand(raw, admin);
+        if (settings?.closeAfterOpen) api.hideLauncher();
+      } catch (err) {
+        showToast(String(err));
+      }
+    },
+    [query, settings?.closeAfterOpen, showToast],
+  );
+
   const openSelected = useCallback(
     async (shiftKey = false, ctrlKey = false, adminKey = false) => {
       const hit = navHits[selected];
       if (!hit) return;
+      // A typed command line is not a file: it has no path to open, reveal or
+      // rename, and the backend decides what it means.
+      if (hit.kind === "run" && hit.meta) {
+        await runTyped(String(hit.meta.raw ?? hit.title), adminKey);
+        return;
+      }
       if (hit.kind === "calc" && hit.meta) {
         const v = String(hit.meta.display ?? hit.title);
         await api.clipboardPushText(v);
@@ -644,7 +685,7 @@ export default function Launcher() {
         launch(() => api.openPath(path));
       }
     },
-    [navHits, selected, settings, query, quick, showToast, qsJump, launch],
+    [navHits, selected, settings, query, quick, showToast, qsJump, launch, runTyped],
   );
 
   const handleCommand = useCallback(
@@ -769,7 +810,29 @@ export default function Launcher() {
 
   const runAction = async (item: { id: string; label: string }) => {
     const hit = action?.hit;
-    if (!hit || !hit.path) return setAction(null);
+    if (!hit) return setAction(null);
+    if (hit.kind === "run") {
+      const raw = String(hit.meta?.raw ?? hit.title);
+      setAction(null);
+      switch (item.id) {
+        case "run":
+          await runTyped(raw, false);
+          return;
+        case "runadmin":
+          await runTyped(raw, true);
+          return;
+        case "runcopy":
+          await api.clipboardPushText(raw);
+          showToast(t("已复制命令"));
+          return;
+        case "runterm":
+          await api.spawnProgram("cmd.exe", `/k ${raw}`);
+          api.hideLauncher();
+          return;
+      }
+      return;
+    }
+    if (!hit.path) return setAction(null);
     const p = hit.path;
     setAction(null);
     switch (item.id) {

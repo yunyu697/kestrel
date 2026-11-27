@@ -54,6 +54,10 @@ export const api = {
     call<boolean>("run_shell_command", { command, cwd }),
   spawnProgram: (program: string, args?: string, cwd?: string) =>
     call<boolean>("spawn_program", { program, args, cwd }),
+  /** Run a typed command line the way the Windows Run dialog does.
+   *  Rejects with the sentence to show when the name does not resolve. */
+  runCommand: (raw: string, admin = false) =>
+    call<void>("run_command_line", { raw, admin }),
 
   getSettings: () => call<Settings>("get_settings"),
   saveSettings: (settings: Settings) => call<void>("save_settings", { settings }),
