@@ -27,6 +27,63 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.29",
+    date: "2026-11-28",
+    title: {
+      zh: "启动器能像“运行”对话框一样执行命令",
+      en: "The launcher runs commands the way the Run dialog does",
+      ja: "ランチャーが「ファイル名を指定して実行」と同じようにコマンドを実行します",
+      es: "El buscador ejecuta comandos igual que el cuadro Ejecutar",
+    },
+    items: [
+      {
+        kind: "new",
+        text: {
+          zh: "输入路径、程序加参数、shell: 文件夹或网址时，第一条结果可直接运行",
+          en: "A path, a program with arguments, a shell: folder or a URL becomes the first result and runs from there",
+          ja: "パス、引数付きのプログラム、shell: フォルダ、URL を入力すると、先頭の結果からそのまま実行できます",
+          es: "Una ruta, un programa con argumentos, una carpeta shell: o una URL pasa a ser el primer resultado y se ejecuta desde ahí",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "执行过的命令写入系统“运行”的历史，两处共用一份列表",
+          en: "Commands that are run join the system Run history, so both places show one list",
+          ja: "実行したコマンドはシステムの「ファイル名を指定して実行」の履歴に加わり、両方で同じ一覧になります",
+          es: "Los comandos ejecutados se añaden al historial del cuadro Ejecutar del sistema, así que ambos muestran una sola lista",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "以管理员身份运行的启动器，执行命令时不再附带自己的权限",
+          en: "A launcher running as administrator no longer lends its rights to the commands it starts",
+          ja: "管理者として実行中のランチャーでも、コマンドは元の権限のまま起動します",
+          es: "Un buscador abierto como administrador ya no cede sus permisos a los comandos que inicia",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "两个普通单词仍按搜索处理，以 > 开头才当作命令执行",
+          en: "Two plain words stay a search phrase; a leading > marks the input as a command",
+          ja: "単語二つの入力は検索のままで、先頭が > のときだけコマンドとして実行します",
+          es: "Dos palabras sueltas siguen siendo una búsqueda; solo un > inicial indica un comando",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "输入命令的前半段时，历史里执行过的完整命令会作为一条结果出现",
+          en: "Half a command brings up the full command from history as one of the results",
+          ja: "コマンドの前半を入力すると、履歴にある完全なコマンドが結果として現れます",
+          es: "Media orden hace aparecer el comando completo del historial como un resultado",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.28",
     date: "2026-11-27",
     title: {
