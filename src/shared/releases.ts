@@ -27,6 +27,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.28",
+    date: "2026-11-27",
+    title: {
+      zh: "窗口不再被系统焦点抖动关掉，快捷键能否响应可查",
+      en: "The launcher no longer closes itself on a system focus bounce, and shortcut presses are recorded",
+      ja: "システムのフォーカス変動でウィンドウが閉じなくなり、ショートカットの反応を記録します",
+      es: "La ventana ya no se cierra por un cambio de foco del sistema y cada pulsación del atajo queda registrada",
+    },
+    items: [
+      {
+        kind: "fix",
+        text: {
+          zh: "窗口出现后 1.5 秒内被桌面或任务栏抢走前台时会取回焦点，不再一闪就消失",
+          en: "Within 1.5 s of appearing, the launcher takes the focus back from the desktop instead of vanishing",
+          ja: "表示後 1.5 秒以内にデスクトップやタスクバーへフォーカスが移ると、消えずにフォーカスを取り戻します",
+          es: "En los 1,5 s posteriores a aparecer, el buscador recupera el foco del escritorio en lugar de desaparecer",
+        },
+      },
+      {
+        kind: "fix",
+        text: {
+          zh: "双击 Ctrl 只在两次单独按下时触发，复制粘贴不再误开启动器",
+          en: "Double Ctrl fires only on two bare presses; Ctrl+C then Ctrl+V no longer opens the launcher",
+          ja: "ダブル Ctrl は単独押しが二回のときだけ反応し、コピーと貼り付けで起動器が開かなくなりました",
+          es: "El doble Ctrl solo se activa con dos pulsaciones sueltas; copiar y pegar ya no abre el buscador",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "快捷键无响应时，日志能区分按键有没有送到程序",
+          en: "When the shortcut does not respond, the log tells a delivered press apart from a missing one",
+          ja: "ショートカットが反応しないとき、押下が届いたかどうかをログで区別できます",
+          es: "Cuando el atajo no responde, el registro distingue una pulsación recibida de una que no llegó",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.27",
     date: "2026-11-25",
     title: {
