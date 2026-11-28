@@ -5,7 +5,8 @@ import { Icon } from "../shared/icons";
 import { api } from "../shared/api";
 import { LANGS, setLang, systemLang, t, useLang } from "../shared/i18n";
 import { resolveTheme } from "../shared/format";
-import { applyColors, applyWindowChrome, currentPalette, schemeFor } from "../shared/theme";
+import { applyColors, applyStyle, applyWindowChrome, currentPalette, normalizeStyle, schemeFor } from "../shared/theme";
+import { STYLES } from "../shared/styles";
 import {
   MONO_SCHEME_LIST,
   NEUTRAL_SCHEME,
@@ -87,6 +88,7 @@ function applyTheme(s: Settings) {
   const root = document.documentElement;
   const theme = resolveTheme(s.theme);
   root.setAttribute("data-theme", theme);
+  applyStyle(s.style);
   // Per-element colour overrides (empty value = theme default).
   applyColors(s, theme);
   applyWindowChrome(s);
@@ -184,8 +186,18 @@ export default function Settings() {
     );
   }
 
+  const pageLabel = NAV.flatMap((g) => g.items).find((i) => i.id === active)?.label ?? "";
+
   return (
     <div className="settings-root">
+      {/* Apple draws traffic lights instead of a close button; the red one is
+          the close control, so the behaviour survives the different chrome. */}
+      <div className="traffic">
+        <button className="tl" data-tl="close" title={t("关闭")} onClick={() => getCurrentWindow().hide()} />
+        <span className="tl" data-tl="min" aria-hidden="true" />
+        <span className="tl" data-tl="max" aria-hidden="true" />
+      </div>
+
       <div className="sb-title" data-tauri-drag-region>
         <div className="brand">
           <div className="logo" role="img" aria-label="Kestrel" />
@@ -193,6 +205,7 @@ export default function Settings() {
           </span>
         </div>
         <div className="spacer" />
+        <div className="title-name">{t("设置")}</div>
         <button className="win-ctl" title={t("关闭")} data-close onClick={() => getCurrentWindow().hide()}>
           <Icon name="close" size={16} />
         </button>
@@ -201,7 +214,7 @@ export default function Settings() {
       <div className="sb-body">
         <nav className="sb-side">
           {NAV.map((g) => (
-            <div key={g.group}>
+            <div key={g.group} className="nav-group">
               <div className="nav-group-label">{t(g.group)}</div>
               {g.items.map((it) => (
                 <div
@@ -210,7 +223,9 @@ export default function Settings() {
                   data-active={active === it.id}
                   onClick={() => setActive(it.id)}
                 >
-                  <Icon name={it.icon} size={17} />
+                  <span className="nav-ic">
+                    <Icon name={it.icon} size={17} />
+                  </span>
                   <span className="nav-label">{t(it.label)}</span>
                 </div>
               ))}
@@ -219,6 +234,11 @@ export default function Settings() {
         </nav>
 
         <main className="sb-content">
+          <div className="sb-crumb">
+            <span>{t("设置")}</span>
+            <span className="crumb-sep">›</span>
+            <b>{t(pageLabel)}</b>
+          </div>
           <div className="sb-pane">
             {active === "general" && (
               <GeneralPane s={settings} update={update} flash={flashToast} />
@@ -311,15 +331,23 @@ function Row({
   );
 }
 
+/**
+ * A titled group of settings.
+ *
+ * Three nested layers rather than two, because the styles disagree on where
+ * the boundary sits: Fluent removes the card and gives every row its own,
+ * Apple keeps one container and divides rows with hairlines, Material colours
+ * the container instead of outlining it, Ant draws the card around the whole
+ * group and turns the heading into its header. A single `.card` cannot express
+ * those four, so the heading gets its own element and the card becomes the
+ * body that each style redefines.
+ */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="section">
-      <div className="section-title">
-        {title}
-        <span className="line" />
-      </div>
-      {children}
-    </div>
+    <section className="sec">
+      <div className="sec-head">{title}</div>
+      <div className="sec-body">{children}</div>
+    </section>
   );
 }
 
@@ -760,6 +788,42 @@ function AppearancePane({
     <>
       <h1>{t("外观")}</h1>
       <p className="pane-sub">{t("主题、配色与窗口观感。")}</p>
+
+      <Section title={t("界面风格")}>
+        <p className="scheme-note">
+          {t("界面风格决定导航结构、控件造型与信息密度，与亮暗主题和配色方案互不影响。")}
+        </p>
+        <div className="style-grid">
+          {STYLES.map((st) => (
+            <button
+              key={st.id}
+              className="style-card"
+              data-active={normalizeStyle(s.style) === st.id}
+              onClick={() => update("style", st.id)}
+              aria-pressed={normalizeStyle(s.style) === st.id}
+            >
+              <span className="sk" data-sk={st.id} aria-hidden="true">
+                <span className="sk-side">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="sk-main">
+                  <span className="sk-frame">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </span>
+              </span>
+              <span className="style-meta">
+                <b>{st.label}</b>
+                <span>{t(st.desc)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Section>
 
       <Section title={t("主题")}>
         <div className="card">

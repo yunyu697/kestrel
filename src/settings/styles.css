@@ -1,0 +1,891 @@
+/* ------------------------------------------------------------------
+   Kestrel Settings — the four interface styles
+
+   This file is the style layer. It may change shape, density and the way
+   hierarchy is expressed; it must never invent a colour. Everything here is
+   keyed off `html[data-style=…]`, which `applyStyle()` writes next to
+   `data-theme`, so 4 styles × 2 themes × 16 colour schemes all stay valid.
+
+   Loaded after settings.css on purpose: the rules below refine the neutral
+   shell rather than replace it.
+   ------------------------------------------------------------------ */
+
+/* ==================================================================
+   Fluent 2 — restrained, tool-like
+   Windows 11 settings: a 240px navigation pane, a 3px bar marking the
+   selection, and every row as its own outlined SettingsCard.
+   ================================================================== */
+[data-style="fluent"] .sb-title {
+  height: 46px;
+}
+[data-style="fluent"] .sb-side {
+  width: 240px;
+  padding: 12px 8px;
+}
+[data-style="fluent"] .nav-group-label {
+  font-size: var(--fs-caption);
+  letter-spacing: 0.06em;
+  padding: 12px 12px 6px;
+}
+[data-style="fluent"] .sb-nav-item {
+  position: relative;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 4px;
+}
+[data-style="fluent"] .sb-nav-item[data-active="true"] {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--text);
+}
+[data-style="fluent"] .sb-nav-item[data-active="true"] svg {
+  color: var(--accent-text);
+}
+/* the selection bar: Fluent's single most recognisable navigation cue */
+[data-style="fluent"] .sb-nav-item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+[data-style="fluent"] .sb-crumb {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  margin: -8px 0 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+[data-style="fluent"] .sb-crumb .crumb-sep {
+  opacity: 0.6;
+}
+[data-style="fluent"] .sb-crumb b {
+  font-weight: 600;
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+[data-style="fluent"] .sb-content {
+  padding: 22px 32px 56px;
+  /* The page sits one step below the cards. Without that step a white card on
+     a white page is only a border, and the row gaps read as one container. */
+  background: var(--bg-sunken);
+}
+
+/* Each row is a card. The container steps out of the way entirely. */
+[data-style="fluent"] .sec > .sec-head {
+  font-size: var(--fs-caption);
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  margin: 0 0 6px 2px;
+}
+[data-style="fluent"] .sec-body > .card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+[data-style="fluent"] .sec-body > .card > .row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 3px;
+  padding: 10px 16px;
+  min-height: 54px;
+}
+[data-style="fluent"] .sec-body > .card > .row:last-child {
+  margin-bottom: 0;
+}
+
+/* ==================================================================
+   Apple HIG — quiet, spacious
+   Content on a grouped background, each group one rounded container, rows
+   divided by hairlines that start at the text column, controls as pills.
+   ================================================================== */
+[data-style="apple"] .sb-title {
+  height: 42px;
+  justify-content: center;
+  padding: 0 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+[data-style="apple"] .traffic {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+  position: absolute;
+  left: 16px;
+  z-index: 2;
+}
+[data-style="apple"] .traffic .tl {
+  background: #d9dbdf;
+  cursor: default;
+}
+[data-style="apple"] .traffic .tl[data-tl="close"] {
+  background: #ff5f57;
+  cursor: pointer;
+  /* A 12px dot is the macOS size but not a comfortable target; the invisible
+     extension brings the hit area to 32px without changing what is drawn. */
+  position: relative;
+}
+[data-style="apple"] .traffic .tl[data-tl="close"]::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+}
+[data-style="apple"] .traffic .tl[data-tl="min"] {
+  background: #febc2e;
+}
+[data-style="apple"] .traffic .tl[data-tl="max"] {
+  background: #28c840;
+}
+[data-style="apple"] .sb-title .brand {
+  display: none;
+}
+[data-style="apple"] .title-name {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.01em;
+}
+[data-style="apple"] .sb-title .spacer {
+  display: none;
+}
+[data-style="apple"] .sb-title .win-ctl {
+  display: none;
+}
+[data-style="apple"] .sb-side {
+  width: 228px;
+  background: transparent;
+  border-right: 1px solid var(--border);
+  padding: 14px 10px;
+}
+[data-style="apple"] .nav-group-label {
+  font-size: var(--fs-caption);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-3);
+  padding: 12px 10px 5px;
+}
+[data-style="apple"] .sb-nav-item {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-weight: 400;
+}
+[data-style="apple"] .sb-nav-item[data-active="true"] {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text);
+  font-weight: 500;
+}
+[data-style="apple"] .sb-nav-item[data-active="true"] svg {
+  color: var(--accent-text);
+}
+[data-style="apple"] .sb-content {
+  padding: 26px 34px 60px;
+  background: var(--bg-sunken);
+}
+[data-style="apple"] .sb-pane h1 {
+  font-size: calc(26px * var(--font-scale, 1));
+  font-weight: 700;
+  letter-spacing: -0.021em;
+  margin-bottom: 2px;
+}
+[data-style="apple"] .sb-pane .pane-sub {
+  margin-bottom: 22px;
+  font-size: var(--fs-body);
+  color: var(--text-2);
+}
+[data-style="apple"] .sec {
+  margin-bottom: 26px;
+}
+[data-style="apple"] .sec > .sec-head {
+  text-transform: none;
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-3);
+  margin: 0 0 7px 16px;
+}
+[data-style="apple"] .card {
+  background: var(--surface);
+  border: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0 0.5px var(--line);
+}
+[data-theme="dark"][data-style="apple"] .card {
+  /* a shadow cannot carry a boundary on a dark surface; the group is a
+     slightly lighter solid instead */
+  background: color-mix(in srgb, var(--surface) 88%, var(--text) 5%);
+  box-shadow: 0 0 0 0.5px var(--border-strong);
+}
+[data-style="apple"] .row {
+  min-height: 62px;
+  padding: 12px 18px;
+  position: relative;
+}
+[data-style="apple"] .card > .row:not(:last-child) {
+  border-bottom: 0;
+}
+[data-style="apple"] .card > .row:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 0;
+  bottom: 0;
+  height: 0.5px;
+  background: var(--line-strong);
+}
+[data-style="apple"] .row .row-desc {
+  color: var(--text-2);
+}
+[data-style="apple"] .sb-footer {
+  background: var(--bg-sunken);
+}
+
+/* ==================================================================
+   Material 3 — blocky, expressive
+   A rail of icons instead of a text sidebar, hierarchy expressed by tonal
+   surfaces rather than borders or shadows, selection as a pill.
+   ================================================================== */
+[data-style="material"] .sb-title {
+  height: 56px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+[data-style="material"] .sb-side {
+  width: 88px;
+  padding: 10px 0;
+  gap: 4px;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  align-items: center;
+}
+[data-style="material"] .nav-group-label {
+  display: none;
+}
+[data-style="material"] .nav-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 4px;
+}
+[data-style="material"] .sb-nav-item {
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 72px;
+  height: 62px;
+  padding: 0;
+  border-radius: 16px;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-2);
+}
+[data-style="material"] .sb-nav-item .nav-label {
+  font-size: calc(10.5px * var(--font-scale, 1));
+  line-height: 1.1;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-style="material"] .sb-nav-item .nav-ic {
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  transition: background var(--dur-fast) var(--ease);
+}
+[data-style="material"] .sb-nav-item:hover {
+  background: transparent;
+  color: var(--text);
+}
+[data-style="material"] .sb-nav-item:hover .nav-ic {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+[data-style="material"] .sb-nav-item[data-active="true"] {
+  background: transparent;
+  color: var(--text);
+}
+[data-style="material"] .sb-nav-item[data-active="true"] .nav-ic {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent-text);
+}
+[data-style="material"] .sb-nav-item[data-active="true"] svg {
+  color: var(--accent-text);
+}
+[data-style="material"] .sb-content {
+  padding: 24px 30px 56px;
+  background: var(--bg);
+}
+[data-style="material"] .sb-pane h1 {
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+[data-style="material"] .sb-pane .pane-sub {
+  color: var(--text-2);
+}
+[data-style="material"] .sec > .sec-head {
+  font-size: calc(11px * var(--font-scale, 1));
+  letter-spacing: 0.07em;
+  color: var(--text-2);
+  margin: 0 0 8px 4px;
+}
+/* no border, no shadow: the surface itself is one step off the background */
+[data-style="material"] .card {
+  background: color-mix(in srgb, var(--surface) 94%, var(--text) 6%);
+  border: 0;
+  border-radius: var(--radius-card);
+}
+[data-style="material"] .row {
+  min-height: 56px;
+  padding: 10px 18px;
+}
+[data-style="material"] .card > .row:not(:last-child) {
+  border-bottom: 0;
+}
+[data-theme="dark"][data-style="material"] .card {
+  background: color-mix(in srgb, var(--surface) 90%, var(--text) 8%);
+}
+
+/* ==================================================================
+   Ant Design — dense, regular
+   A menu rail, one bordered card per group with a real card header, a rule
+   under every row, and the tightest rows of the four.
+   ================================================================== */
+[data-style="ant"] .sb-title {
+  height: 44px;
+  background: var(--bg);
+}
+[data-style="ant"] .sb-side {
+  width: 208px;
+  padding: 10px 8px;
+  gap: 0;
+}
+[data-style="ant"] .nav-group-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  padding: 14px 12px 6px;
+}
+[data-style="ant"] .sb-nav-item {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-weight: 400;
+  gap: 10px;
+}
+[data-style="ant"] .sb-nav-item[data-active="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+[data-style="ant"] .sb-nav-item[data-active="true"] svg {
+  color: var(--accent-text);
+}
+[data-style="ant"] .sb-crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  margin: -10px 0 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+[data-style="ant"] .sb-crumb b {
+  font-weight: 400;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+[data-style="ant"] .sb-content {
+  padding: 20px 28px 48px;
+  background: var(--bg-sunken);
+}
+[data-style="ant"] .sb-pane h1 {
+  font-size: calc(20px * var(--font-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0;
+}
+[data-style="ant"] .sec {
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+/* the heading becomes the card header rather than a caption above it */
+[data-style="ant"] .sec > .sec-head {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+}
+[data-style="ant"] .sec-body > .card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+[data-style="ant"] .sec-body > .card > .row {
+  min-height: 44px;
+  padding: 8px 16px;
+}
+[data-style="ant"] .sec-body > .card > .row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+[data-style="ant"] .row .row-desc {
+  margin-top: 1px;
+  line-height: 1.35;
+}
+/* Ant packs lists into the same card language */
+[data-style="ant"] .list-row {
+  border-radius: 6px;
+}
+
+/* ==================================================================
+   Controls — the same widget in four forms.
+   Shape and rhythm only; the fill comes from the colour tokens.
+   ================================================================== */
+
+/* ---- switch ---- */
+[data-style="fluent"] .switch {
+  width: 40px;
+  height: 20px;
+}
+[data-style="fluent"] .switch::after {
+  width: 14px;
+  height: 14px;
+  top: 2px;
+  left: 2px;
+}
+[data-style="fluent"] .switch[data-on="true"]::after {
+  transform: translateX(20px);
+}
+
+[data-style="apple"] .switch {
+  width: 37px;
+  height: 22px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  border: 0;
+}
+[data-style="apple"] .switch::after {
+  width: 18px;
+  height: 18px;
+  top: 2px;
+  left: 2px;
+}
+[data-style="apple"] .switch[data-on="true"]::after {
+  transform: translateX(15px);
+}
+
+[data-style="material"] .switch {
+  width: 48px;
+  height: 27px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border: 2px solid var(--text-3);
+}
+[data-style="material"] .switch::after {
+  width: 17px;
+  height: 17px;
+  top: 3px;
+  left: 3px;
+  background: var(--text-3);
+  box-shadow: none;
+}
+[data-style="material"] .switch[data-on="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+[data-style="material"] .switch[data-on="true"]::after {
+  width: 21px;
+  height: 21px;
+  top: 1px;
+  left: 1px;
+  transform: translateX(21px);
+  background: var(--accent-ink);
+}
+[data-style="material"] .switch:active::after {
+  width: 21px;
+}
+
+[data-style="ant"] .switch {
+  width: 44px;
+  height: 22px;
+}
+[data-style="ant"] .switch::after {
+  width: 16px;
+  height: 16px;
+  top: 2px;
+  left: 2px;
+}
+[data-style="ant"] .switch[data-on="true"]::after {
+  transform: translateX(22px);
+}
+
+/* ---- buttons ---- */
+[data-style="fluent"] .btn {
+  border-radius: 4px;
+}
+[data-style="apple"] .btn {
+  border-radius: 999px;
+  height: 30px;
+  padding: 0 14px;
+  font-weight: 500;
+}
+[data-style="material"] .btn {
+  border-radius: 999px;
+  height: 36px;
+  padding: 0 18px;
+  font-weight: 500;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+[data-style="material"] .btn[data-variant="primary"] {
+  background: var(--accent);
+}
+[data-style="ant"] .btn {
+  border-radius: 6px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+/* ---- segmented ---- */
+[data-style="fluent"] .seg {
+  border-radius: 6px;
+}
+[data-style="fluent"] .seg button {
+  border-radius: 4px;
+}
+[data-style="apple"] .seg {
+  border-radius: 999px;
+  padding: 2px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-color: transparent;
+}
+[data-style="apple"] .seg button {
+  border-radius: 999px;
+}
+[data-style="material"] .seg {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  border-color: transparent;
+}
+[data-style="material"] .seg button {
+  border-radius: 999px;
+}
+[data-style="material"] .seg button[data-active="true"] {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  box-shadow: none;
+  color: var(--accent-text);
+}
+[data-style="ant"] .seg {
+  border-radius: 6px;
+}
+[data-style="ant"] .seg button {
+  border-radius: 4px;
+}
+[data-style="ant"] .seg button[data-active="true"] {
+  box-shadow: none;
+  border: 1px solid var(--border-strong);
+}
+
+/* ---- text fields ---- */
+[data-style="fluent"] .input,
+[data-style="fluent"] .select {
+  border-radius: 4px;
+}
+[data-style="apple"] .input,
+[data-style="apple"] .select {
+  border-radius: 9px;
+  background: var(--surface-2);
+  border-color: transparent;
+}
+[data-style="material"] .input,
+[data-style="material"] .select {
+  border-radius: 4px 4px 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--text-3);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  padding: 0 12px;
+  height: 40px;
+}
+[data-style="material"] .input:focus {
+  border-bottom: 2px solid var(--accent);
+  box-shadow: none;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+[data-style="ant"] .input,
+[data-style="ant"] .select {
+  border-radius: 6px;
+}
+
+/* ---- slider ---- */
+[data-style="apple"] .slider input[type="range"]::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  border-width: 4px;
+}
+[data-style="material"] .slider input[type="range"] {
+  height: 4px;
+}
+[data-style="material"] .slider input[type="range"]::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+  background: var(--accent);
+}
+[data-style="ant"] .slider input[type="range"] {
+  height: 4px;
+  border-radius: 2px;
+}
+[data-style="ant"] .slider input[type="range"]::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+/* ---- misc surfaces that follow the same language ---- */
+[data-style="apple"] .list-row {
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+}
+[data-style="material"] .list-row {
+  border: 0;
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface) 94%, var(--text) 6%);
+}
+[data-style="ant"] .list-row {
+  border-radius: 6px;
+}
+[data-style="material"] .badge {
+  border-radius: 999px;
+}
+[data-style="apple"] .badge {
+  border-radius: 999px;
+}
+
+/* ==================================================================
+   Style picker
+   Each thumbnail draws that style's own skeleton, not the active one, so
+   the four are comparable at a glance: where the navigation goes, how the
+   rows are grouped, how the selection is marked.
+   ================================================================== */
+.style-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.style-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 9px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.style-card:hover {
+  border-color: var(--border-strong);
+}
+.style-card[data-active="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.style-card .style-meta {
+  display: block;
+}
+.style-card .style-meta b {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text);
+}
+.style-card .style-meta span {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-caption);
+  line-height: 1.35;
+  color: var(--text-3);
+}
+
+/* ---- the thumbnail itself ---- */
+.sk {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+}
+.sk-side {
+  width: 27%;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 5px;
+}
+.sk-side i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+}
+.sk-main {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 5px;
+}
+.sk-frame {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sk-frame i {
+  display: block;
+  flex: 1;
+  border-radius: 2px;
+}
+
+/* Fluent: bar-marked selection, one outlined card per row */
+.sk[data-sk="fluent"] .sk-side {
+  position: relative;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.sk[data-sk="fluent"] .sk-side i:nth-child(2) {
+  background: color-mix(in srgb, var(--text) 30%, transparent);
+}
+.sk[data-sk="fluent"] .sk-side::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin-top: -6px;
+  width: 2px;
+  height: 12px;
+  background: var(--accent);
+}
+.sk[data-sk="fluent"] .sk-frame i {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* Apple: quiet rail, one grouped container, hairline rows */
+.sk[data-sk="apple"] .sk-side {
+  gap: 5px;
+}
+.sk[data-sk="apple"] .sk-side i {
+  height: 4px;
+}
+.sk[data-sk="apple"] .sk-side i:nth-child(2) {
+  background: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.sk[data-sk="apple"] .sk-frame {
+  gap: 0;
+  background: var(--surface);
+  border-radius: 4px;
+  box-shadow: 0 0 0 0.5px var(--line-strong);
+  overflow: hidden;
+}
+.sk[data-sk="apple"] .sk-frame i {
+  border-radius: 0;
+  border-bottom: 0.5px solid var(--line-strong);
+}
+.sk[data-sk="apple"] .sk-frame i:last-child {
+  border-bottom: 0;
+}
+
+/* Material: icon rail with a tonal pill, blocks of surface */
+.sk[data-sk="material"] .sk-side {
+  width: 20%;
+  align-items: center;
+  gap: 5px;
+}
+.sk[data-sk="material"] .sk-side i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+.sk[data-sk="material"] .sk-side i:nth-child(2) {
+  width: 14px;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.sk[data-sk="material"] .sk-frame i {
+  background: color-mix(in srgb, var(--surface) 90%, var(--text) 9%);
+  border-radius: 3px;
+}
+
+/* Ant: menu with a filled active row, one card with a header strip */
+.sk[data-sk="ant"] .sk-side {
+  gap: 3px;
+}
+.sk[data-sk="ant"] .sk-side i {
+  height: 5px;
+  border-radius: 2px;
+}
+.sk[data-sk="ant"] .sk-side i:nth-child(2) {
+  background: var(--accent-soft);
+}
+.sk[data-sk="ant"] .sk-frame {
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sk[data-sk="ant"] .sk-frame i {
+  flex: 1;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+.sk[data-sk="ant"] .sk-frame i:first-child {
+  flex: 0 0 9px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+.sk[data-sk="ant"] .sk-frame i:last-child {
+  border-bottom: 0;
+}
+
+/* ==================================================================
+   Sub-components
+   Panes built before the style layer (favourites, apps, colour schemes)
+   carry their own roundness numbers. They follow the control radius here
+   instead of keeping a fifth set of values that belongs to no style.
+   Per-style rules above are more specific, so anything expressed there
+   still wins.
+   ================================================================== */
+.win-ctl,
+.chip,
+.chip .chip-x,
+.list-row,
+.list-row .lr-icon,
+.app-tile,
+.app-tile .at-ico,
+.scheme,
+.toast,
+.status-bar {
+  border-radius: var(--radius-ctl);
+}

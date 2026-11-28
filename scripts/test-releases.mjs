@@ -113,7 +113,7 @@ readme.split("\n").forEach((line, i) => {
 });
 let rows = 0;
 for (const line of readme.split("\n")) {
-  const m = /^\| (1\.2\.\d+) \| \d{4}-\d{2}-\d{2} \| (.*) \|$/.exec(line);
+  const m = /^\| (\d+\.\d+\.\d+) \| \d{4}-\d{2}-\d{2} \| (.*) \|$/.exec(line);
   if (!m || cmp(m[1], SINCE) < 0) continue;
   rows++;
   assert.ok(

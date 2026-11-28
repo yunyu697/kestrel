@@ -37,6 +37,12 @@ if (dynStart >= 0 && dynEnd > dynStart) {
   }
 }
 
+// Interface style descriptions are rendered from a data table too. Only
+// `desc` is collected: the labels are proper nouns that stay untranslated in
+// every language, so they are deliberately not dictionary keys.
+const styles = fs.readFileSync("src/shared/styles.ts", "utf8");
+for (const m of styles.matchAll(/\bdesc\s*:\s*"((?:[^"\\]|\\.)*)"/g)) used.add(m[1]);
+
 // parse dict blocks
 function block(name) {
   const i = src.indexOf(`const ${name}: Dict = {`);

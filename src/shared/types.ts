@@ -84,6 +84,8 @@ export interface Settings {
   accent: string;
   /** A scheme id from palettes.ts; "" = follow the theme (see theme.ts). */
   colorScheme: string;
+  /** Interface style layer: "fluent" | "apple" | "material" | "ant". */
+  style: string;
   opacity: number;
   blur: boolean;
   cornerRadius: number;

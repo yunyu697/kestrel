@@ -47,6 +47,9 @@ jobs:
       - name: Run command line
         run: npm run test:run
 
+      - name: Interface styles
+        run: npm run test:styles
+
       - name: Rust format
         working-directory: src-tauri
         run: cargo fmt --check

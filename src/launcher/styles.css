@@ -1,0 +1,235 @@
+/* ------------------------------------------------------------------
+   Kestrel launcher + Quick Switch — the four interface styles
+
+   Shape only. Colours come from the theme and the colour scheme, so every
+   combination stays valid.
+
+   One constraint shapes this file: the Quick Switch window is sized in Rust
+   (`compute_qs_geometry`) from fixed numbers — 58px search bar, 1px hairline,
+   28px path row, 28px section head, 46px per row, 34px footer. A style may
+   redraw the bar, but inside `.shell[data-qs="true"]` it must not become
+   taller than 58px or the footer gets clipped. Where a style wants a shorter
+   bar it may; the slack lands in the list, and the row snapping already
+   tolerates that.
+
+   Row height is not set here at all: the moving selection highlight is
+   positioned in JavaScript, so `--row-h` is written inline on `.shell` to
+   keep the two in step from one number.
+   ------------------------------------------------------------------ */
+
+/* ==================================================================
+   Fluent 2 — a full-width bar, hairline under it, a bar marking the row
+   ================================================================== */
+[data-style="fluent"] .shell[data-qs="false"] .bar {
+  height: 58px;
+}
+/* 58 is also the number the backend computed the QS window from; stating it
+   here keeps the pair visible instead of relying on a default. */
+[data-style="fluent"] .shell[data-qs="true"] .bar {
+  height: 58px;
+}
+[data-style="fluent"] .shell .bar input {
+  font-size: var(--fs-search);
+}
+[data-style="fluent"] .pill {
+  border-radius: 4px;
+}
+/* the selection bar: same cue as the navigation pane */
+[data-style="fluent"] .pill::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+[data-style="fluent"] .row {
+  border-radius: 4px;
+}
+[data-style="fluent"] .fav-card {
+  border-radius: 4px;
+}
+[data-style="fluent"] .qs-dir[data-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* ==================================================================
+   Apple HIG — a large field, no dividers at all, selection as a block
+   ================================================================== */
+[data-style="apple"] .shell[data-qs="false"] .bar {
+  height: 66px;
+  padding: 0 20px;
+}
+[data-style="apple"] .shell[data-qs="true"] .bar {
+  height: 56px;
+  padding: 0 18px;
+}
+[data-style="apple"] .bar input {
+  font-size: calc(19px * var(--font-scale, 1));
+  letter-spacing: -0.015em;
+}
+/* The language has no dividers inside a surface. Everything that separated
+   bar from list, or row from row, is exactly what would make this Apple. */
+[data-style="apple"] .hairline {
+  display: none;
+}
+[data-style="apple"] .card {
+  border: 0.5px solid var(--line-strong);
+}
+[data-style="apple"] .pill {
+  left: 8px;
+  right: 8px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+[data-style="apple"] .row {
+  border-radius: 9px;
+  padding: 0 14px;
+}
+[data-style="apple"] .fav-card {
+  border: 0;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  border-radius: 10px;
+}
+[data-style="apple"] .fav-block {
+  border-bottom: 0;
+}
+[data-style="apple"] .qs-dir {
+  border-radius: 8px;
+}
+[data-style="apple"] .qs-dir[data-selected="true"] {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+[data-style="apple"] .qs-head {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--text-3);
+}
+[data-style="apple"] .qk-tag {
+  border-radius: 999px;
+}
+
+/* ==================================================================
+   Material 3 — the search field is its own pill, selection is tonal
+   ================================================================== */
+[data-style="material"] .shell[data-qs="false"] .bar {
+  height: 56px;
+  margin: 10px 12px 4px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+[data-style="material"] .shell[data-qs="true"] .bar {
+  height: 44px;
+  margin: 8px 10px 0;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+[data-style="material"] .hairline {
+  display: none;
+}
+[data-style="material"] .card {
+  border: 0;
+}
+[data-style="material"] .pill {
+  left: 8px;
+  right: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+[data-style="material"] .row {
+  border-radius: 999px;
+  padding: 0 16px;
+}
+[data-style="material"] .fav-card {
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+[data-style="material"] .fav-block {
+  border-bottom: 0;
+}
+[data-style="material"] .qs-dir {
+  border-radius: 999px;
+}
+[data-style="material"] .qs-dir[data-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+[data-style="material"] .qs-head {
+  letter-spacing: 0.07em;
+  font-size: calc(11px * var(--font-scale, 1));
+}
+[data-style="material"] .qs-ic {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  flex: none;
+}
+
+/* ==================================================================
+   Ant Design — a bordered field, a rule under every row, dense rhythm
+   ================================================================== */
+[data-style="ant"] .shell[data-qs="false"] .bar {
+  height: 44px;
+  margin: 10px 12px 0;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg);
+}
+[data-style="ant"] .shell[data-qs="true"] .bar {
+  height: 42px;
+  margin: 7px 8px 0;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg);
+}
+[data-style="ant"] .bar input {
+  font-size: calc(15px * var(--font-scale, 1));
+}
+[data-style="ant"] .pill {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+[data-style="ant"] .row {
+  border-radius: 4px;
+}
+[data-style="ant"] .list .row {
+  border-bottom: 1px solid var(--line);
+}
+[data-style="ant"] .list .row:last-child {
+  border-bottom: 0;
+}
+[data-style="ant"] .fav-card {
+  border-radius: 6px;
+}
+[data-style="ant"] .qs-dir {
+  border-bottom: 1px solid var(--line);
+}
+[data-style="ant"] .qs-dir[data-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+[data-style="ant"] .qs-dir:last-child {
+  border-bottom: 0;
+}
+[data-style="ant"] .qs-loc,
+[data-style="ant"] .qs-head {
+  border-bottom: 1px solid var(--line);
+}
+[data-style="ant"] .qs-head {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+[data-style="ant"] .qk-tag {
+  border-radius: 4px;
+  height: 20px;
+  font-weight: 500;
+}

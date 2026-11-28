@@ -158,8 +158,9 @@
   height: 28px;
   padding: 0 16px;
   font-size: var(--fs-sm);
-  color: var(--text-2);
-  opacity: 0.75;
+  /* Dimming with opacity took this under 4.5:1 in dark mode. The path is
+     secondary, not decorative, so it keeps a token that is dimmed for it. */
+  color: var(--text-3);
   user-select: none;
 }
 .qs-loc > span {
@@ -202,7 +203,7 @@
 }
 .qs-dir .p {
   font-size: var(--fs-sm);
-  opacity: 0.55;
+  color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1111,15 +1112,10 @@
 .shell[data-narrow="true"] .foot .optional {
   display: none;
 }
-.shell[data-compact="true"] {
-  --row-h: 38px;
-}
-.shell:not([data-compact="true"]) {
-  --row-h: 46px;
-}
-.shell[data-compact="true"] .bar {
-  height: 50px;
-}
+/* Row height is written inline on `.shell` from Launcher.tsx, because the
+   moving selection highlight is positioned from the same number in JS. Compact
+   mode only tightens the rows — it no longer squeezes the search bar, since
+   each style now owns that height and the setting is about the list. */
 .shell[data-compact="true"] .bar input {
   font-size: var(--fs-title);
 }

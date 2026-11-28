@@ -511,6 +511,17 @@ const en: Dict = {
   "每次启动立即查询一次（不受频率限制）": "Query once on every launch, regardless of the schedule",
   "GitHub 直连缓慢时，用镜像加速安装包下载": "Speed up installer downloads when GitHub is slow",
   "连接 GitHub 查询最新版本": "Connects to GitHub to query the latest version",
+  "界面风格": "Interface style",
+  "界面风格决定导航结构、控件造型与信息密度，与亮暗主题和配色方案互不影响。":
+    "The interface style sets the navigation structure, the shape of controls and the information density. Light or dark mode and the colour scheme work independently of it.",
+  "克制而工具化：侧栏竖条选中，每行一张独立卡片":
+    "Restrained and tool-like: a bar marks the selected section, every row is its own card",
+  "安静留白：整组容器，行间发丝线，按钮为药丸形":
+    "Quiet and spacious: each group is one container, rows divided by hairlines, buttons pill-shaped",
+  "块面表达：图标导航栏，表面色分层，药丸选中":
+    "Blocky and expressive: an icon rail, surfaces layered by tone, selection as a pill",
+  "密度与规则：菜单侧栏，逐行分隔线，紧凑行高":
+    "Dense and regular: a menu rail, a divider under every row, tighter rows",
 };
 
 const ja: Dict = {
@@ -1004,6 +1015,17 @@ const ja: Dict = {
   "每次启动立即查询一次（不受频率限制）": "起動のたびに一度問い合わせます（周期の制限を受けません）",
   "GitHub 直连缓慢时，用镜像加速安装包下载": "GitHub が遅いとき、ミラーでインストーラーのダウンロードを高速化します",
   "连接 GitHub 查询最新版本": "GitHub に接続して最新版を確認します",
+  "界面风格": "インターフェースのスタイル",
+  "界面风格决定导航结构、控件造型与信息密度，与亮暗主题和配色方案互不影响。":
+    "スタイルはナビゲーションの構造、コントロールの形、情報の密度を決めます。明暗テーマと配色スキームとは独立しています。",
+  "克制而工具化：侧栏竖条选中，每行一张独立卡片":
+    "抑制の効いたツール調：選択項目に縦棒、各行が独立したカード",
+  "安静留白：整组容器，行间发丝线，按钮为药丸形":
+    "静かで余白のある構成：グループが一つの容器、行間はヘアライン、ボタンはカプセル形",
+  "块面表达：图标导航栏，表面色分层，药丸选中":
+    "面で語る構成：アイコンレール、表面色の階層、カプセル形の選択",
+  "密度与规则：菜单侧栏，逐行分隔线，紧凑行高":
+    "密度と規則：メニュー式のレール、各行に区切り線、詰めた行高",
 };
 
 const es: Dict = {
@@ -1513,6 +1535,17 @@ const es: Dict = {
   "每次启动立即查询一次（不受频率限制）": "Consulta en cada inicio, sin importar la periodicidad",
   "GitHub 直连缓慢时，用镜像加速安装包下载": "Acelera la descarga del instalador cuando GitHub va lento",
   "连接 GitHub 查询最新版本": "Consulta la última versión en GitHub",
+  "界面风格": "Estilo de la interfaz",
+  "界面风格决定导航结构、控件造型与信息密度，与亮暗主题和配色方案互不影响。":
+    "El estilo define la estructura de navegación, la forma de los controles y la densidad de información. El modo claro u oscuro y la paleta funcionan de forma independiente.",
+  "克制而工具化：侧栏竖条选中，每行一张独立卡片":
+    "Contenido y funcional: una barra marca la sección activa y cada fila es una tarjeta",
+  "安静留白：整组容器，行间发丝线，按钮为药丸形":
+    "Silencioso y amplio: cada grupo es un contenedor, filas con línea fina y botones tipo píldora",
+  "块面表达：图标导航栏，表面色分层，药丸选中":
+    "Por bloques: riel de iconos, superficies escalonadas y selección en píldora",
+  "密度与规则：菜单侧栏，逐行分隔线，紧凑行高":
+    "Denso y regular: riel de menú, separador en cada fila y filas más ajustadas",
 };
 
 const zhTW: Dict = {
@@ -1997,6 +2030,17 @@ const zhTW: Dict = {
   "每次启动立即查询一次（不受频率限制）": "每次啟動立即查詢一次（不受頻率限制）",
   "GitHub 直连缓慢时，用镜像加速安装包下载": "GitHub 直連緩慢時，用鏡像加速安裝包下載",
   "连接 GitHub 查询最新版本": "連接 GitHub 查詢最新版本",
+  "界面风格": "介面風格",
+  "界面风格决定导航结构、控件造型与信息密度，与亮暗主题和配色方案互不影响。":
+    "風格決定導覽結構、控制項造型與資訊密度。明暗主題與配色方案獨立於它。",
+  "克制而工具化：侧栏竖条选中，每行一张独立卡片":
+    "克制而工具化：側欄以直條標示選取，每一列各自成一張卡片",
+  "安静留白：整组容器，行间发丝线，按钮为药丸形":
+    "安靜留白：整組一個容器，列間細線，按鈕為膠囊形",
+  "块面表达：图标导航栏，表面色分层，药丸选中":
+    "塊面表達：圖示導覽列，表面色分層，膠囊形選取",
+  "密度与规则：菜单侧栏，逐行分隔线，紧凑行高":
+    "密度與規則：選單側欄，逐列分隔線，緊湊列高",
 };
 
 const DICTS: Record<Lang, Dict> = { zh: {}, "zh-TW": zhTW, en, ja, es };

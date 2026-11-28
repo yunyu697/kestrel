@@ -153,6 +153,12 @@ fn open_privilege_default() -> String {
     "normal".into()
 }
 
+/// Interface style layer. Only shape, density and hierarchy are affected —
+/// colours stay with `theme` / `color_scheme`, so the two axes combine freely.
+fn style_default() -> String {
+    "fluent".into()
+}
+
 /// Presets seeded into an empty custom-command list, in `lang`.
 pub fn preset_commands(lang: &str) -> Vec<CustomCommand> {
     let i = crate::i18n::index_of(lang);
@@ -236,6 +242,11 @@ pub struct Settings {
     /// Colour scheme id from palettes.ts; empty = follow the theme. Legacy
     /// values ("auto", "custom", unknown ids) are migrated on the frontend.
     pub color_scheme: String,
+    /// Interface style layer: "fluent" (default) | "apple" | "material" | "ant".
+    /// Independent of `theme` and `color_scheme` — it changes the skeleton,
+    /// never a colour.
+    #[serde(default = "style_default")]
+    pub style: String,
     pub opacity: f64,
     pub blur: bool,
     pub corner_radius: f64,
@@ -320,6 +331,7 @@ impl Default for Settings {
             theme: "system".into(),
             accent: "#4C7DFF".into(),
             color_scheme: String::new(),
+            style: style_default(),
             opacity: 0.98,
             blur: true,
             corner_radius: 18.0,

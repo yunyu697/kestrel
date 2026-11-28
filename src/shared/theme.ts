@@ -119,8 +119,45 @@ function clamp(v: number, lo: number, hi: number): number {
  */
 const MIN_READABLE_ALPHA = 0.82;
 
+/**
+ * Style layer.
+ *
+ * Four interface languages can be selected in the settings page. The layer is
+ * deliberately orthogonal to colour: a style owns shape, density and the way
+ * hierarchy is expressed, never a colour token. That is what lets
+ * 4 styles × 2 themes × 16 schemes all be valid combinations.
+ *
+ * The window/card/control radii come from here rather than from a single
+ * number, because the four languages do not share a roundness family: Ant is
+ * nearly square, Material rounds the window more than the card, Apple rounds
+ * controls into pills at CSS level. `cornerRadius` is still honoured, but as a
+ * *scale* of the style's own base radii (18 = the style as drawn).
+ */
+export type StyleId = "fluent" | "apple" | "material" | "ant";
+
+export const STYLE_IDS: StyleId[] = ["fluent", "apple", "material", "ant"];
+
+/** [window, card, control] base radii, in px. */
+const STYLE_RADII: Record<StyleId, [number, number, number]> = {
+  fluent: [18, 12, 8],
+  apple: [20, 16, 10],
+  material: [22, 12, 12],
+  ant: [8, 8, 6],
+};
+
+export function normalizeStyle(id: string | undefined): StyleId {
+  return id === "apple" || id === "material" || id === "ant" ? id : "fluent";
+}
+
+/** Write the style onto `:root`; every per-style rule keys off `data-style`. */
+export function applyStyle(id: string | undefined): StyleId {
+  const style = normalizeStyle(id);
+  document.documentElement.setAttribute("data-style", style);
+  return style;
+}
+
 export function applyWindowChrome(
-  s: Pick<Settings, "opacity" | "blur" | "cornerRadius" | "fontScale">,
+  s: Pick<Settings, "opacity" | "blur" | "cornerRadius" | "fontScale" | "style">,
 ): void {
   const root = document.documentElement;
   const scale = clamp(s.fontScale, 0.85, 1.2);
@@ -129,10 +166,14 @@ export function applyWindowChrome(
   // Map the slider's 0.6–1 range onto the readable 0.82–1 range.
   const surfaceAlpha = MIN_READABLE_ALPHA + (alpha - 0.6) / 0.4 * (1 - MIN_READABLE_ALPHA);
 
+  // 18px is the reference: at that value each style keeps its drawn radii.
+  const factor = radius / 18;
+  const [win, card, ctl] = STYLE_RADII[normalizeStyle(s.style)];
+
   root.style.setProperty("--font-scale", String(scale));
-  root.style.setProperty("--radius-win", `${radius}px`);
-  root.style.setProperty("--radius-card", `${Math.round((radius * 2) / 3)}px`);
-  root.style.setProperty("--radius-ctl", `${Math.round((radius * 4) / 9)}px`);
+  root.style.setProperty("--radius-win", `${Math.round(win * factor)}px`);
+  root.style.setProperty("--radius-card", `${Math.round(card * factor)}px`);
+  root.style.setProperty("--radius-ctl", `${Math.round(ctl * factor)}px`);
   root.style.setProperty("--win-alpha", String(alpha));
   root.style.setProperty("--surface-alpha", surfaceAlpha.toFixed(3));
 }

@@ -27,6 +27,54 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.0",
+    date: "2026-11-29",
+    title: {
+      zh: "界面风格可在四种设计规范之间切换",
+      en: "The interface can follow any of four design languages",
+      ja: "インターフェースのスタイルを 4 つのデザイン言語から選べます",
+      es: "La interfaz puede seguir cualquiera de cuatro lenguajes de diseño",
+    },
+    items: [
+      {
+        kind: "new",
+        text: {
+          zh: "外观新增界面风格：四种设计规范各自一套骨架，可随时切换",
+          en: "Appearance gains a style picker, each design language with a layout of its own",
+          ja: "外観に「スタイル」を追加。4 つのデザイン言語がそれぞれ独自のレイアウトを持ちます",
+          es: "Apariencia añade un selector de estilo, cada lenguaje de diseño con su propia estructura",
+        },
+      },
+      {
+        kind: "new",
+        text: {
+          zh: "启动器与快速切换栏随风格一起改变，搜索栏与行高各不相同",
+          en: "The launcher and the quick switch bar follow the style, with their own search field and row height",
+          ja: "ランチャーとクイック切り替えバーもスタイルに追従し、検索欄と行の高さが変わります",
+          es: "El buscador y la barra de cambio rápido siguen el estilo, con su campo de búsqueda y altura de fila",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "圆角设置改为相对所选风格的倍率，切换风格后不会变成直角",
+          en: "The corner radius setting becomes a multiplier of the chosen style, so switching never leaves square corners",
+          ja: "角丸の設定は選択中のスタイルに対する倍率になり、切り替えても角が立ちません",
+          es: "El ajuste de esquinas pasa a ser un multiplicador del estilo elegido, así que al cambiar no quedan esquinas rectas",
+        },
+      },
+      {
+        kind: "improve",
+        text: {
+          zh: "界面风格与亮暗主题、配色方案彼此独立，可自由组合",
+          en: "Interface style is independent of the light or dark theme and of the colour scheme, and combines freely",
+          ja: "スタイルは明暗テーマや配色とは独立しており、自由に組み合わせられます",
+          es: "El estilo es independiente del tema claro u oscuro y del esquema de color, y se combinan libremente",
+        },
+      },
+    ],
+  },
+  {
     version: "1.2.29",
     date: "2026-11-28",
     title: {

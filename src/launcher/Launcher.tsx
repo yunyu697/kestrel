@@ -15,7 +15,7 @@ import {
   trimEnd,
   upOne,
 } from "../shared/pathnav";
-import { applyColors, applyWindowChrome } from "../shared/theme";
+import { applyColors, applyStyle, applyWindowChrome, normalizeStyle, type StyleId } from "../shared/theme";
 import {
   checkForUpdate,
   clearFoundUpdate,
@@ -70,6 +70,18 @@ const ELEVATABLE = new Set([
   "reg",
   "lnk",
 ]);
+
+/**
+ * Result-row height per style. One number per style, consumed by both the
+ * stylesheet (as `--row-h`, written inline on `.shell`) and the moving
+ * selection highlight below, so the two can never disagree.
+ */
+const STYLE_ROW_H: Record<StyleId, number> = {
+  fluent: 44,
+  apple: 52,
+  material: 48,
+  ant: 40,
+};
 
 function canRunAsAdmin(hit: SearchHit): boolean {
   // A Store app is addressed by its package id: there is no image to elevate.
@@ -202,7 +214,12 @@ export default function Launcher() {
     toastTimer.current = window.setTimeout(() => setToast(null), 1600);
   }, []);
 
-  const rowH = settings?.compactMode ? 38 : 46;
+  // Result-row height. The moving selection highlight is positioned in JS, so
+  // the height has to be a number here and not only a CSS rule; it is written
+  // onto `.shell` as `--row-h` so the stylesheet and the highlight cannot
+  // drift apart. Compact mode wins over the style's own rhythm.
+  const styleId = normalizeStyle(settings?.style);
+  const rowH = settings?.compactMode ? 38 : STYLE_ROW_H[styleId];
   // Re-render on language change so every t() call below picks up the new one.
   const lang = useLang();
   void lang;
@@ -268,6 +285,9 @@ export default function Launcher() {
     const themeName = resolveTheme(s.theme);
     document.documentElement.setAttribute("data-theme", themeName);
     document.documentElement.setAttribute("data-anim", s.animations ? "on" : "off");
+    // Style layer before colours: it only writes shape tokens, but it has to
+    // be in place before the first paint of this window.
+    applyStyle(s.style);
     // Per-element colour overrides (empty value = theme default).
     applyColors(s, themeName);
     applyWindowChrome(s);
@@ -926,6 +946,7 @@ export default function Launcher() {
         // few result rows, so it always keeps the side panel.
         !quick && settings?.previewPosition === "bottom" ? "bottom" : "right"
       }
+      style={{ "--row-h": `${rowH}px` } as React.CSSProperties}
     >
       <div className="card">
         {updateFound && (

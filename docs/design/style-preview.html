@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-style="fluent" data-theme="light" data-accent="blue">
+<head>
+<meta charset="utf-8">
+<title>Kestrel 界面风格设计稿 — 四种规范</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+
+  /* ═══════════ colour layer: theme + palette (orthogonal to style) ═══════════ */
+  :root {
+    --font-sans: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+    --font-mono: "Cascadia Mono", Consolas, monospace;
+
+    --bg: #ffffff;
+    --bg-2: #f7f8fa;
+    --surface: #ffffff;
+    --border: rgba(15, 23, 42, 0.09);
+    --border-strong: rgba(15, 23, 42, 0.18);
+    --text: #14161b;
+    --text-2: #535b68;
+    --text-3: #6d7583;
+    --hover: rgba(15, 23, 42, 0.05);
+    --line: rgba(15, 23, 42, 0.075);
+
+    --accent: #3b6be8;
+    --accent-text: #2f5cd4;
+    --accent-ink: #ffffff;
+    --accent-soft: rgba(59, 107, 232, 0.13);
+    --accent-softer: rgba(59, 107, 232, 0.07);
+  }
+  html[data-theme="dark"] {
+    --bg: #16181d;
+    --bg-2: #101216;
+    --surface: #1c1f25;
+    --border: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.20);
+    --text: #e9ebef;
+    --text-2: #a4abb8;
+    --text-3: #8b93a1;
+    --hover: rgba(255, 255, 255, 0.06);
+    --line: rgba(255, 255, 255, 0.08);
+
+    --accent: #6b93f5;
+    --accent-text: #9ab4fa;
+    --accent-ink: #10131a;
+    --accent-soft: rgba(107, 147, 245, 0.20);
+    --accent-softer: rgba(107, 147, 245, 0.11);
+  }
+  html[data-accent="teal"] { --accent:#12857a; --accent-text:#0d6f66; --accent-soft:rgba(18,133,122,.13); --accent-softer:rgba(18,133,122,.07); }
+  html[data-accent="teal"][data-theme="dark"] { --accent:#3fb3a6; --accent-text:#79d2c7; --accent-ink:#0d1214; --accent-soft:rgba(63,179,166,.20); --accent-softer:rgba(63,179,166,.11); }
+  html[data-accent="purple"] { --accent:#7a5cd6; --accent-text:#6a4cc4; --accent-soft:rgba(122,92,214,.13); --accent-softer:rgba(122,92,214,.07); }
+  html[data-accent="purple"][data-theme="dark"] { --accent:#a78bfa; --accent-text:#c3b0fc; --accent-ink:#12101a; --accent-soft:rgba(167,139,250,.20); --accent-softer:rgba(167,139,250,.11); }
+  html[data-accent="graphite"] { --accent:#5b6472; --accent-text:#4d5561; --accent-soft:rgba(91,100,114,.13); --accent-softer:rgba(91,100,114,.07); }
+  html[data-accent="graphite"][data-theme="dark"] { --accent:#9aa4b4; --accent-text:#bcc5d2; --accent-ink:#14171c; --accent-soft:rgba(154,164,180,.20); --accent-softer:rgba(154,164,180,.11); }
+
+  /* each style brings its own type stack */
+  html[data-style="apple"] { --font-sans: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif; }
+  html[data-style="material"] { --font-sans: "Roboto", "Roboto Flex", system-ui, "Segoe UI Variable Text", "Microsoft YaHei UI", "PingFang SC", sans-serif; }
+  html[data-style="ant"] { --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Microsoft YaHei UI", sans-serif; }
+
+  body {
+    background: #e9ecf2; color: #14161b;
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+  html[data-theme="dark"] body { background: #0b0d11; }
+
+  /* ═══════════ demo shell ═══════════ */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    padding: 12px 22px;
+    background: #fff; border-bottom: 1px solid rgba(15,23,42,.09);
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  }
+  .topbar h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+  .topbar .note { font-size: 11.5px; color: #6d7583; }
+  .group { display: flex; align-items: center; gap: 5px; }
+  .group > span { font-size: 11px; color: #6d7583; margin-right: 2px; }
+  .opt {
+    appearance: none; border: 1px solid rgba(15,23,42,.14); background: #fff; color: #14161b;
+    font: inherit; font-size: 12px; height: 27px; padding: 0 10px; border-radius: 6px; cursor: pointer;
+  }
+  .opt[aria-pressed="true"] { background: #14161b; border-color: #14161b; color: #fff; }
+  .dot { appearance: none; width: 19px; height: 19px; border-radius: 50%; border: 1px solid rgba(15,23,42,.16); cursor: pointer; padding: 0; }
+  .dot[aria-pressed="true"] { outline: 2px solid #14161b; outline-offset: 2px; }
+  html[data-theme="dark"] .topbar { background: #14171c; border-bottom-color: rgba(255,255,255,.10); }
+  html[data-theme="dark"] .topbar h1 { color: #e9ebef; }
+  html[data-theme="dark"] .topbar .note, html[data-theme="dark"] .group > span { color: #9aa2b1; }
+  html[data-theme="dark"] .opt { background: #22262d; border-color: rgba(255,255,255,.20); color: #e9ebef; }
+  html[data-theme="dark"] .opt[aria-pressed="true"] { background: #e9ebef; border-color: #e9ebef; color: #14161b; }
+  html[data-theme="dark"] .dot[aria-pressed="true"] { outline-color: #e9ebef; }
+
+  .stage { padding: 26px 22px 40px; display: flex; flex-direction: column; gap: 26px; align-items: flex-start; }
+  .case { display: none; flex-direction: column; gap: 8px; }
+  html[data-style="fluent"]   .case[data-s="fluent"],
+  html[data-style="apple"]    .case[data-s="apple"],
+  html[data-style="material"] .case[data-s="material"],
+  html[data-style="ant"]      .case[data-s="ant"] { display: flex; }
+  .case > .cap { font-size: 12px; color: var(--text-3); letter-spacing: .01em; }
+  /* ?only=qs isolates the quick-switch block for review */
+  html[data-only="qs"] .topbar,
+  html[data-only="qs"] .case:not(.qscase),
+  html[data-only="qs"] .tablewrap { display: none !important; }
+  html[data-only="atoms"] .case { display: none !important; }
+  html[data-only="qs"] .case.qscase:not([data-s="fluent"]):not([data-s="apple"]):not([data-s="material"]):not([data-s="ant"]) { display: none; }
+  .case > .cap b { color: var(--text-2); font-weight: 600; }
+
+  .win { position: relative; overflow: hidden; background: var(--bg); color: var(--text); flex: none; }
+  .shadow { box-shadow: 0 26px 60px -30px rgba(15,23,42,.48), 0 0 0 .5px rgba(15,23,42,.10); }
+  html[data-theme="dark"] .shadow { box-shadow: 0 26px 60px -30px rgba(0,0,0,.9), 0 0 0 .5px rgba(255,255,255,.10); }
+
+  /* shared control atoms (each style overrides below) */
+  .sw { position: relative; flex: none; border-radius: 999px; background: var(--border-strong); transition: background .16s; }
+  .sw::after { content: ""; position: absolute; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.22); }
+  .sw[data-on] { background: var(--accent); }
+  .seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--bg-2); border-radius: 6px; border: 1px solid var(--border); }
+  .seg > b { font-weight: 500; font-size: 12px; padding: 0 11px; height: 24px; display: inline-flex; align-items: center; border-radius: 4px; color: var(--text-2); }
+  .seg > b[data-on] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(15,23,42,.10); }
+  .pal { display: inline-flex; gap: 7px; }
+  .pal i { width: 18px; height: 18px; border-radius: 50%; display: block; }
+  .pal i[data-on] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px currentColor; }
+  .btn { font: inherit; font-size: 12px; height: 30px; padding: 0 13px; border-radius: 5px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+
+  /* style picker thumbnails: one shape, four骨架 */
+  .pk { appearance: none; font: inherit; background: none; border: 0; padding: 0; cursor: default; display: flex; flex-direction: column; gap: 6px; align-items: stretch; color: inherit; text-align: left; }
+  .pk > .th { position: relative; display: block; height: 54px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
+  .pk > .th::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 26%; background: var(--bg-2); border-right: 1px solid var(--line); }
+  .pk > .th::after { content: ""; position: absolute; left: 34%; right: 9%; top: 20%; bottom: 20%; border-radius: 2px;
+    background-color: var(--surface);
+    background-image: repeating-linear-gradient(to bottom,
+      color-mix(in srgb, var(--text) 15%, transparent) 0 3px, transparent 3px 9px);
+    background-position: 3px 4px; background-repeat: repeat-y; background-size: calc(100% - 6px) auto;
+    box-shadow: 0 0 0 1px var(--line); }
+  .pk > b { font-size: 11.5px; font-weight: 500; }
+  .pk > span { font-size: 10.5px; color: var(--text-3); line-height: 1.3; }
+  .pk[data-on] > .th { box-shadow: 0 0 0 2px var(--accent); }
+  .pk[data-on] > b { color: var(--accent-text); }
+
+  /* ══════════════════════════════════════════════════════════════════
+     FLUENT 2 — NavigationView, breadcrumb, one SettingsCard per row
+     ══════════════════════════════════════════════════════════════════ */
+  .fl { width: 1040px; height: 720px; border-radius: 8px; zoom: .70; display: flex; flex-direction: column; border: 1px solid var(--border-strong); }
+  .fl-title { height: 40px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 6px 0 12px;
+    background: color-mix(in srgb, var(--bg) 84%, var(--accent) 16%); border-bottom: 1px solid var(--line); }
+  .fl-title .logo { width: 19px; height: 19px; border-radius: 4px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+  .fl-title .nm { font-size: 12.5px; font-weight: 600; }
+  .fl-title .sp { flex: 1; }
+  .fl-title .wb { width: 32px; height: 26px; display: grid; place-items: center; font-size: 11px; color: var(--text-2); }
+  .fl-body { flex: 1; display: flex; min-height: 0; }
+  .fl-side { width: 240px; flex: none; padding: 8px; display: flex; flex-direction: column; gap: 2px;
+    background: color-mix(in srgb, var(--bg) 92%, var(--text) 4%); border-right: 1px solid var(--line); }
+  .fl-side .grp { font-size: 11px; font-weight: 600; color: var(--text-3); padding: 14px 12px 5px; }
+  .fl-nav { position: relative; display: flex; align-items: center; gap: 11px; height: 38px; padding: 0 12px; border-radius: 4px; font-size: 13px; color: var(--text-2); }
+  .fl-nav .ic { width: 16px; text-align: center; flex: none; opacity: .9; }
+  .fl-nav[data-on] { background: var(--accent-softer); color: var(--text); font-weight: 600; }
+  .fl-nav[data-on]::before { content: ""; position: absolute; left: 2px; top: 9px; bottom: 9px; width: 3px; border-radius: 2px; background: var(--accent); }
+  .fl-nav[data-on] .ic { color: var(--accent-text); opacity: 1; }
+  .fl-main { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; padding: 0 30px 10px; }
+  .fl-crumb { height: 42px; flex: none; display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-3); }
+  .fl-crumb .sep { opacity: .55; }
+  .fl-crumb b { font-size: 15px; font-weight: 600; color: var(--text); }
+  .fl-sect { margin-bottom: 16px; }
+  .fl-sect > .gt { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .fl-card { display: flex; align-items: center; gap: 13px; min-height: 56px; padding: 7px 16px; margin-bottom: 3px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
+  .fl-card .ico { width: 20px; height: 20px; flex: none; display: grid; place-items: center; color: var(--accent-text); font-size: 13px; }
+  .fl-card .tx { flex: 1; min-width: 0; }
+  .fl-card .tx .lb { font-size: 13px; font-weight: 500; }
+  .fl-card .tx .ds { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+  .fl-picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .fl-picks .pk > .th { border-radius: 3px; }
+  .fl-picks .pk > .th::before { background: color-mix(in srgb, var(--bg) 90%, var(--text) 6%); }
+  .fl-picks .pk > .th::after { border-radius: 1px; }
+  .fl-picks .pk[data-on] > .th { box-shadow: 0 0 0 2px var(--accent), 0 0 0 3px var(--bg); }
+  .fl-foot { height: 52px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 24px;
+    border-top: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 95%, var(--text) 2%); }
+  .fl-foot .hint { font-size: 11.5px; color: var(--text-3); }
+  .fl-foot .sp { flex: 1; }
+  .fl .sw { width: 40px; height: 20px; }
+  .fl .sw::after { top: 4px; left: 4px; width: 12px; height: 12px; }
+  .fl .sw[data-on]::after { left: 24px; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     APPLE HIG — traffic lights, source-list sidebar, Large Title,
+     inset grouped list (one big rounded container, inset hairlines)
+     ══════════════════════════════════════════════════════════════════ */
+  .ap { width: 1040px; height: 720px; border-radius: 10px; zoom: .70; display: flex; flex-direction: column;
+    border: .5px solid rgba(0,0,0,.16); }
+  html[data-theme="dark"] .ap { border-color: rgba(255,255,255,.14); }
+  .ap-title { position: relative; height: 44px; flex: none; display: flex; align-items: center; padding: 0 14px;
+    background: color-mix(in srgb, var(--bg) 95%, var(--text) 4%); border-bottom: .5px solid var(--line); }
+  .ap-lights { display: flex; gap: 8px; }
+  .ap-lights i { width: 12px; height: 12px; border-radius: 50%; }
+  .ap-lights i:nth-child(1) { background: #ff5f57; }
+  .ap-lights i:nth-child(2) { background: #febc2e; }
+  .ap-lights i:nth-child(3) { background: #28c840; }
+  .ap-title .nm { position: absolute; left: 0; right: 0; text-align: center; font-size: 13px; font-weight: 600; letter-spacing: -.01em; pointer-events: none; }
+  .ap-body { flex: 1; display: flex; min-height: 0; }
+  .ap-side { width: 232px; flex: none; padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 1px;
+    background: color-mix(in srgb, var(--bg) 93%, var(--text) 5%); border-right: .5px solid var(--line); }
+  .ap-side .grp { font-size: 11px; font-weight: 600; color: var(--text-3); padding: 15px 8px 5px; letter-spacing: -.005em; }
+  .ap-nav { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; border-radius: 6px; font-size: 13px; color: var(--text); letter-spacing: -.005em; }
+  .ap-nav .ic { width: 15px; text-align: center; flex: none; color: var(--accent-text); font-size: 13px; }
+  .ap-nav[data-on] { background: color-mix(in srgb, var(--text) 10%, transparent); font-weight: 500; }
+  .ap-main { flex: 1; min-width: 0; overflow: hidden; padding: 14px 26px 20px; display: flex; flex-direction: column; }
+  .ap-main h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.024em; line-height: 1.15; }
+  .ap-main .sub { margin: 3px 0 18px; font-size: 12.5px; color: var(--text-2); letter-spacing: -.004em; }
+  .ap-group { margin-bottom: 18px; border-radius: 12px; overflow: hidden; background: var(--bg);
+    --ap-hair: rgba(0,0,0,.10);
+    box-shadow: 0 1px 1px rgba(0,0,0,.045), 0 0 0 .5px rgba(0,0,0,.09); }
+  html[data-theme="dark"] .ap-group { background: #2b2d34; box-shadow: 0 0 0 .5px rgba(255,255,255,.09); --ap-hair: rgba(255,255,255,.11); }
+  .ap-group > .gt { padding: 15px 18px 5px; font-size: 11.5px; font-weight: 600; color: var(--text-2); letter-spacing: -.003em; }
+  .ap-row { position: relative; display: flex; align-items: center; gap: 16px; min-height: 50px; padding: 10px 18px; }
+  .ap-row + .ap-row::before { content: ""; position: absolute; left: 18px; right: 0; top: 0; height: .5px; background: var(--ap-hair); }
+  .ap-row .main { flex: 1; min-width: 0; }
+  .ap-row .lb { font-size: 13px; letter-spacing: -.004em; }
+  .ap-row .ds { font-size: 11.5px; color: var(--text-3); margin-top: 2px; letter-spacing: -.002em; }
+  .ap-picks { display: flex; gap: 10px; padding: 2px 0 4px; }
+  .ap-picks .pk { flex: 1; }
+  .ap-picks .pk > .th { border-radius: 7px; border-color: var(--line); }
+  .ap-picks .pk > .th::before { background: color-mix(in srgb, var(--bg) 90%, var(--text) 6%); }
+  .ap-picks .pk > .th::after { border-radius: 4px; box-shadow: 0 0 0 .5px var(--line); }
+  .ap-picks .pk[data-on] > .th { box-shadow: 0 0 0 2px var(--accent); }
+  .ap .sw { width: 36px; height: 21px; }
+  .ap .sw::after { top: 2.5px; left: 2.5px; width: 16px; height: 16px; box-shadow: 0 1px 2.5px rgba(0,0,0,.28); }
+  .ap .sw[data-on]::after { left: 17.5px; }
+  .ap .seg { background: transparent; border: 0; padding: 0; gap: 0; border-radius: 7px; overflow: hidden;
+    box-shadow: 0 0 0 .5px var(--border); background: var(--surface); }
+  .ap .seg > b { height: 26px; padding: 0 12px; border-radius: 0; font-size: 12px; }
+  .ap .seg > b + b { border-left: .5px solid var(--line); }
+  .ap .seg > b[data-on] { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     MATERIAL 3 — top app bar, 88px navigation rail, filled cards,
+     tonal pills, state layers, FAB
+     ══════════════════════════════════════════════════════════════════ */
+  .m3 { width: 1040px; height: 720px; border-radius: 24px; zoom: .70; display: flex; flex-direction: column; }
+  .m3-bar { height: 62px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
+  .m3-bar .mi { width: 26px; height: 26px; display: grid; place-items: center; color: var(--text-2); font-size: 15px; }
+  .m3-bar h1 { margin: 0; font-size: 21px; font-weight: 400; letter-spacing: 0; }
+  .m3-body { flex: 1; display: flex; min-height: 0; }
+  .m3-rail { width: 88px; flex: none; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .m3-it { width: 76px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0 5px; color: var(--text-2); }
+  .m3-it .ic { width: 56px; height: 30px; border-radius: 999px; display: grid; place-items: center; font-size: 15px; }
+  .m3-it .lb { font-size: 11px; font-weight: 500; letter-spacing: .01em; }
+  .m3-it[data-on] .ic { background: var(--accent-soft); color: var(--accent-text); }
+  .m3-it[data-on] .lb { color: var(--text); font-weight: 600; }
+  .m3-main { flex: 1; min-width: 0; padding: 2px 22px 20px 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px; }
+  .m3-card { border-radius: 12px; padding: 2px 0 6px; background: color-mix(in srgb, var(--surface) 93%, var(--text) 7%); }
+  .m3-card > .ct { padding: 13px 20px 3px; font-size: 10.5px; font-weight: 600; letter-spacing: .085em; text-transform: uppercase; color: var(--text-3); }
+  .m3-row { display: flex; align-items: center; gap: 16px; min-height: 54px; padding: 7px 20px; }
+  .m3-row .main { flex: 1; min-width: 0; }
+  .m3-row .lb { font-size: 13.5px; letter-spacing: .002em; }
+  .m3-row .ds { font-size: 11.5px; color: var(--text-3); margin-top: 2px; letter-spacing: .006em; }
+  .m3-picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 2px 4px 4px; }
+  .m3-picks .pk > .th { border-radius: 10px; background: color-mix(in srgb, var(--surface) 86%, var(--text) 8%); border-color: transparent; }
+  .m3-picks .pk > .th::before { background: color-mix(in srgb, var(--surface) 78%, var(--text) 12%); }
+  .m3-picks .pk > .th::after { border-radius: 4px; box-shadow: none; background-color: color-mix(in srgb, var(--surface) 96%, var(--text) 3%); }
+  .m3-picks .pk[data-on] > .th { box-shadow: 0 0 0 2px var(--accent); }
+  .m3 .sw { width: 46px; height: 26px; background: transparent; box-shadow: inset 0 0 0 2px var(--border-strong); }
+  .m3 .sw::after { top: 50%; left: 4px; width: 14px; height: 14px; margin-top: -7px; background: var(--text-2); box-shadow: none; }
+  .m3 .sw[data-on] { background: var(--accent); box-shadow: none; }
+  .m3 .sw[data-on]::after { left: 26px; width: 18px; height: 18px; margin-top: -9px; background: var(--accent-ink); }
+  .m3 .seg { background: transparent; border: 1px solid var(--border-strong); border-radius: 999px; padding: 2px; }
+  .m3 .seg > b { border-radius: 999px; }
+  .m3 .seg > b[data-on] { background: var(--accent-soft); color: var(--accent-text); box-shadow: none; }
+  .m3-fab { position: absolute; right: 22px; bottom: 20px; width: 54px; height: 54px; border-radius: 16px;
+    display: grid; place-items: center; font-size: 19px;
+    background: var(--accent-soft); color: var(--accent-text);
+    box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 4px 10px rgba(0,0,0,.14); }
+
+  /* ══════════════════════════════════════════════════════════════════
+     ANT DESIGN — page header with breadcrumb, menu with soft fill,
+     one bordered card, 44px rows with 1px dividers
+     ══════════════════════════════════════════════════════════════════ */
+  .an { width: 1040px; height: 720px; border-radius: 8px; zoom: .70; display: flex; flex-direction: column; }
+  .an-head { flex: none; padding: 12px 24px 0; background: var(--bg); }
+  .an-crumb { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); }
+  .an-crumb b { color: var(--text); font-weight: 400; }
+  .an-title { display: flex; align-items: center; gap: 12px; padding: 6px 0 10px; }
+  .an-title h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0; }
+  .an-title .acts { margin-left: auto; display: flex; gap: 8px; }
+  .an-title .acts .btn { height: 30px; border-radius: 6px; }
+  .an-head .divider { height: 1px; background: var(--line); margin: 0 -24px; }
+  .an-body { flex: 1; display: flex; min-height: 0; }
+  .an-menu { width: 208px; flex: none; padding: 8px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); }
+  .an-menu .grp { padding: 13px 12px 4px; font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: .04em; }
+  .an-item { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border-radius: 6px; font-size: 13px; color: var(--text); }
+  .an-item .ic { width: 16px; flex: none; text-align: center; color: var(--text-3); font-size: 12px; }
+  .an-item[data-on] { background: var(--accent-softer); color: var(--accent-text); font-weight: 500; }
+  .an-item[data-on] .ic { color: var(--accent-text); }
+  .an-main { flex: 1; min-width: 0; padding: 16px 24px 20px; overflow: hidden; }
+  .an-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .an-card > .ch { height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+    border-bottom: 1px solid var(--line); font-size: 13.5px; font-weight: 600; }
+  .an-card > .ch .more { font-size: 11.5px; font-weight: 400; color: var(--text-3); }
+  .an-row { display: flex; align-items: center; gap: 16px; min-height: 44px; padding: 6px 16px; border-bottom: 1px solid var(--line); }
+  .an-row:last-child { border-bottom: 0; }
+  .an-row .main { flex: 1; min-width: 0; }
+  .an-row .lb { font-size: 13px; }
+  .an-row .ds { font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+  .an-sub { padding: 12px 16px 2px; font-size: 12px; font-weight: 600; color: var(--text-2); border-top: 1px solid var(--line); margin-top: 0; }
+  .an-picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 4px 0 6px; }
+  .an-picks .pk > .th { border-radius: 6px; }
+  .an-picks .pk > .th::before { background: color-mix(in srgb, var(--bg) 92%, var(--text) 5%); }
+  .an-picks .pk > .th::after { border-radius: 2px; }
+  .an-picks .pk[data-on] > .th { box-shadow: 0 0 0 2px var(--accent); }
+  .an .sw { width: 36px; height: 20px; }
+  .an .sw::after { top: 2px; left: 2px; width: 16px; height: 16px; }
+  .an .sw[data-on]::after { left: 18px; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     LAUNCHERS — 780 × 540
+     ══════════════════════════════════════════════════════════════════ */
+  .lp { width: 780px; height: 540px; zoom: .86; display: flex; flex-direction: column; }
+
+  /* --- Fluent: PowerToys Run, full-width search, 3px indicator --- */
+  .lpf { border-radius: 8px; border: 1px solid var(--border-strong); }
+  .lpf .bar { height: 48px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 16px; border-bottom: 1px solid var(--line); }
+  .lpf .bar .mag { width: 15px; height: 15px; flex: none; color: var(--text-3); }
+  .lpf .bar .q { flex: 1; font-size: 14px; }
+  .lpf .bar .q i { display: inline-block; width: 1px; height: 15px; background: var(--accent); margin-left: 1px; vertical-align: -2px; }
+  .lpf .bar .esc { font-size: 10.5px; color: var(--text-3); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; }
+  .lpf .body { flex: 1; display: flex; min-height: 0; }
+  .lpf .list { flex: 1; min-width: 0; padding: 4px 6px; display: flex; flex-direction: column; gap: 1px; }
+  .lpf .res { position: relative; display: flex; align-items: center; gap: 11px; height: 44px; padding: 0 10px; border-radius: 4px; }
+  .lpf .res[data-on] { background: var(--accent-softer); }
+  .lpf .res[data-on]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--accent); }
+  .lpf .res .ic { width: 24px; height: 24px; flex: none; border-radius: 4px; background: color-mix(in srgb, var(--bg) 88%, var(--text) 8%); display: grid; place-items: center; font-size: 11px; color: var(--text-2); }
+  .lpf .res .tx { flex: 1; min-width: 0; }
+  .lpf .res .nm { font-size: 12.5px; font-weight: 500; }
+  .lpf .res .pt { font-size: 11px; color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lpf .res .kd { font-size: 10.5px; color: var(--text-3); }
+  .lpf .prev { width: 236px; flex: none; border-left: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; }
+  .lpf .prev .pico { width: 34px; height: 34px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-text); display: grid; place-items: center; font-size: 14px; }
+  .lpf .prev .pn { font-size: 13.5px; font-weight: 600; margin-top: 9px; }
+  .lpf .prev .pp { font-size: 11px; color: var(--text-3); margin-top: 2px; word-break: break-all; line-height: 1.45; }
+  .lpf .prev .kv { display: flex; justify-content: space-between; font-size: 11.5px; padding: 5px 0; border-top: 1px solid var(--line); }
+  .lpf .prev .kv span { color: var(--text-3); }
+  .lpf .prev .kv b { font-weight: 500; }
+  .lpf .prev .kvs { margin-top: 10px; }
+  .lpf .prev .acts { margin-top: auto; display: flex; gap: 6px; }
+  .lpf .prev .acts .btn { height: 28px; font-size: 11.5px; padding: 0 11px; }
+  .lpf .foot { height: 30px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 14px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--text-3); }
+  .lpf .foot .sp { flex: 1; }
+
+  /* --- Apple: Spotlight, floating panel, no chrome, inset selection --- */
+  .lpa-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; padding-top: 24px; }
+  .lpa { width: 700px; flex: 1; min-height: 0; display: flex; flex-direction: column; border-radius: 13px; border: .5px solid rgba(0,0,0,.13); }
+  html[data-theme="dark"] .lpa { border-color: rgba(255,255,255,.13); }
+  .lpa .bar { height: 58px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 18px; }
+  .lpa .bar .mag { width: 19px; height: 19px; flex: none; color: var(--text-3); }
+  .lpa .bar .q { flex: 1; font-size: 21px; font-weight: 400; letter-spacing: -.015em; }
+  .lpa .bar .q i { display: inline-block; width: 1.5px; height: 21px; background: var(--accent); margin-left: 1px; vertical-align: -3px; }
+  .lpa .bar .esc { font-size: 11px; color: var(--text-3); }
+  .lpa .body { flex: 1; min-height: 0; display: flex; border-top: .5px solid var(--line); }
+  .lpa .list { width: 404px; flex: none; padding: 5px 7px 7px; display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+  .lpa .res { display: flex; align-items: center; gap: 11px; height: 50px; padding: 0 11px; border-radius: 8px; }
+  .lpa .res[data-on] { background: var(--accent); color: var(--accent-ink); }
+  .lpa .res .ic { width: 26px; height: 26px; flex: none; border-radius: 6px; background: color-mix(in srgb, var(--text) 8%, transparent); display: grid; place-items: center; font-size: 11px; }
+  .lpa .res[data-on] .ic { background: color-mix(in srgb, var(--accent-ink) 22%, transparent); }
+  .lpa .res .tx { flex: 1; min-width: 0; }
+  .lpa .res .nm { font-size: 13px; font-weight: 500; letter-spacing: -.008em; }
+  .lpa .res .pt { font-size: 11px; color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lpa .res[data-on] .pt { color: color-mix(in srgb, var(--accent-ink) 78%, transparent); }
+  .lpa .res .kd { font-size: 10.5px; color: var(--text-3); }
+  .lpa .res[data-on] .kd { color: color-mix(in srgb, var(--accent-ink) 78%, transparent); }
+  .lpa .prev { flex: 1; min-width: 0; padding: 16px 18px; border-left: .5px solid var(--line); display: flex; flex-direction: column; }
+  .lpa .prev .pico { width: 40px; height: 40px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-text); display: grid; place-items: center; font-size: 16px; }
+  .lpa .prev .pn { font-size: 15px; font-weight: 600; margin-top: 10px; letter-spacing: -.012em; }
+  .lpa .prev .pp { font-size: 11px; color: var(--text-3); margin-top: 2px; word-break: break-all; line-height: 1.45; }
+  .lpa .prev .kvs { margin-top: 12px; }
+  .lpa .prev .kv { display: flex; justify-content: space-between; font-size: 11.5px; padding: 4px 0; }
+  .lpa .prev .kv span { color: var(--text-3); }
+  .lpa .prev .kv b { font-weight: 500; }
+  .lpa .prev .acts { margin-top: auto; display: flex; gap: 7px; }
+  .lpa .prev .acts .btn { height: 26px; font-size: 11.5px; padding: 0 12px; border-radius: 999px; }
+  .lpa .foot { height: 30px; flex: none; display: flex; align-items: center; gap: 13px; padding: 0 17px; border-top: .5px solid var(--line); font-size: 10.5px; color: var(--text-3); }
+  .lpa .foot .sp { flex: 1; }
+
+  /* --- Material: pill search, tonal selection, filled preview card --- */
+  .lpm-wrap { display: flex; flex-direction: column; padding: 0; }
+  .lpm { border-radius: 24px; }
+  .lpm .bar { flex: none; padding: 12px 12px 8px; }
+  .lpm .field { height: 52px; border-radius: 999px; display: flex; align-items: center; gap: 12px; padding: 0 18px;
+    background: color-mix(in srgb, var(--surface) 88%, var(--text) 7%); }
+  .lpm .field .mag { width: 17px; height: 17px; flex: none; color: var(--text-2); }
+  .lpm .field .q { flex: 1; font-size: 15px; }
+  .lpm .field .q i { display: inline-block; width: 1.5px; height: 16px; background: var(--accent); margin-left: 1px; vertical-align: -2px; }
+  .lpm .field .esc { font-size: 11px; color: var(--text-3); }
+  .lpm .body { flex: 1; display: flex; min-height: 0; padding: 0 12px 10px; gap: 8px; }
+  .lpm .list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .lpm .res { display: flex; align-items: center; gap: 13px; height: 48px; padding: 0 14px; border-radius: 999px; }
+  .lpm .res[data-on] { background: var(--accent-soft); }
+  .lpm .res .ic { width: 26px; height: 26px; flex: none; border-radius: 50%; background: color-mix(in srgb, var(--surface) 84%, var(--text) 10%); display: grid; place-items: center; font-size: 11px; color: var(--text-2); }
+  .lpm .res[data-on] .ic { background: var(--accent); color: var(--accent-ink); }
+  .lpm .res .tx { flex: 1; min-width: 0; }
+  .lpm .res .nm { font-size: 13.5px; letter-spacing: .002em; }
+  .lpm .res .pt { font-size: 11px; color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lpm .prev { width: 268px; flex: none; border-radius: 12px; padding: 16px; display: flex; flex-direction: column;
+    background: color-mix(in srgb, var(--surface) 93%, var(--text) 7%); }
+  .lpm .prev .pico { width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-text); display: grid; place-items: center; font-size: 16px; }
+  .lpm .prev .pn { font-size: 15px; font-weight: 500; margin-top: 10px; }
+  .lpm .prev .pp { font-size: 11px; color: var(--text-3); margin-top: 2px; word-break: break-all; line-height: 1.45; }
+  .lpm .prev .kvs { margin-top: 12px; }
+  .lpm .prev .kv { display: flex; justify-content: space-between; font-size: 11.5px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .lpm .prev .kv:last-child { border-bottom: 0; }
+  .lpm .prev .kv span { color: var(--text-3); }
+  .lpm .prev .kv b { font-weight: 500; }
+  .lpm .prev .acts { margin-top: auto; display: flex; gap: 7px; }
+  .lpm .prev .acts .btn { height: 30px; font-size: 11.5px; padding: 0 14px; border-radius: 999px; border-color: transparent; background: color-mix(in srgb, var(--surface) 80%, var(--text) 8%); }
+  .lpm .prev .acts .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .lpm .foot { height: 34px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 20px; font-size: 10.5px; color: var(--text-3); }
+  .lpm .foot .sp { flex: 1; }
+
+  /* --- Ant: bordered search, 36px rows with dividers, dense --- */
+  .lan { border-radius: 8px; border: 1px solid var(--border-strong); }
+  .lan .bar { flex: none; padding: 12px 12px 10px; border-bottom: 1px solid var(--line); }
+  .lan .field { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg); }
+  .lan .field .mag { width: 14px; height: 14px; flex: none; color: var(--text-3); }
+  .lan .field .q { flex: 1; font-size: 13px; }
+  .lan .field .q i { display: inline-block; width: 1px; height: 14px; background: var(--accent); margin-left: 1px; vertical-align: -2px; }
+  .lan .field .esc { font-size: 10px; color: var(--text-3); }
+  .lan .body { flex: 1; display: flex; min-height: 0; }
+  .lan .list { flex: 1; min-width: 0; }
+  .lan .res { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+  .lan .res[data-on] { background: var(--accent-softer); }
+  .lan .res .ic { width: 22px; height: 22px; flex: none; border-radius: 4px; background: color-mix(in srgb, var(--bg) 90%, var(--text) 6%); display: grid; place-items: center; font-size: 10.5px; color: var(--text-2); }
+  .lan .res .tx { flex: 1; min-width: 0; }
+  .lan .res .nm { font-size: 12.5px; }
+  .lan .res .pt { font-size: 11px; color: var(--text-3); margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lan .res .kd { font-size: 10px; color: var(--text-3); }
+  .lan .prev { width: 228px; flex: none; border-left: 1px dashed var(--border-strong); padding: 14px; display: flex; flex-direction: column; }
+  .lan .prev .pico { width: 32px; height: 32px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-text); display: grid; place-items: center; font-size: 13px; }
+  .lan .prev .pn { font-size: 13px; font-weight: 600; margin-top: 9px; }
+  .lan .prev .pp { font-size: 11px; color: var(--text-3); margin-top: 2px; word-break: break-all; line-height: 1.45; }
+  .lan .prev .kvs { margin-top: 10px; }
+  .lan .prev .kv { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+  .lan .prev .kv:last-child { border-bottom: 0; }
+  .lan .prev .kv span { color: var(--text-3); }
+  .lan .prev .kv b { font-weight: 500; }
+  .lan .prev .acts { margin-top: auto; display: flex; gap: 6px; }
+  .lan .prev .acts .btn { height: 26px; font-size: 11px; padding: 0 10px; border-radius: 6px; }
+  .lan .foot { height: 28px; flex: none; display: flex; align-items: center; gap: 13px; padding: 0 14px; border-top: 1px solid var(--line); font-size: 10px; color: var(--text-3); background: color-mix(in srgb, var(--bg) 96%, var(--text) 3%); }
+  .lan .foot .sp { flex: 1; }
+
+  /* ═══════════ sliders (form follows style) ═══════════ */
+  .sld { display: flex; align-items: center; gap: 10px; width: 186px; flex: none; }
+  .sld .tk { position: relative; flex: 1; height: 4px; border-radius: 999px; background: var(--border-strong); }
+  .sld .tk i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--accent); }
+  .sld .tk u { position: absolute; top: 50%; width: 15px; height: 15px; margin-top: -7.5px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transform: translateX(-50%); }
+  .sld .vl { font-size: 11.5px; color: var(--text-3); min-width: 33px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .fl .sld .tk u { width: 16px; height: 16px; margin-top: -8px; border: 2px solid var(--accent); background: var(--bg); box-shadow: none; }
+  .ap .sld .tk { background: color-mix(in srgb, var(--text) 15%, transparent); }
+  .ap .sld .tk u { width: 18px; height: 18px; margin-top: -9px; box-shadow: 0 1px 4px rgba(0,0,0,.30); }
+  .m3 .sld .tk { height: 6px; background: var(--accent-soft); }
+  .m3 .sld .tk u { width: 18px; height: 18px; margin-top: -9px; background: var(--accent); box-shadow: none; }
+  .an .sld .tk u { width: 14px; height: 14px; margin-top: -7px; border: 2px solid var(--accent); background: #fff; box-shadow: none; }
+
+  /* keep scrolling lists inside their frame */
+  .lpf .list, .lpm .list, .lan .list { overflow: hidden; }
+
+  /* ═══════════ Quick Switch box ═══════════
+     A different window from the launcher: it docks under a file dialog, so it
+     is short and wide (width = 2/3 of the dialog, clamp 320..workarea; height =
+     bar + hairline + path row + section head + 46*rows + footer). The rows are
+     folders to jump into, not search hits, and the window owns no shadow of its
+     own on screen — the card edge IS the window edge. */
+  .qsbox { width: 560px; flex: none; display: flex; flex-direction: column;
+    overflow: hidden; background: var(--bg); color: var(--text); }
+  .qsbox .qhead { display: flex; align-items: center; flex: none; }
+  .qsbox .qhead .mag { flex: none; color: var(--text-3); }
+  .qsbox .qhead .q { flex: 1; min-width: 0; display: flex; align-items: center;
+    overflow: hidden; white-space: nowrap; }
+  .qsbox .qhead .q i { display: inline-block; flex: none; background: var(--accent); }
+  .qsbox .qtag { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
+  /* secondary text still has to clear 4.5:1 — no extra opacity on top of --text-3;
+     the section head separates itself by colour (--text-2) and weight instead */
+  .qsbox .qloc { display: flex; align-items: center; flex: none; color: var(--text-3); }
+  .qsbox .qloc span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qsbox .qhead2 { display: flex; align-items: center; flex: none; color: var(--text-2);
+    font-weight: 600; text-transform: uppercase; }
+  .qsbox .qdir { display: flex; align-items: center; flex: none; }
+  .qsbox .qdir .dico { flex: none; display: grid; place-items: center; }
+  .qsbox .qdir .dtx { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+  .qsbox .qdir .dn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qsbox .qdir .dp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-3); }
+  .qsbox .qkey { margin-left: auto; flex: none; color: var(--text-3); opacity: .7; }
+  .qsbox .qfoot { display: flex; align-items: center; flex: none; color: var(--text-3); }
+  .qsbox .qfoot .sp { flex: 1; }
+
+  /* Fluent: same 48px bar as the launcher, 3px indicator on the selected row */
+  .qsf { border-radius: 8px; border: 1px solid var(--border-strong); }
+  .qsf .qhead { height: 48px; padding: 0 14px 0 16px; gap: 10px; border-bottom: 1px solid var(--line); }
+  .qsf .qhead .mag { width: 15px; height: 15px; }
+  .qsf .qhead .q { font-size: 14px; }
+  .qsf .qhead .q i { width: 1px; height: 15px; margin-left: 1px; }
+  .qsf .qtag { height: 20px; padding: 0 7px; border-radius: 3px; font-size: 10.5px; font-weight: 600;
+    color: var(--accent-text); background: var(--accent-soft); }
+  .qsf .qloc { height: 28px; padding: 0 16px; font-size: 11px; }
+  .qsf .qhead2 { height: 28px; padding: 0 16px; font-size: 10.5px; letter-spacing: .05em; }
+  .qsf .qdir { height: 44px; padding: 0 16px; gap: 10px; }
+  .qsf .qdir .dico { width: 16px; height: 16px; font-size: 12px; color: var(--accent-text); }
+  .qsf .qdir .dn { font-size: 12.5px; font-weight: 500; }
+  .qsf .qdir .dp { font-size: 10.5px; }
+  .qsf .qdir .qkey { font-size: 10.5px; }
+  .qsf .qdir[data-on] { background: var(--accent-softer); box-shadow: inset 3px 0 0 var(--accent); }
+  .qsf .qfoot { height: 32px; padding: 0 16px; border-top: 1px solid var(--line); font-size: 10.5px; gap: 13px; }
+
+  /* Apple: no divider anywhere, big input, selected row is an inset rounded block */
+  .qsa { border-radius: 14px; border: .5px solid rgba(0,0,0,.13); }
+  html[data-theme="dark"] .qsa { border-color: rgba(255,255,255,.13); }
+  .qsa .qhead { height: 58px; padding: 0 18px; gap: 12px; }
+  .qsa .qhead .mag { width: 18px; height: 18px; }
+  .qsa .qhead .q { font-size: 19px; letter-spacing: -.015em; }
+  .qsa .qhead .q i { width: 1.5px; height: 19px; margin-left: 1px; }
+  .qsa .qtag { height: 21px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    color: var(--accent-ink); background: var(--accent); }
+  .qsa .qloc { height: 26px; padding: 0 20px; font-size: 11.5px; }
+  .qsa .qhead2 { height: 26px; padding: 0 20px; font-size: 11px; letter-spacing: .02em; text-transform: none; }
+  .qsa .qdir { height: 48px; margin: 0 6px; padding: 0 14px; gap: 11px; border-radius: 8px; }
+  .qsa .qdir .dico { width: 18px; height: 18px; font-size: 13px; color: var(--accent-text); }
+  .qsa .qdir .dn { font-size: 13px; font-weight: 500; }
+  .qsa .qdir .dp { font-size: 11px; }
+  .qsa .qdir .qkey { font-size: 11px; opacity: 0; }
+  .qsa .qdir[data-on] { background: color-mix(in srgb, var(--text) 10%, transparent); }
+  .qsa .qdir[data-on] .qkey { opacity: .55; }
+  .qsa .qfoot { height: 32px; padding: 0 20px; font-size: 11px; gap: 14px; }
+
+  /* Material: the pill search field floats above the list; selected row is a tonal pill */
+  .qsm { border-radius: 20px; }
+  .qsm .qhead { height: 44px; margin: 10px 10px 0; padding: 0 16px; border-radius: 999px; gap: 11px;
+    background: color-mix(in srgb, var(--surface) 86%, var(--text) 8%); }
+  .qsm .qhead .mag { width: 16px; height: 16px; }
+  .qsm .qhead .q { font-size: 14px; }
+  .qsm .qhead .q i { width: 1.5px; height: 15px; margin-left: 1px; }
+  .qsm .qtag { height: 22px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
+    color: var(--accent-text); background: var(--accent-soft); }
+  .qsm .qloc { height: 26px; padding: 0 22px; font-size: 11px; }
+  .qsm .qhead2 { height: 30px; padding: 0 22px; font-size: 10.5px; letter-spacing: .09em; }
+  .qsm .qdir { height: 46px; margin: 0 8px; padding: 0 14px; gap: 12px; border-radius: 999px; }
+  .qsm .qdir .dico { width: 20px; height: 20px; border-radius: 50%; font-size: 11px; color: var(--text-2);
+    background: color-mix(in srgb, var(--surface) 82%, var(--text) 7%); }
+  .qsm .qdir .dn { font-size: 13px; font-weight: 500; }
+  .qsm .qdir .dp { font-size: 10.5px; }
+  .qsm .qdir .qkey { font-size: 10.5px; }
+  .qsm .qdir[data-on] { background: var(--accent-soft); }
+  .qsm .qdir[data-on] .dn { color: var(--accent-text); font-weight: 600; }
+  .qsm .qfoot { height: 34px; padding: 0 22px; font-size: 10.5px; gap: 14px; }
+
+  /* Ant: bordered field, every row separated by a 1px rule, dense 40px rows */
+  .qsn { border-radius: 8px; border: 1px solid var(--border-strong); }
+  .qsn .qhead { height: 32px; margin: 10px 12px; padding: 0 11px; gap: 8px;
+    border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); }
+  .qsn .qhead .mag { width: 13px; height: 13px; }
+  .qsn .qhead .q { font-size: 12.5px; }
+  .qsn .qhead .q i { width: 1px; height: 13px; margin-left: 1px; }
+  .qsn .qtag { height: 18px; padding: 0 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
+    color: var(--accent-text); background: var(--accent-softer);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .qsn .qloc { height: 26px; padding: 0 14px; font-size: 11px; border-bottom: 1px solid var(--line); }
+  .qsn .qhead2 { height: 26px; padding: 0 14px; font-size: 10px; letter-spacing: .04em;
+    color: var(--text-3); border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 96%, var(--text) 4%); }
+  .qsn .qdir { height: 40px; padding: 0 14px; gap: 10px; border-bottom: 1px solid var(--line); }
+  .qsn .qdir .dico { width: 15px; height: 15px; font-size: 11px; color: var(--text-2); }
+  .qsn .qdir .dn { font-size: 12px; font-weight: 500; }
+  .qsn .qdir .dp { font-size: 10.5px; }
+  .qsn .qdir .qkey { font-size: 10.5px; }
+  .qsn .qdir[data-on] { background: var(--accent-softer); }
+  .qsn .qdir[data-on] .dn { color: var(--accent-text); }
+  .qsn .qfoot { height: 30px; padding: 0 14px; font-size: 10.5px; gap: 13px; border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 96%, var(--text) 3%); }
+
+  /* ═══════════ quick switch context (a foreign dialog + our box under it) ═══════════ */
+  .qsctx { display: flex; flex-direction: column; align-items: flex-start; }
+  .qsdlg { width: 560px; height: 76px; flex: none; border: 1px dashed var(--border-strong); border-radius: 6px;
+    background: color-mix(in srgb, var(--bg) 92%, var(--text) 4%); display: flex; flex-direction: column;
+    justify-content: center; gap: 3px; padding: 0 16px; color: var(--text-3); font-size: 11.5px; }
+  .qsdlg b { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+  .qsgap { height: 6px; flex: none; }
+
+  /* ═══════════ same component, four forms ═══════════ */
+  .atoms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 1040px; }
+  .atom { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 13px 14px 15px; display: flex; flex-direction: column; gap: 11px; }
+  .atom > h3 { margin: 0; font-size: 12px; font-weight: 600; }
+  .atom .lab { font-size: 10.5px; color: var(--text-3); letter-spacing: .01em; margin-bottom: -6px; }
+  .atom .line { display: flex; align-items: center; gap: 9px; }
+  .atom .pickrow { position: relative; display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 10px; font-size: 12.5px; border-radius: 6px; color: var(--text); }
+  .atom .pickrow .ic { width: 15px; text-align: center; font-size: 12px; }
+  .atom .b { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 5px; display: inline-flex; align-items: center;
+    border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
+  .atom .b.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+
+  /* search field — the first thing the eye lands on, so its shape is the tell */
+  .atom .sbar { display: flex; align-items: center; gap: 8px; }
+  .atom .sbar .mag { flex: none; color: var(--text-3); }
+  .atom .sbar .q { flex: 1; min-width: 0; display: flex; align-items: center; }
+  .atom .sbar .q i { display: inline-block; flex: none; background: var(--accent); margin-left: 1px; }
+  .atom .sbar .k { flex: none; color: var(--text-3); font-size: 10px; }
+  .atom[data-k="fl"] .sbar { height: 34px; padding: 0 10px; border-bottom: 1px solid var(--line); }
+  .atom[data-k="fl"] .sbar .mag { width: 13px; height: 13px; }
+  .atom[data-k="fl"] .sbar .q { font-size: 12px; }
+  .atom[data-k="fl"] .sbar .q i { width: 1px; height: 13px; }
+  .atom[data-k="fl"] .sbar .k { border: 1px solid var(--border); border-radius: 3px; padding: 1px 4px; }
+  .atom[data-k="ap"] .sbar { height: 40px; padding: 0 6px; }
+  .atom[data-k="ap"] .sbar .mag { width: 15px; height: 15px; }
+  .atom[data-k="ap"] .sbar .q { font-size: 13.5px; letter-spacing: -.01em; }
+  .atom[data-k="ap"] .sbar .q i { width: 1.5px; height: 14px; }
+  .atom[data-k="m3"] .sbar { height: 36px; padding: 0 14px; border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 86%, var(--text) 8%); }
+  .atom[data-k="m3"] .sbar .mag { width: 14px; height: 14px; color: var(--text-2); }
+  .atom[data-k="m3"] .sbar .q { font-size: 12.5px; }
+  .atom[data-k="m3"] .sbar .q i { width: 1.5px; height: 13px; }
+  .atom[data-k="an"] .sbar { height: 32px; padding: 0 10px; border: 1px solid var(--border-strong);
+    border-radius: 6px; background: var(--surface); }
+  .atom[data-k="an"] .sbar .mag { width: 12px; height: 12px; }
+  .atom[data-k="an"] .sbar .q { font-size: 12px; }
+  .atom[data-k="an"] .sbar .q i { width: 1px; height: 12px; }
+
+  /* switches */
+  .atom .sw { width: 38px; height: 19px; }
+  .atom .sw::after { top: 3.5px; left: 3.5px; width: 12px; height: 12px; }
+  .atom .sw[data-on]::after { left: 22.5px; }
+  .atom[data-k="ap"] .sw { width: 37px; height: 22px; }
+  .atom[data-k="ap"] .sw::after { top: 2.5px; left: 2.5px; width: 17px; height: 17px; }
+  .atom[data-k="ap"] .sw[data-on]::after { left: 17.5px; }
+  .atom[data-k="m3"] .sw { width: 48px; height: 27px; background: transparent; box-shadow: inset 0 0 0 2px var(--border-strong); }
+  .atom[data-k="m3"] .sw::after { top: 50%; left: 4px; width: 14px; height: 14px; margin-top: -7px; background: var(--text-2); box-shadow: none; }
+  .atom[data-k="m3"] .sw[data-on] { background: var(--accent); box-shadow: none; }
+  .atom[data-k="m3"] .sw[data-on]::after { left: 27px; width: 19px; height: 19px; margin-top: -9.5px; background: var(--accent-ink); }
+  .atom[data-k="an"] .sw { width: 44px; height: 22px; }
+  .atom[data-k="an"] .sw::after { top: 2px; left: 2px; width: 18px; height: 18px; }
+  .atom[data-k="an"] .sw[data-on]::after { left: 24px; }
+
+  /* buttons */
+  .atom[data-k="ap"] .b { height: 28px; border-radius: 7px; border-color: transparent; background: color-mix(in srgb, var(--text) 8%, transparent); }
+  .atom[data-k="ap"] .b.pri { background: var(--accent); color: var(--accent-ink); }
+  .atom[data-k="m3"] .b { height: 34px; border-radius: 999px; border-color: transparent; background: color-mix(in srgb, var(--text) 7%, transparent); padding: 0 15px; }
+  .atom[data-k="m3"] .b.pri { background: var(--accent); color: var(--accent-ink); }
+  .atom[data-k="an"] .b { height: 31px; border-radius: 6px; }
+
+  /* selected nav item */
+  .atom[data-k="fl"] .pickrow { background: var(--accent-softer); font-weight: 600; }
+  .atom[data-k="fl"] .pickrow::before { content: ""; position: absolute; left: 2px; top: -8px; bottom: -8px; width: 3px; border-radius: 2px; background: var(--accent); }
+  .atom[data-k="fl"] .pickrow .ic { color: var(--accent-text); }
+  .atom[data-k="ap"] .pickrow { background: color-mix(in srgb, var(--text) 10%, transparent); font-weight: 500; }
+  .atom[data-k="ap"] .pickrow .ic { color: var(--accent-text); }
+  .atom[data-k="m3"] .pickrow { background: var(--accent-soft); border-radius: 999px; font-weight: 600; }
+  .atom[data-k="m3"] .pickrow .ic { color: var(--accent-text); }
+  .atom[data-k="an"] .pickrow { background: var(--accent-softer); color: var(--accent-text); font-weight: 500; }
+  .atom[data-k="an"] .pickrow .ic { color: var(--accent-text); }
+
+  /* ═══════════ comparison table ═══════════ */
+  .tablewrap { width: 100%; max-width: 1040px; margin-top: 4px; }
+  .tablewrap h2 { font-size: 13px; font-weight: 600; margin: 0 0 10px; color: var(--text-2); }
+  table.cmp { width: 100%; border-collapse: collapse; font-size: 11.5px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  table.cmp th, table.cmp td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.cmp th { font-weight: 600; color: var(--text-2); background: var(--bg-2); font-size: 11px; }
+  table.cmp tr:last-child td { border-bottom: 0; }
+  table.cmp td:first-child { color: var(--text-3); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Kestrel 界面风格设计稿</h1>
+  <div class="group">
+    <span>风格</span>
+    <button class="opt" data-set-style="fluent" aria-pressed="true">Fluent 2</button>
+    <button class="opt" data-set-style="apple" aria-pressed="false">Apple HIG</button>
+    <button class="opt" data-set-style="material" aria-pressed="false">Material 3</button>
+    <button class="opt" data-set-style="ant" aria-pressed="false">Ant Design</button>
+  </div>
+  <div class="group">
+    <span>主题</span>
+    <button class="opt" data-set-theme="light" aria-pressed="true">亮</button>
+    <button class="opt" data-set-theme="dark" aria-pressed="false">暗</button>
+  </div>
+  <div class="group">
+    <span>配色</span>
+    <button class="dot" data-set-accent="blue" style="background:#3b6be8" aria-pressed="true" title="蓝"></button>
+    <button class="dot" data-set-accent="teal" style="background:#12857a" aria-pressed="false" title="青"></button>
+    <button class="dot" data-set-accent="purple" style="background:#7a5cd6" aria-pressed="false" title="紫"></button>
+    <button class="dot" data-set-accent="graphite" style="background:#5b6472" aria-pressed="false" title="石墨"></button>
+  </div>
+  <div class="note">每套替换的是骨架，不只是圆角</div>
+</div>
+
+<div class="stage">
+
+  <!-- ═══════════════════════ FLUENT 2 ═══════════════════════ -->
+  <section class="case" data-s="fluent">
+    <div class="cap"><b>Fluent 2</b> — NavigationView（选中项 3px 竖条）· 面包屑 · 每行一张 SettingsCard，行高 60，左侧图标</div>
+    <div class="win fl shadow">
+      <div class="fl-title">
+        <div class="logo">K</div><div class="nm">Kestrel</div>
+        <div class="sp"></div><div class="wb">—</div><div class="wb">▢</div><div class="wb">✕</div>
+      </div>
+      <div class="fl-body">
+        <div class="fl-side">
+          <div class="grp">常规</div>
+          <div class="fl-nav"><span class="ic">◍</span><span>通用</span></div>
+          <div class="fl-nav"><span class="ic">⌘</span><span>快捷键</span></div>
+          <div class="fl-nav"><span class="ic">⌕</span><span>搜索与索引</span></div>
+          <div class="grp">外观</div>
+          <div class="fl-nav" data-on><span class="ic">◑</span><span>外观</span></div>
+          <div class="fl-nav"><span class="ic">▤</span><span>启动器</span></div>
+          <div class="grp">其他</div>
+          <div class="fl-nav"><span class="ic">↻</span><span>更新</span></div>
+          <div class="fl-nav"><span class="ic">ⓘ</span><span>关于</span></div>
+        </div>
+        <div class="fl-main">
+          <div class="fl-crumb"><span>设置</span><span class="sep">›</span><b>外观</b></div>
+
+          <div class="fl-sect">
+            <div class="gt">界面风格</div>
+            <div class="fl-card" style="display:block; padding:12px 14px;">
+              <div class="fl-picks">
+                <button class="pk" data-on><span class="th"></span><b>Fluent</b><span>竖条选中</span></button>
+                <button class="pk"><span class="th"></span><b>Apple</b><span>灰块选中</span></button>
+                <button class="pk"><span class="th"></span><b>Material</b><span>tonal 药丸</span></button>
+                <button class="pk"><span class="th"></span><b>Ant</b><span>浅底菜单</span></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-sect">
+            <div class="gt">外观</div>
+            <div class="fl-card">
+              <div class="ico">◐</div>
+              <div class="tx"><div class="lb">主题</div><div class="ds">跟随系统，或固定为亮色、暗色</div></div>
+              <div class="seg"><b>跟随系统</b><b data-on>亮色</b><b>暗色</b></div>
+            </div>
+            <div class="fl-card">
+              <div class="ico">◈</div>
+              <div class="tx"><div class="lb">配色方案</div><div class="ds">16 套，按色相排列</div></div>
+              <div class="pal">
+                <i data-on style="background:#3b6be8; color:#3b6be8"></i>
+                <i style="background:#12857a"></i><i style="background:#7a5cd6"></i>
+                <i style="background:#c2564b"></i><i style="background:#5b6472"></i><i style="background:#b0791f"></i>
+              </div>
+            </div>
+            <div class="fl-card">
+              <div class="ico">▤</div>
+              <div class="tx"><div class="lb">紧凑列表</div><div class="ds">缩小结果行高度，一屏显示更多</div></div>
+              <div class="sw" data-on></div>
+            </div>
+            <div class="fl-card">
+              <div class="ico">A</div>
+              <div class="tx"><div class="lb">字体缩放</div><div class="ds">只影响文字，不改变控件高度</div></div>
+              <div class="sld"><span class="tk"><i style="width:58%"></i><u style="left:58%"></u></span><span class="vl">100%</span></div>
+            </div>
+            <div class="fl-card">
+              <div class="ico">◍</div>
+              <div class="tx"><div class="lb">背景透明度</div><div class="ds">只调整背景，文字保持不透明</div></div>
+              <div class="sld"><span class="tk"><i style="width:82%"></i><u style="left:82%"></u></span><span class="vl">82%</span></div>
+            </div>
+            <div class="fl-card">
+              <div class="ico">⌘</div>
+              <div class="tx"><div class="lb">语言</div><div class="ds">界面文字语言</div></div>
+              <div class="seg"><b data-on>简体中文</b><b>English</b><b>日本語</b></div>
+            </div>
+            <div class="fl-card">
+              <div class="ico">⤢</div>
+              <div class="tx"><div class="lb">启动器尺寸</div><div class="ds">默认 780 × 540，可拖动边缘调整</div></div>
+              <div class="seg"><b data-on>默认</b><b>大</b><b>自定义</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fl-foot">
+        <span class="hint">设置实时保存</span>
+        <div class="sp"></div>
+        <button class="btn">恢复默认</button>
+        <button class="btn primary">完成</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ APPLE HIG ═══════════════════════ -->
+  <section class="case" data-s="apple">
+    <div class="cap"><b>Apple HIG</b> — 红黄绿灯 · 无边框侧栏（灰块选中）· 大标题 · inset grouped 列表：整组包在 12px 圆角容器内，行间发丝线左侧缩进</div>
+    <div class="win ap shadow">
+      <div class="ap-title">
+        <div class="ap-lights"><i></i><i></i><i></i></div>
+        <div class="nm">Kestrel</div>
+      </div>
+      <div class="ap-body">
+        <div class="ap-side">
+          <div class="grp">常规</div>
+          <div class="ap-nav"><span class="ic">◍</span><span>通用</span></div>
+          <div class="ap-nav"><span class="ic">⌘</span><span>快捷键</span></div>
+          <div class="ap-nav"><span class="ic">⌕</span><span>搜索与索引</span></div>
+          <div class="grp">外观</div>
+          <div class="ap-nav" data-on><span class="ic">◑</span><span>外观</span></div>
+          <div class="ap-nav"><span class="ic">▤</span><span>启动器</span></div>
+          <div class="grp">其他</div>
+          <div class="ap-nav"><span class="ic">↻</span><span>更新</span></div>
+          <div class="ap-nav"><span class="ic">ⓘ</span><span>关于</span></div>
+        </div>
+        <div class="ap-main">
+          <h1>外观</h1>
+          <p class="sub">界面风格、主题与配色互相独立，可以任意组合。</p>
+
+          <div class="ap-group">
+            <div class="gt">界面风格</div>
+            <div class="ap-row" style="display:block; padding:8px 18px 14px;">
+              <div class="ap-picks">
+                <button class="pk"><span class="th"></span><b>Fluent</b></button>
+                <button class="pk" data-on><span class="th"></span><b>Apple</b></button>
+                <button class="pk"><span class="th"></span><b>Material</b></button>
+                <button class="pk"><span class="th"></span><b>Ant</b></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ap-group">
+            <div class="gt">外观</div>
+            <div class="ap-row">
+              <div class="main"><div class="lb">主题</div><div class="ds">跟随系统，或固定为亮色、暗色</div></div>
+              <div class="seg"><b>跟随系统</b><b data-on>亮色</b><b>暗色</b></div>
+            </div>
+            <div class="ap-row">
+              <div class="main"><div class="lb">配色方案</div><div class="ds">16 套，按色相排列</div></div>
+              <div class="pal">
+                <i data-on style="background:#3b6be8; color:#3b6be8"></i>
+                <i style="background:#12857a"></i><i style="background:#7a5cd6"></i>
+                <i style="background:#c2564b"></i><i style="background:#5b6472"></i><i style="background:#b0791f"></i>
+              </div>
+            </div>
+            <div class="ap-row">
+              <div class="main"><div class="lb">紧凑列表</div><div class="ds">缩小结果行高度，一屏显示更多</div></div>
+              <div class="sw" data-on></div>
+            </div>
+            <div class="ap-row">
+              <div class="main"><div class="lb">字体缩放</div><div class="ds">只影响文字，不改变控件高度</div></div>
+              <div class="sld"><span class="tk"><i style="width:58%"></i><u style="left:58%"></u></span><span class="vl">100%</span></div>
+            </div>
+            <div class="ap-row">
+              <div class="main"><div class="lb">背景透明度</div><div class="ds">只调整背景，文字保持不透明</div></div>
+              <div class="sld"><span class="tk"><i style="width:82%"></i><u style="left:82%"></u></span><span class="vl">82%</span></div>
+            </div>
+            <div class="ap-row">
+              <div class="main"><div class="lb">语言</div><div class="ds">界面文字语言</div></div>
+              <div class="seg"><b data-on>简体中文</b><b>English</b><b>日本語</b></div>
+            </div>
+            <div class="ap-row">
+              <div class="main"><div class="lb">启动器尺寸</div><div class="ds">默认 780 × 540，可拖动边缘调整</div></div>
+              <div class="seg"><b data-on>默认</b><b>大</b><b>自定义</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ MATERIAL 3 ═══════════════════════ -->
+  <section class="case" data-s="material">
+    <div class="cap"><b>Material 3</b> — 顶栏 + 88px 图标导航栏（tonal 药丸）· 表面色分层卡片（无边框无阴影）· 大写卡片标签 · FAB 保存</div>
+    <div class="win m3 shadow">
+      <div class="m3-bar"><div class="mi">☰</div><h1>设置</h1></div>
+      <div class="m3-body">
+        <div class="m3-rail">
+          <div class="m3-it"><span class="ic">◍</span><span class="lb">通用</span></div>
+          <div class="m3-it"><span class="ic">⌘</span><span class="lb">快捷键</span></div>
+          <div class="m3-it"><span class="ic">⌕</span><span class="lb">搜索</span></div>
+          <div class="m3-it" data-on><span class="ic">◑</span><span class="lb">外观</span></div>
+          <div class="m3-it"><span class="ic">▤</span><span class="lb">启动器</span></div>
+          <div class="m3-it"><span class="ic">↻</span><span class="lb">更新</span></div>
+          <div class="m3-it"><span class="ic">ⓘ</span><span class="lb">关于</span></div>
+        </div>
+        <div class="m3-main">
+          <div class="m3-card">
+            <div class="ct">界面风格</div>
+            <div class="m3-row" style="display:block; padding:4px 16px 10px;">
+              <div class="m3-picks">
+                <button class="pk"><span class="th"></span><b>Fluent</b></button>
+                <button class="pk"><span class="th"></span><b>Apple</b></button>
+                <button class="pk" data-on><span class="th"></span><b>Material</b></button>
+                <button class="pk"><span class="th"></span><b>Ant</b></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="m3-card">
+            <div class="ct">外观</div>
+            <div class="m3-row">
+              <div class="main"><div class="lb">主题</div><div class="ds">跟随系统，或固定为亮色、暗色</div></div>
+              <div class="seg"><b>跟随系统</b><b data-on>亮色</b><b>暗色</b></div>
+            </div>
+            <div class="m3-row">
+              <div class="main"><div class="lb">配色方案</div><div class="ds">16 套，按色相排列</div></div>
+              <div class="pal">
+                <i data-on style="background:#3b6be8; color:#3b6be8"></i>
+                <i style="background:#12857a"></i><i style="background:#7a5cd6"></i>
+                <i style="background:#c2564b"></i><i style="background:#5b6472"></i><i style="background:#b0791f"></i>
+              </div>
+            </div>
+            <div class="m3-row">
+              <div class="main"><div class="lb">紧凑列表</div><div class="ds">缩小结果行高度，一屏显示更多</div></div>
+              <div class="sw" data-on></div>
+            </div>
+            <div class="m3-row">
+              <div class="main"><div class="lb">字体缩放</div><div class="ds">只影响文字，不改变控件高度</div></div>
+              <div class="sld"><span class="tk"><i style="width:58%"></i><u style="left:58%"></u></span><span class="vl">100%</span></div>
+            </div>
+            <div class="m3-row">
+              <div class="main"><div class="lb">背景透明度</div><div class="ds">只调整背景，文字保持不透明</div></div>
+              <div class="sld"><span class="tk"><i style="width:82%"></i><u style="left:82%"></u></span><span class="vl">82%</span></div>
+            </div>
+            <div class="m3-row">
+              <div class="main"><div class="lb">语言</div><div class="ds">界面文字语言</div></div>
+              <div class="seg"><b data-on>简体中文</b><b>English</b><b>日本語</b></div>
+            </div>
+            <div class="m3-row">
+              <div class="main"><div class="lb">启动器尺寸</div><div class="ds">默认 780 × 540，可拖动边缘调整</div></div>
+              <div class="seg"><b data-on>默认</b><b>大</b><b>自定义</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="m3-fab">✓</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ ANT DESIGN ═══════════════════════ -->
+  <section class="case" data-s="ant">
+    <div class="cap"><b>Ant Design</b> — 页头面包屑 + 标题 + 操作按钮 · 菜单（浅底 + 强调色文字）· 单张卡片，卡头分隔线，44px 行距，行间 1px</div>
+    <div class="win an shadow">
+      <div class="an-head">
+        <div class="an-crumb"><span>设置</span><span>/</span><b>外观</b></div>
+        <div class="an-title">
+          <h1>外观</h1>
+          <div class="acts">
+            <button class="btn">恢复默认</button>
+            <button class="btn primary">保存</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+      </div>
+      <div class="an-body">
+        <div class="an-menu">
+          <div class="grp">常规</div>
+          <div class="an-item"><span class="ic">◍</span><span>通用</span></div>
+          <div class="an-item"><span class="ic">⌘</span><span>快捷键</span></div>
+          <div class="an-item"><span class="ic">⌕</span><span>搜索与索引</span></div>
+          <div class="grp">外观</div>
+          <div class="an-item" data-on><span class="ic">◑</span><span>外观</span></div>
+          <div class="an-item"><span class="ic">▤</span><span>启动器</span></div>
+          <div class="grp">其他</div>
+          <div class="an-item"><span class="ic">↻</span><span>更新</span></div>
+          <div class="an-item"><span class="ic">ⓘ</span><span>关于</span></div>
+        </div>
+        <div class="an-main">
+          <div class="an-card">
+            <div class="ch"><span>界面风格</span><span class="more">切换后立即生效</span></div>
+            <div class="an-row" style="display:block; padding:8px 16px 12px;">
+              <div class="an-picks">
+                <button class="pk"><span class="th"></span><b>Fluent</b></button>
+                <button class="pk"><span class="th"></span><b>Apple</b></button>
+                <button class="pk"><span class="th"></span><b>Material</b></button>
+                <button class="pk" data-on><span class="th"></span><b>Ant</b></button>
+              </div>
+            </div>
+            <div class="an-sub">外观设置</div>
+            <div class="an-row">
+              <div class="main"><div class="lb">主题</div><div class="ds">跟随系统，或固定为亮色、暗色</div></div>
+              <div class="seg"><b>跟随系统</b><b data-on>亮色</b><b>暗色</b></div>
+            </div>
+            <div class="an-row">
+              <div class="main"><div class="lb">配色方案</div><div class="ds">16 套，按色相排列</div></div>
+              <div class="pal">
+                <i data-on style="background:#3b6be8; color:#3b6be8"></i>
+                <i style="background:#12857a"></i><i style="background:#7a5cd6"></i>
+                <i style="background:#c2564b"></i><i style="background:#5b6472"></i><i style="background:#b0791f"></i>
+              </div>
+            </div>
+            <div class="an-row">
+              <div class="main"><div class="lb">紧凑列表</div><div class="ds">缩小结果行高度，一屏显示更多</div></div>
+              <div class="sw" data-on></div>
+            </div>
+            <div class="an-row">
+              <div class="main"><div class="lb">字体缩放</div><div class="ds">只影响文字，不改变控件高度</div></div>
+              <div class="sld"><span class="tk"><i style="width:58%"></i><u style="left:58%"></u></span><span class="vl">100%</span></div>
+            </div>
+            <div class="an-row">
+              <div class="main"><div class="lb">背景透明度</div><div class="ds">只调整背景，文字保持不透明</div></div>
+              <div class="sld"><span class="tk"><i style="width:82%"></i><u style="left:82%"></u></span><span class="vl">82%</span></div>
+            </div>
+            <div class="an-row">
+              <div class="main"><div class="lb">语言</div><div class="ds">界面文字语言</div></div>
+              <div class="seg"><b data-on>简体中文</b><b>English</b><b>日本語</b></div>
+            </div>
+            <div class="an-row">
+              <div class="main"><div class="lb">启动器尺寸</div><div class="ds">默认 780 × 540，可拖动边缘调整</div></div>
+              <div class="seg"><b data-on>默认</b><b>大</b><b>自定义</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ FLUENT launcher ═══════════════════════ -->
+  <section class="case" data-s="fluent">
+    <div class="cap"><b>Fluent 2 · 启动器</b> — 通栏搜索栏 48 · 行高 44 · 选中项左侧 3px 竖条 · 预览区用 1px 竖线分隔</div>
+    <div class="win lpf lp shadow">
+      <div class="bar">
+        <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+        <div class="q">run<i></i></div>
+        <span class="esc">Esc</span>
+      </div>
+      <div class="body">
+        <div class="list">
+          <div class="res" data-on><div class="ic">&gt;</div><div class="tx"><div class="nm">run</div><div class="pt">C:\Windows\System32\run.exe</div></div><div class="kd">命令</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">Runbook.md</div><div class="pt">D:\Notes\ops\Runbook.md</div></div><div class="kd">今天</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">runtime.json</div><div class="pt">C:\Projects\kestrel\src\runtime.json</div></div><div class="kd">昨天</div></div>
+          <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Run</div><div class="pt">系统「运行」对话框</div></div><div class="kd">命令</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">run_tests.ps1</div><div class="pt">C:\Projects\kestrel\scripts\run_tests.ps1</div></div><div class="kd">上周</div></div>
+          <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Runbook 模板</div><div class="pt">粘贴到当前窗口</div></div><div class="kd">片段</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">settings.json</div><div class="pt">C:\Users\someone\AppData\Roaming\kestrel\settings.json</div></div><div class="kd">本周</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">install.ps1</div><div class="pt">C:\Projects\kestrel\scripts\install.ps1</div></div><div class="kd">上周</div></div>
+          <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Kestrel 更新日志</div><div class="pt">阅读 1.2.29 的变更</div></div><div class="kd">片段</div></div>
+        </div>
+        <div class="prev">
+          <div class="pico">&gt;</div>
+          <div class="pn">run</div>
+          <div class="pp">C:\Windows\System32\run.exe</div>
+          <div class="kvs">
+            <div class="kv"><span>类型</span><b>命令行</b></div>
+            <div class="kv"><span>权限</span><b>普通</b></div>
+            <div class="kv"><span>历史</span><b>与 Win+R 共用</b></div>
+            <div class="kv"><span>提权</span><b>Ctrl+Shift+↵</b></div>
+          </div>
+          <div class="acts"><button class="btn primary">运行</button><button class="btn">提权</button></div>
+        </div>
+      </div>
+      <div class="foot"><span>↑↓ 选择</span><span>↵ 运行</span><span>Tab 操作</span><div class="sp"></div><span>6 个结果</span></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ APPLE launcher ═══════════════════════ -->
+  <section class="case" data-s="apple">
+    <div class="cap"><b>Apple HIG · 启动器</b> — Spotlight 形态：居中窄面板、无边框、20px 大输入框 · 行高 50，选中是实色整行圆角块</div>
+    <div class="lpa-wrap">
+      <div class="win lpa lp shadow">
+        <div class="bar">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <div class="q">run<i></i></div>
+          <span class="esc">esc</span>
+        </div>
+        <div class="body">
+          <div class="list">
+            <div class="res" data-on><div class="ic">&gt;</div><div class="tx"><div class="nm">run</div><div class="pt">C:\Windows\System32\run.exe</div></div><div class="kd">命令</div></div>
+            <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">Runbook.md</div><div class="pt">D:\Notes\ops\Runbook.md</div></div><div class="kd">今天</div></div>
+            <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">runtime.json</div><div class="pt">C:\Projects\kestrel\src\runtime.json</div></div><div class="kd">昨天</div></div>
+            <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Run</div><div class="pt">系统「运行」对话框</div></div><div class="kd">命令</div></div>
+            <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">run_tests.ps1</div><div class="pt">C:\Projects\kestrel\scripts\run_tests.ps1</div></div><div class="kd">上周</div></div>
+            <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Runbook 模板</div><div class="pt">粘贴到当前窗口</div></div><div class="kd">片段</div></div>
+            <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">settings.json</div><div class="pt">C:\Users\someone\AppData\Roaming\kestrel\settings.json</div></div><div class="kd">本周</div></div>
+            <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">install.ps1</div><div class="pt">C:\Projects\kestrel\scripts\install.ps1</div></div><div class="kd">上周</div></div>
+          </div>
+          <div class="prev">
+            <div class="pico">&gt;</div>
+            <div class="pn">run</div>
+            <div class="pp">C:\Windows\System32\run.exe</div>
+            <div class="kvs">
+              <div class="kv"><span>类型</span><b>命令行</b></div>
+              <div class="kv"><span>权限</span><b>普通</b></div>
+              <div class="kv"><span>历史</span><b>与 Win+R 共用</b></div>
+              <div class="kv"><span>提权</span><b>Ctrl+Shift+↵</b></div>
+            </div>
+            <div class="acts"><button class="btn primary">运行</button><button class="btn">提权</button></div>
+          </div>
+        </div>
+        <div class="foot"><span>↑↓ 选择</span><span>↵ 运行</span><span>⌘K 操作</span><div class="sp"></div><span>6 个结果</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ MATERIAL launcher ═══════════════════════ -->
+  <section class="case" data-s="material">
+    <div class="cap"><b>Material 3 · 启动器</b> — 独立药丸搜索栏（surfaceContainerHigh）· 行高 48，选中是 tonal 药丸 · 预览做成 filled 卡片</div>
+    <div class="win lpm lp shadow">
+      <div class="bar">
+        <div class="field">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <div class="q">run<i></i></div>
+          <span class="esc">esc</span>
+        </div>
+      </div>
+      <div class="body">
+        <div class="list">
+          <div class="res" data-on><div class="ic">&gt;</div><div class="tx"><div class="nm">run</div><div class="pt">C:\Windows\System32\run.exe</div></div><div class="kd">命令</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">Runbook.md</div><div class="pt">D:\Notes\ops\Runbook.md</div></div><div class="kd">今天</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">runtime.json</div><div class="pt">C:\Projects\kestrel\src\runtime.json</div></div><div class="kd">昨天</div></div>
+          <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Run</div><div class="pt">系统「运行」对话框</div></div><div class="kd">命令</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">run_tests.ps1</div><div class="pt">C:\Projects\kestrel\scripts\run_tests.ps1</div></div><div class="kd">上周</div></div>
+          <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Runbook 模板</div><div class="pt">粘贴到当前窗口</div></div><div class="kd">片段</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">settings.json</div><div class="pt">C:\Users\someone\AppData\Roaming\kestrel\settings.json</div></div><div class="kd">本周</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">install.ps1</div><div class="pt">C:\Projects\kestrel\scripts\install.ps1</div></div><div class="kd">上周</div></div>
+        </div>
+        <div class="prev">
+          <div class="pico">&gt;</div>
+          <div class="pn">run</div>
+          <div class="pp">C:\Windows\System32\run.exe</div>
+          <div class="kvs">
+            <div class="kv"><span>类型</span><b>命令行</b></div>
+            <div class="kv"><span>权限</span><b>普通</b></div>
+            <div class="kv"><span>历史</span><b>与 Win+R 共用</b></div>
+            <div class="kv"><span>提权</span><b>Ctrl+Shift+↵</b></div>
+          </div>
+          <div class="acts"><button class="btn primary">运行</button><button class="btn">提权</button></div>
+        </div>
+      </div>
+      <div class="foot"><span>↑↓ 选择</span><span>↵ 运行</span><span>Tab 操作</span><div class="sp"></div><span>6 个结果</span></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ ANT launcher ═══════════════════════ -->
+  <section class="case" data-s="ant">
+    <div class="cap"><b>Ant Design · 启动器</b> — 带边框的 36px 搜索框 · 行高 38、行间 1px 分隔线 · 选中浅底 · 预览用虚线分隔</div>
+    <div class="win lan lp shadow">
+      <div class="bar">
+        <div class="field">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <div class="q">run<i></i></div>
+          <span class="esc">Esc</span>
+        </div>
+      </div>
+      <div class="body">
+        <div class="list">
+          <div class="res" data-on><div class="ic">&gt;</div><div class="tx"><div class="nm">run</div><div class="pt">C:\Windows\System32\run.exe</div></div><div class="kd">命令</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">Runbook.md</div><div class="pt">D:\Notes\ops\Runbook.md</div></div><div class="kd">今天</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">runtime.json</div><div class="pt">C:\Projects\kestrel\src\runtime.json</div></div><div class="kd">昨天</div></div>
+          <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Run</div><div class="pt">系统「运行」对话框</div></div><div class="kd">命令</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">run_tests.ps1</div><div class="pt">C:\Projects\kestrel\scripts\run_tests.ps1</div></div><div class="kd">上周</div></div>
+          <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Runbook 模板</div><div class="pt">粘贴到当前窗口</div></div><div class="kd">片段</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">settings.json</div><div class="pt">C:\Users\someone\AppData\Roaming\kestrel\settings.json</div></div><div class="kd">本周</div></div>
+          <div class="res"><div class="ic">▣</div><div class="tx"><div class="nm">install.ps1</div><div class="pt">C:\Projects\kestrel\scripts\install.ps1</div></div><div class="kd">上周</div></div>
+          <div class="res"><div class="ic">◈</div><div class="tx"><div class="nm">Kestrel 更新日志</div><div class="pt">阅读 1.2.29 的变更</div></div><div class="kd">片段</div></div>
+        </div>
+        <div class="prev">
+          <div class="pico">&gt;</div>
+          <div class="pn">run</div>
+          <div class="pp">C:\Windows\System32\run.exe</div>
+          <div class="kvs">
+            <div class="kv"><span>类型</span><b>命令行</b></div>
+            <div class="kv"><span>权限</span><b>普通</b></div>
+            <div class="kv"><span>历史</span><b>与 Win+R 共用</b></div>
+            <div class="kv"><span>提权</span><b>Ctrl+Shift+↵</b></div>
+          </div>
+          <div class="acts"><button class="btn primary">运行</button><button class="btn">提权</button></div>
+        </div>
+      </div>
+      <div class="foot"><span>↑↓ 选择</span><span>↵ 运行</span><span>Tab 操作</span><div class="sp"></div><span>共 6 条</span></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ QUICK SWITCH · FLUENT ═══════════════════════ -->
+  <section class="case qscase" data-s="fluent">
+    <div class="cap"><b>Fluent 2 · 快速切换</b> — 独立窗口，宽度取文件对话框的 2/3（560），贴在下方 6px；搜索栏 48 与启动器同构，行高 44，选中左侧 3px 竖条</div>
+    <div class="qsctx">
+      <div class="qsdlg"><b>另存为</b><span>文件名：报表.xlsx　·　当前位置 D:\设计素材\2026</span></div>
+      <div class="qsgap"></div>
+      <div class="qsbox qsf shadow">
+        <div class="qhead">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <div class="q">D:\设计素材\2026<i></i></div>
+          <span class="qtag">⇥ 快速切换</span>
+        </div>
+        <div class="qloc"><span>D:\设计素材\2026</span></div>
+        <div class="qhead2">最近访问的目录</div>
+        <div class="qdir" data-on><span class="dico">▤</span><span class="dtx"><span class="dn">2026</span><span class="dp">D:\设计素材\2026</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qdir"><span class="dico">▤</span><span class="dtx"><span class="dn">2025</span><span class="dp">D:\设计素材\2025</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qdir"><span class="dico">▤</span><span class="dtx"><span class="dn">品牌资料</span><span class="dp">D:\共享\品牌资料</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qfoot"><span>↑↓ 选择</span><span>↵ 跳转</span><div class="sp"></div><span>3 个目录</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ QUICK SWITCH · APPLE ═══════════════════════ -->
+  <section class="case qscase" data-s="apple">
+    <div class="cap"><b>Apple HIG · 快速切换</b> — 窗口本身是卡片，无边框无分隔线；19px 大输入，行高 48，选中是内缩圆角灰块（inset rounded）</div>
+    <div class="qsctx">
+      <div class="qsdlg"><b>另存为</b><span>文件名：报表.xlsx　·　当前位置 D:\设计素材\2026</span></div>
+      <div class="qsgap"></div>
+      <div class="qsbox qsa shadow">
+        <div class="qhead">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <div class="q">D:\设计素材\2026<i></i></div>
+          <span class="qtag">⇥ 快速切换</span>
+        </div>
+        <div class="qloc"><span>D:\设计素材\2026</span></div>
+        <div class="qhead2">最近访问的目录</div>
+        <div class="qdir" data-on><span class="dico">▤</span><span class="dtx"><span class="dn">2026</span><span class="dp">D:\设计素材\2026</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qdir"><span class="dico">▤</span><span class="dtx"><span class="dn">2025</span><span class="dp">D:\设计素材\2025</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qdir"><span class="dico">▤</span><span class="dtx"><span class="dn">品牌资料</span><span class="dp">D:\共享\品牌资料</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qfoot"><span>↑↓ 选择</span><span>↵ 跳转</span><div class="sp"></div><span>3 个目录</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ QUICK SWITCH · MATERIAL ═══════════════════════ -->
+  <section class="case qscase" data-s="material">
+    <div class="cap"><b>Material 3 · 快速切换</b> — 药丸搜索栏浮在列表上方，与列表分离；行高 46，选中是 tonal 药丸；圆角 20 与背景分离</div>
+    <div class="qsctx">
+      <div class="qsdlg"><b>另存为</b><span>文件名：报表.xlsx　·　当前位置 D:\设计素材\2026</span></div>
+      <div class="qsgap"></div>
+      <div class="qsbox qsm shadow">
+        <div class="qhead">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <div class="q">D:\设计素材\2026<i></i></div>
+          <span class="qtag">⇥ 快速切换</span>
+        </div>
+        <div class="qloc"><span>D:\设计素材\2026</span></div>
+        <div class="qhead2">最近访问的目录</div>
+        <div class="qdir" data-on><span class="dico">▤</span><span class="dtx"><span class="dn">2026</span><span class="dp">D:\设计素材\2026</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qdir"><span class="dico">▤</span><span class="dtx"><span class="dn">2025</span><span class="dp">D:\设计素材\2025</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qdir"><span class="dico">▤</span><span class="dtx"><span class="dn">品牌资料</span><span class="dp">D:\共享\品牌资料</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qfoot"><span>↑↓ 选择</span><span>↵ 跳转</span><div class="sp"></div><span>3 个目录</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ QUICK SWITCH · ANT ═══════════════════════ -->
+  <section class="case qscase" data-s="ant">
+    <div class="cap"><b>Ant Design · 快速切换</b> — 带边框的 32px 输入框，路径行与每个目录行都有 1px 分隔线，行高 40，紧凑优先</div>
+    <div class="qsctx">
+      <div class="qsdlg"><b>另存为</b><span>文件名：报表.xlsx　·　当前位置 D:\设计素材\2026</span></div>
+      <div class="qsgap"></div>
+      <div class="qsbox qsn shadow">
+        <div class="qhead">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <div class="q">D:\设计素材\2026<i></i></div>
+          <span class="qtag">⇥ 快速切换</span>
+        </div>
+        <div class="qloc"><span>D:\设计素材\2026</span></div>
+        <div class="qhead2">最近访问的目录</div>
+        <div class="qdir" data-on><span class="dico">▤</span><span class="dtx"><span class="dn">2026</span><span class="dp">D:\设计素材\2026</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qdir"><span class="dico">▤</span><span class="dtx"><span class="dn">2025</span><span class="dp">D:\设计素材\2025</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qdir"><span class="dico">▤</span><span class="dtx"><span class="dn">品牌资料</span><span class="dp">D:\共享\品牌资料</span></span><span class="qkey">↵ 跳转</span></div>
+        <div class="qfoot"><span>↑↓ 选择</span><span>↵ 跳转</span><div class="sp"></div><span>3 个目录</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ same component, four forms ═══════════ -->
+  <div class="tablewrap">
+    <h2>同一个组件，四种形态</h2>
+    <div class="atoms">
+
+      <div class="atom" data-k="fl">
+        <h3>Fluent 2</h3>
+        <span class="lab">搜索栏 · 形态本身就是标识</span>
+        <div class="sbar">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <span class="q">run<i></i></span>
+          <span class="k">Esc</span>
+        </div>
+        <span class="lab">开关 · 细杆、深色轨道</span>
+        <div class="line"><span class="sw" data-on></span><span class="sw"></span></div>
+        <span class="lab">按钮 · 4 圆角、1px 描边</span>
+        <div class="line"><span class="b pri">运行</span><span class="b">提权</span></div>
+        <span class="lab">选中项 · 竖条 + 淡底</span>
+        <div class="pickrow"><span class="ic">◑</span><span>外观</span></div>
+      </div>
+
+      <div class="atom" data-k="ap">
+        <h3>Apple HIG</h3>
+        <span class="lab">搜索栏 · 形态本身就是标识</span>
+        <div class="sbar">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <span class="q">run<i></i></span>
+          <span class="k">esc</span>
+        </div>
+        <span class="lab">开关 · iOS 比例、无边框</span>
+        <div class="line"><span class="sw" data-on></span><span class="sw"></span></div>
+        <span class="lab">按钮 · 药丸、无描边</span>
+        <div class="line"><span class="b pri">运行</span><span class="b">提权</span></div>
+        <span class="lab">选中项 · 灰块</span>
+        <div class="pickrow"><span class="ic">◑</span><span>外观</span></div>
+      </div>
+
+      <div class="atom" data-k="m3">
+        <h3>Material 3</h3>
+        <span class="lab">搜索栏 · 形态本身就是标识</span>
+        <div class="sbar">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <span class="q">run<i></i></span>
+          <span class="k"></span>
+        </div>
+        <span class="lab">开关 · 粗轨道、大圆点</span>
+        <div class="line"><span class="sw" data-on></span><span class="sw"></span></div>
+        <span class="lab">按钮 · 全圆、无描边</span>
+        <div class="line"><span class="b pri">运行</span><span class="b">提权</span></div>
+        <span class="lab">选中项 · tonal 药丸</span>
+        <div class="pickrow"><span class="ic">◑</span><span>外观</span></div>
+      </div>
+
+      <div class="atom" data-k="an">
+        <h3>Ant Design</h3>
+        <span class="lab">搜索栏 · 形态本身就是标识</span>
+        <div class="sbar">
+          <svg class="mag" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.4 12.4L16 16" stroke-linecap="round"/></svg>
+          <span class="q">run<i></i></span>
+          <span class="k">Esc</span>
+        </div>
+        <span class="lab">开关 · 大尺寸、方肩</span>
+        <div class="line"><span class="sw" data-on></span><span class="sw"></span></div>
+        <span class="lab">按钮 · 6 圆角、1px 描边</span>
+        <div class="line"><span class="b pri">运行</span><span class="b">提权</span></div>
+        <span class="lab">选中项 · 浅底 + 强调色文字</span>
+        <div class="pickrow"><span class="ic">◑</span><span>外观</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════ structural comparison ═══════════ -->
+  <div class="tablewrap">
+    <h2>骨架级差异（这些才是四套规范的分水岭，不是圆角）</h2>
+    <table class="cmp">
+      <tr><th style="width:104px">骨架</th><th>Fluent 2</th><th>Apple HIG</th><th>Material 3</th><th>Ant Design</th></tr>
+      <tr><td>窗口</td><td>标题栏 + 面包屑，8 圆角</td><td>红黄绿灯，10 圆角，无面包屑</td><td>顶栏 + 24 圆角</td><td>页头（面包屑+标题+按钮），8 圆角</td></tr>
+      <tr><td>导航</td><td>240px 侧栏，竖条 + 浅底，文字 13</td><td>232px 无边框侧栏，灰块选中，图标带色</td><td>88px 图标栏，tonal 药丸</td><td>208px 菜单，浅底 + 强调色文字，40 行高</td></tr>
+      <tr><td>内容组织</td><td>每行一张独立卡片，60 高，左图标</td><td>inset group：整组一个 12 圆角容器，发丝线左缩进 18</td><td>表面色分层卡片，大写标签 10.5</td><td>单张卡片 + 卡头分隔线，组标题在卡内</td></tr>
+      <tr><td>行高</td><td>60</td><td>50</td><td>54</td><td>44</td></tr>
+      <tr><td>层级表达</td><td>1px 描边</td><td>阴影 + 0.5px 细边（暗色换实底）</td><td>表面色明度阶梯，无边框</td><td>1px 边框 + 行分隔线</td></tr>
+      <tr><td>控件</td><td>32×4 圆角；开关 40×20 细杆</td><td>26 高分组按钮；iOS 开关 36×21</td><td>药丸分组；M3 开关 46×26 大圆点</td><td>30×6；开关 36×20</td></tr>
+      <tr><td>标志元素</td><td>Mica 标题栏、竖条、面包屑</td><td>大标题 26/700、发丝线、实色选中药丸</td><td>FAB、state layer、tonal 药丸</td><td>蓝色主色、卡头、密集分隔线</td></tr>
+      <tr><td>启动器</td><td>通栏 48 搜索，行 44，竖条</td><td>Spotlight：居中 700 面板，20px 输入，行 50 实底</td><td>药丸搜索，行 48 tonal 药丸，预览是 filled 卡</td><td>36 边框搜索框，行 38 分隔线，虚线预览</td></tr>
+      <tr><td>快速切换</td><td>560 短宽窗；48 搜索栏带 1px 分隔；路径 28 + 分区头 28；行 44，竖条</td><td>同宽；58 大输入、无任何分隔线；行 48，选中是内缩圆角灰块</td><td>同宽；药丸搜索浮在列表上方；行 46，tonal 药丸；圆角 20</td><td>同宽；32 边框输入；路径与每行都有 1px 分隔；行 40</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  const set = (attr, val) => {
+    document.documentElement.setAttribute(attr, val);
+    document.querySelectorAll('[data-set-' + attr.replace('data-', '') + ']').forEach(b => {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-set-' + attr.replace('data-', '')) === val));
+    });
+  };
+  document.querySelectorAll('[data-set-style]').forEach(b =>
+    b.addEventListener('click', () => set('data-style', b.dataset.setStyle)));
+  document.querySelectorAll('[data-set-theme]').forEach(b =>
+    b.addEventListener('click', () => set('data-theme', b.dataset.setTheme)));
+  document.querySelectorAll('[data-set-accent]').forEach(b =>
+    b.addEventListener('click', () => set('data-accent', b.dataset.setAccent)));
+
+  // URL entry: ?style=apple&theme=dark&accent=teal&only=qs
+  const q = new URLSearchParams(location.search);
+  if (q.get('style')) set('data-style', q.get('style'));
+  if (q.get('theme')) set('data-theme', q.get('theme'));
+  if (q.get('accent')) set('data-accent', q.get('accent'));
+  if (q.get('only')) document.documentElement.setAttribute('data-only', q.get('only'));
+</script>
+</body>
+</html>
